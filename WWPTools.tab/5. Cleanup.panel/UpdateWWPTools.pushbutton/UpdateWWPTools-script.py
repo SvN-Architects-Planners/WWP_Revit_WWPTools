@@ -391,6 +391,41 @@ def _standby_log_path(repo_root, pid):
         log_dir = tempfile.gettempdir()
     return os.path.normpath(os.path.join(log_dir, "wwptools_update_{}.log".format(pid)))
 
+
+def _manual_batch_path(repo_root, pid):
+    base_dir = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    scripts_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "UpdateScripts"))
+    try:
+        if not os.path.isdir(scripts_dir):
+            os.makedirs(scripts_dir)
+    except Exception:
+        scripts_dir = tempfile.gettempdir()
+    return os.path.normpath(os.path.join(scripts_dir, "wwptools_manual_update_{}.bat".format(pid)))
+
+
+def _write_manual_update_batch(repo_root, batch_path):
+    safe_root = os.path.normpath(repo_root)
+    lines = [
+        "@echo off",
+        "echo Manual WWPTools updater",
+        "echo Repo: {}".format(safe_root),
+        "",
+        "git -C \"{}\" fetch origin {} 2>&1".format(safe_root, TARGET_BRANCH),
+        "if errorlevel 1 (echo Fetch failed & pause & exit /b 1)",
+        "git -C \"{}\" reset --hard origin/{} 2>&1".format(safe_root, TARGET_BRANCH),
+        "if errorlevel 1 (echo Reset failed & pause & exit /b 1)",
+        "git -C \"{}\" clean -ffdx 2>&1".format(safe_root),
+        "if errorlevel 1 (echo Clean failed & pause & exit /b 1)",
+        "echo Update completed successfully.",
+        "pause",
+    ]
+    try:
+        with open(batch_path, "w") as f:
+            f.write("\r\n".join(lines) + "\r\n")
+        return True
+    except Exception:
+        return False
+
 def _schedule_update_on_revit_exit(repo_root, installed_label=None):
     """
     Spawn a detached cmd process that waits until Revit fully closes,
@@ -477,9 +512,31 @@ def _start_standby_update(repo_root, reason, installed_label=None):
             "You can reopen Revit after the update finishes.".format(reason)
         )
         # Try to show a non-blocking external message so the dialog doesn't prevent closing Revit
-        if not _launch_powershell_message(TITLE, notice):
-            # Fallback to modal alert if external launch fails
+        launched = _launch_powershell_message(TITLE, notice)
+        if not launched:
             _alert(notice, TITLE)
+
+        # Offer to create a manual updater batch file the user can run later
+        try:
+            create_manual = _confirm(
+                "Create a manual updater batch file you can run later?",
+                TITLE,
+            )
+        except Exception:
+            create_manual = False
+
+        if create_manual:
+            pid = os.getpid()
+            batch_path = _manual_batch_path(repo_root, pid)
+            if _write_manual_update_batch(repo_root, batch_path):
+                try:
+                    # Open containing folder and select the batch file
+                    subprocess.Popen(["explorer", "/select,{}".format(batch_path)])
+                except Exception:
+                    try:
+                        os.startfile(os.path.dirname(batch_path))
+                    except Exception:
+                        _alert("Manual update batch created at: {}".format(batch_path), TITLE)
     else:
         _alert(
             "Could not start the standby updater.\n\n"
