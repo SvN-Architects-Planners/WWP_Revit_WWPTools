@@ -114,6 +114,27 @@ def _launch_powershell_message(title, message):
         return False
 
 
+def _powershell_toast_command(title, message, appid="WWP Architects + Planners"):
+    """Return a PowerShell command string that shows a Windows toast notification.
+    Falls back to a MessageBox if toast APIs are unavailable.
+    """
+    safe_title = (title or "").replace("'", "''")
+    safe_message = (message or "").replace("'", "''")
+    safe_appid = (appid or "").replace("'", "''")
+
+    # Use Windows.UI.Notifications via WinRT if available, else fallback to MessageBox
+    cmd = (
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"try {{ "
+        "Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction Stop; "
+        "$xml = '<toast><visual><binding template=\'ToastGeneric\'><text>{title}</text><text>{msg}</text></binding></visual></toast>'; "
+        "$doc = New-Object Windows.Data.Xml.Dom.XmlDocument; $doc.LoadXml($xml); "
+        "$toast = [Windows.UI.Notifications.ToastNotification]::new($doc); "
+        "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{appid}'); $notifier.Show($toast); "
+        "}} catch {{ try {{ Add-Type -AssemblyName PresentationFramework -ErrorAction SilentlyContinue; [System.Windows.MessageBox]::Show('{msg}', '{title}') }} catch {{}} }}\""
+    ).format(title=safe_title, msg=safe_message, appid=safe_appid)
+    return cmd
+
+
 def _extension_root():
     return os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
 
@@ -366,22 +387,18 @@ def _schedule_update_on_revit_exit(repo_root, installed_label=None):
     safe_root = os.path.normpath(repo_root)
     log_path = _standby_log_path(repo_root, pid)
 
-    start_notice = _powershell_message_command(
+    start_notice = _powershell_toast_command(
         TITLE,
-        "Revit has closed. WWPTools update is now running in the background. "
-        "You will get a completion message when it finishes.",
+        "Revit has closed. WWPTools update is now running in the background. You will get a completion message when it finishes.",
     )
     installed_text = installed_label or "the latest available version"
-    success_notice = _powershell_message_command(
+    success_notice = _powershell_toast_command(
         TITLE,
-        "WWPTools update finished successfully to {}. You can reopen Revit now.\n\n"
-        "Update finished successfully after Revit closed.\n\n"
-        "Log file:\n{}".format(installed_text, log_path),
+        "WWPTools update finished successfully to {}. Update finished after Revit closed.\n\nLog file:\n{}".format(installed_text, log_path),
     )
-    failed_notice = _powershell_message_command(
+    failed_notice = _powershell_toast_command(
         TITLE,
-        "WWPTools update failed after Revit closed.\n\n"
-        "Check the update log for details:\n{}".format(log_path),
+        "WWPTools update failed after Revit closed.\n\nCheck the update log for details:\n{}".format(log_path),
     )
 
     # Batch script: poll until all Revit processes are gone, then mirror origin/main.
