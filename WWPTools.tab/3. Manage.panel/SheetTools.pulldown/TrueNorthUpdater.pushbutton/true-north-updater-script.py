@@ -86,7 +86,7 @@ def _collect_titleblocks():
     )
 
 def _get_param_entries(titleblock_instances):
-    """Return all numeric (non-YesNo) parameters on titleblock instances and types."""
+    """Return all angle parameters on titleblock instances and types."""
     entries = {}
     for tb in titleblock_instances:
         if not tb:
@@ -95,7 +95,7 @@ def _get_param_entries(titleblock_instances):
             for p in tb.Parameters:
                 if not p or not p.Definition:
                     continue
-                if not _is_numeric_parameter(p):
+                if not _is_angle_parameter(p):
                     continue
                 name = p.Definition.Name
                 if name:
@@ -109,7 +109,7 @@ def _get_param_entries(titleblock_instances):
                 for p in symbol.Parameters:
                     if not p or not p.Definition:
                         continue
-                    if not _is_numeric_parameter(p):
+                    if not _is_angle_parameter(p):
                         continue
                     name = p.Definition.Name
                     if name:

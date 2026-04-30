@@ -114,7 +114,6 @@ def _is_supported_scale_parameter(param):
             param.StorageType in (
                 DB.StorageType.Double,
                 DB.StorageType.Integer,
-                DB.StorageType.String,
             )
             and not _is_yes_no_parameter(param)
         )
