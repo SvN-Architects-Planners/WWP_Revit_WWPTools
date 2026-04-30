@@ -177,23 +177,24 @@ def _get_true_north_angle_for_view(doc, view):
     except Exception:
         return round(math.degrees(angle_rad) % 360.0, 4)
 
-def _element_id_int(element_id):
+def _elem_id_int(element_id):
     if element_id is None:
         return None
-    if hasattr(element_id, "IntegerValue"):
-        try:
-            return int(_elem_id_int(element_id))
-        except Exception:
-            pass
-    if hasattr(element_id, "Value"):
-        try:
-            return int(element_id.Value)
-        except Exception:
-            pass
+    try:
+        return int(element_id.Value)  # Revit 2024+
+    except Exception:
+        pass
+    try:
+        return int(element_id.IntegerValue)  # Revit 2023-
+    except Exception:
+        pass
     try:
         return int(element_id)
     except Exception:
         return None
+
+def _element_id_int(element_id):
+    return _elem_id_int(element_id)
 
 def _show_true_north_dialog(
     sheet_items,
@@ -219,13 +220,6 @@ def _show_true_north_dialog(
     from System.Windows.Markup import XamlReader
     from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
-
-
-def _elem_id_int(eid):
-    try:
-        return int(eid.Value)      # Revit 2024+
-    except AttributeError:
-        return int(eid.Value)  # Revit 2023-
 
     xaml_path = os.path.join(os.path.dirname(__file__), "TrueNorthUpdaterDialog.xaml")
     if not os.path.isfile(xaml_path):
