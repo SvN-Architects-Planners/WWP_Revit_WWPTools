@@ -92,10 +92,10 @@ def _powershell_message_command(title, message):
     safe_message = (message or "").replace("'", "''")
     return (
         "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
-        "-Command \"try { "
+        "-Command \"try {{ "
         "Add-Type -AssemblyName PresentationFramework -ErrorAction Stop; "
         "[System.Windows.MessageBox]::Show('{msg}', '{title}') | Out-Null "
-        "} catch {}\" >NUL 2>&1"
+        "}} catch {{}}\" >NUL 2>&1"
     ).format(msg=safe_message, title=safe_title)
 
 
@@ -329,7 +329,7 @@ def _show_not_repo_message():
 # Background updater - runs after Revit exits
 # ---------------------------------------------------------------------------
 
-def _schedule_update_on_revit_exit(repo_root):
+def _schedule_update_on_revit_exit(repo_root, installed_label=None):
     """
     Spawn a detached cmd process that waits until Revit fully closes,
     then resets to origin/main so locked DLLs are no longer an obstacle.
@@ -346,10 +346,12 @@ def _schedule_update_on_revit_exit(repo_root):
         "Revit has closed. WWPTools update is now running in the background. "
         "You will get a completion message when it finishes.",
     )
+    installed_text = installed_label or "the latest available version"
     success_notice = _powershell_message_command(
         TITLE,
-        "WWPTools update completed successfully. You can reopen Revit now.\n\n"
-        "Log file:\n{}".format(log_path),
+        "WWPTools update finished successfully to {}. You can reopen Revit now.\n\n"
+        "Update finished successfully after Revit closed.\n\n"
+        "Log file:\n{}".format(installed_text, log_path),
     )
     failed_notice = _powershell_message_command(
         TITLE,
@@ -401,7 +403,7 @@ def _schedule_update_on_revit_exit(repo_root):
         return False
 
 
-def _start_standby_update(repo_root, reason):
+def _start_standby_update(repo_root, reason, installed_label=None):
     if not _git_cli_available():
         _alert(
             "WWPTools can not finish this update while Revit is open.\n\n"
@@ -411,7 +413,7 @@ def _start_standby_update(repo_root, reason):
             TITLE,
         )
         return
-    if _schedule_update_on_revit_exit(repo_root):
+    if _schedule_update_on_revit_exit(repo_root, installed_label=installed_label):
         _alert(
             "WWPTools is ready to finish updating, but Revit is using one or more files.\n\n"
             "{}\n\n"
@@ -487,6 +489,7 @@ def _update_repo(repo_info, repo_root):
         _start_standby_update(
             repo_root,
             "This update includes DLL files that Revit can not replace while it is running.",
+            installed_label=remote_tag,
         )
         return
 
@@ -503,6 +506,7 @@ def _update_repo(repo_info, repo_root):
         _start_standby_update(
             repo_root,
             "A WWPTools DLL is locked by Revit, so Git can not replace it yet.",
+            installed_label=remote_tag,
         )
         return
 
