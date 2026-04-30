@@ -91,11 +91,11 @@ def _powershell_message_command(title, message):
     safe_title = (title or "").replace("'", "''")
     safe_message = (message or "").replace("'", "''")
     return (
-        "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
+        "powershell -NoProfile -ExecutionPolicy Bypass -STA "
         "-Command \"try {{ "
         "Add-Type -AssemblyName PresentationFramework -ErrorAction Stop; "
         "[System.Windows.MessageBox]::Show('{msg}', '{title}') | Out-Null "
-        "}} catch {{}}\" >NUL 2>&1"
+        "}} catch {{}}\""
     ).format(msg=safe_message, title=safe_title)
 
 
@@ -329,6 +329,18 @@ def _show_not_repo_message():
 # Background updater - runs after Revit exits
 # ---------------------------------------------------------------------------
 
+def _standby_log_path(repo_root, pid):
+    base_dir = os.environ.get("LOCALAPPDATA")
+    if not base_dir:
+        base_dir = tempfile.gettempdir()
+    log_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "UpdateLogs"))
+    try:
+        if not os.path.isdir(log_dir):
+            os.makedirs(log_dir)
+    except Exception:
+        log_dir = tempfile.gettempdir()
+    return os.path.normpath(os.path.join(log_dir, "wwptools_update_{}.log".format(pid)))
+
 def _schedule_update_on_revit_exit(repo_root, installed_label=None):
     """
     Spawn a detached cmd process that waits until Revit fully closes,
@@ -337,9 +349,7 @@ def _schedule_update_on_revit_exit(repo_root, installed_label=None):
     """
     pid = os.getpid()
     safe_root = os.path.normpath(repo_root)
-    log_path = os.path.normpath(
-        os.path.join(tempfile.gettempdir(), "wwptools_update_{}.log".format(pid))
-    )
+    log_path = _standby_log_path(repo_root, pid)
 
     start_notice = _powershell_message_command(
         TITLE,
