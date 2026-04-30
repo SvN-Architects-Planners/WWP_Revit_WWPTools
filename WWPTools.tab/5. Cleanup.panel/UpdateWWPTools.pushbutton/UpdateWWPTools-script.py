@@ -99,6 +99,21 @@ def _powershell_message_command(title, message):
     ).format(msg=safe_message, title=safe_title)
 
 
+def _launch_powershell_message(title, message):
+    """Launch the PowerShell message externally so it does not block Revit."""
+    cmd = _powershell_message_command(title, message)
+    try:
+        subprocess.Popen(
+            cmd,
+            shell=True,
+            creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            close_fds=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _extension_root():
     return os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
 
@@ -424,13 +439,16 @@ def _start_standby_update(repo_root, reason, installed_label=None):
         )
         return
     if _schedule_update_on_revit_exit(repo_root, installed_label=installed_label):
-        _alert(
+        notice = (
             "WWPTools is ready to finish updating, but Revit is using one or more files.\n\n"
             "{}\n\n"
             "Close all Revit windows. The standby updater will finish automatically after Revit closes.\n"
-            "You can reopen Revit after the update finishes.".format(reason),
-            TITLE,
+            "You can reopen Revit after the update finishes.".format(reason)
         )
+        # Try to show a non-blocking external message so the dialog doesn't prevent closing Revit
+        if not _launch_powershell_message(TITLE, notice):
+            # Fallback to modal alert if external launch fails
+            _alert(notice, TITLE)
     else:
         _alert(
             "Could not start the standby updater.\n\n"
