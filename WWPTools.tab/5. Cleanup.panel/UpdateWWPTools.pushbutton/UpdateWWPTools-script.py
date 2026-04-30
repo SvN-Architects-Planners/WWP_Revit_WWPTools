@@ -4,8 +4,8 @@ import sys
 import tempfile
 import traceback
 
-from pyrevit import script
-from pyrevit.coreutils import git as pygit
+from pyrevit import script  # type: ignore
+from pyrevit.coreutils import git as pygit  # type: ignore
 
 
 script_dir = os.path.dirname(__file__)
@@ -26,9 +26,9 @@ _CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00
 
 def _revit_ui():
     try:
-        import clr
+        import clr  # type: ignore
         clr.AddReference("RevitAPIUI")
-        from Autodesk.Revit import UI
+        from Autodesk.Revit import UI  # type: ignore
         return UI
     except Exception:
         return None
@@ -45,7 +45,7 @@ def _alert(message, title=TITLE):
         except Exception:
             pass
     try:
-        from pyrevit import forms
+        from pyrevit import forms  # type: ignore
         forms.alert(text, title=caption or TITLE)
     except Exception:
         raise Exception(text)
@@ -66,7 +66,7 @@ def _confirm(message, title=TITLE):
         except Exception:
             pass
     try:
-        from pyrevit import forms
+        from pyrevit import forms  # type: ignore
         return bool(forms.alert(text, title=caption or TITLE, yes=True, no=True))
     except Exception:
         return False
@@ -74,13 +74,13 @@ def _confirm(message, title=TITLE):
 
 def _reload_pyrevit():
     try:
-        from pyrevit.loader import sessionmgr
+        from pyrevit.loader import sessionmgr  # type: ignore
         sessionmgr.reload_pyrevit()
         return True
     except Exception:
         pass
     try:
-        from pyrevit.loader import sessionmgr as sm
+        from pyrevit.loader import sessionmgr as sm  # type: ignore
         sm.reload_pyrevit()
         return True
     except Exception:
