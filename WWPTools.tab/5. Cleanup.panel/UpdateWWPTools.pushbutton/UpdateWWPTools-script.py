@@ -101,10 +101,24 @@ def _powershell_message_command(title, message):
 
 def _launch_powershell_message(title, message):
     """Launch the PowerShell message externally so it does not block Revit."""
-    cmd = _powershell_message_command(title, message)
+    # Try toast API first (non-blocking visual notification)
+    toast_cmd = _powershell_toast_command(title, message)
     try:
         subprocess.Popen(
-            cmd,
+            toast_cmd,
+            shell=True,
+            creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            close_fds=True,
+        )
+        return True
+    except Exception:
+        pass
+
+    # Fallback to plain PowerShell MessageBox (detached)
+    msg_cmd = _powershell_message_command(title, message)
+    try:
+        subprocess.Popen(
+            msg_cmd,
             shell=True,
             creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
             close_fds=True,
