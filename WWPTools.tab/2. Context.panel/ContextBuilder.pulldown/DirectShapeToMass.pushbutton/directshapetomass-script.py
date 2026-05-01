@@ -665,7 +665,7 @@ def _add_material_instance_param(family_doc, freeform_elements):
         _log_debug("No material parameter found on freeform element - association skipped.")
 
 
-def _convert_element_to_family(doc, element, solids, output_option):
+def _convert_element_to_family(doc, element, solids, output_option, seen_family_names=None):
     _log_debug("Converting source element id={} type='{}' app_id='{}' app_data='{}' solids={}".format(
         _elem_id_int(element.Id),
         element.GetType().FullName if element is not None else "<none>",
@@ -713,6 +713,17 @@ def _convert_element_to_family(doc, element, solids, output_option):
 
     family_prefix = output_option.get("family_prefix") or "WWP_ConvertedFamily"
     family_name = _make_safe_name("{}_{}".format(family_prefix, source_key), "{}_{}".format(family_prefix, elem_id))
+
+    # If another element in this run already claimed this name (e.g. Revit Parts that
+    # share a parent's IfcGUID/ApplicationDataId, or elements sharing a type name),
+    # append the element ID so each element gets its own distinct .rfa and project family.
+    if seen_family_names is not None and family_name in seen_family_names:
+        family_name = _make_safe_name(
+            "{}_{}".format(family_name, elem_id),
+            "{}_{}".format(family_prefix, elem_id),
+        )
+    if seen_family_names is not None:
+        seen_family_names.add(family_name)
 
     family_doc = app.NewFamilyDocument(template_path)
     if family_doc is None:
@@ -905,6 +916,7 @@ def main():
     created_instances = []
     failures = []
     failed_element_ids = []
+    seen_family_names = set()
 
     # Extract all geometry BEFORE placing any families.
     # Placing a family commits a transaction and triggers a model regeneration, which
@@ -925,7 +937,7 @@ def main():
 
     for element, solids in element_solids:
         try:
-            instance = _convert_element_to_family(doc, element, solids, output_option)
+            instance = _convert_element_to_family(doc, element, solids, output_option, seen_family_names)
             if instance is not None:
                 created_instances.append(instance)
         except Exception as ex:
