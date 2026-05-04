@@ -27,10 +27,9 @@ OUTPUT_CATEGORY_OPTIONS = (
     {
         "category": DB.BuiltInCategory.OST_Mass,
         "label": "In-Place Mass (recommended)",
+        "use_directshape": True,
         "family_prefix": "WWP_InPlaceMass",
         "result_label": "In-place masses",
-        "template_keywords": ("conceptual mass", "mass"),
-        "exclude_keywords": ("generic model",),
     },
     {
         "category": DB.BuiltInCategory.OST_Mass,
@@ -886,13 +885,17 @@ def _highlight_failed_elements(doc, failed_element_ids):
 
 
 def _preview_text(scope_label, elements, output_option):
+    if output_option.get("use_directshape"):
+        source_note = "Source elements will be DELETED after successful conversion."
+    else:
+        source_note = "Original source elements will be kept."
     lines = [
         "Scope: {}".format(scope_label),
         "Source elements found: {}".format(len(elements)),
         "Supported categories: Mass, Generic Models",
         "Output category: {}".format(_category_display_name(output_option["category"])),
         "Output: one {} per source element".format((output_option.get("result_label") or "family").rstrip("s").lower()),
-        "Original source elements will be kept.",
+        source_note,
         "",
         "Preview of first 20 source elements:",
     ]
@@ -995,6 +998,12 @@ def main():
                 instance = _convert_element_to_directshape(doc, element, solids, output_option, seen_family_names)
                 if instance is not None:
                     created_instances.append(instance)
+                    # Delete the source element now that its geometry is baked into the new DirectShape.
+                    try:
+                        doc.Delete(element.Id)
+                        _log_debug("Deleted source element id={}.".format(_elem_id_int(element.Id)))
+                    except Exception as del_ex:
+                        _log_debug("Could not delete source element id={}: {}".format(_elem_id_int(element.Id), del_ex))
                 sub.Commit()
             except Exception as ex:
                 _log_debug("Element {} failed: {}\n{}".format(_elem_id_int(element.Id), str(ex), traceback.format_exc()))
