@@ -1,0 +1,5 @@
+title: "Mass to\nIn-Place"
+tooltip: |
+  Convert placed conceptual mass family instances into in-place DirectShape masses embedded in the project.
+  Version: 1.5.0
+author: "Jason Tian"
