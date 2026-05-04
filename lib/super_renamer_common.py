@@ -1,4 +1,5 @@
 import os
+import re
 import traceback
 
 import clr
@@ -27,7 +28,7 @@ def _elem_id_int(eid):
     try:
         return int(eid.Value)      # Revit 2024+
     except AttributeError:
-        return int(eid.Value)  # Revit 2023-
+        return int(eid.IntegerValue)  # Revit 2023-
 
 def _mode_config(mode):
     if mode == "selection":
@@ -84,7 +85,7 @@ def _set_name(element, name):
 def _build_new_name(current, find_text, replace_text, prefix, suffix):
     new_name = current
     if find_text:
-        new_name = new_name.replace(find_text, replace_text)
+        new_name = re.sub(re.escape(find_text), replace_text, new_name, flags=re.IGNORECASE)
     if prefix:
         new_name = "{}{}".format(prefix, new_name)
     if suffix:

@@ -30,9 +30,10 @@ def split_prefix_numeric(text):
 
 
 def build_new_numbers(starting_str, count, reference_list):
-	starting_number = int(starting_str)
-	first_item = str(reference_list[0]) if reference_list else ""
-	prefix, numeric = split_prefix_numeric(first_item)
+	prefix, numeric = split_prefix_numeric(starting_str.strip())
+	if not numeric:
+		numeric = "1"
+	starting_number = int(numeric)
 	width = len(numeric)
 	return [
 		"{}{}".format(prefix, str(i).zfill(width))
@@ -89,10 +90,9 @@ def main():
 		ui.uiUtils_alert("Starting Number is required.", title="Renumber Sheets")
 		return
 
-	try:
-		int(starting_number)
-	except Exception:
-		ui.uiUtils_alert("Starting Number must be a whole number.", title="Renumber Sheets")
+	_, _numeric_part = split_prefix_numeric(starting_number.strip())
+	if not _numeric_part:
+		ui.uiUtils_alert("Starting Sheet Number must contain a number (e.g. A100 or 100).", title="Renumber Sheets")
 		return
 
 	selected_sheets = [sorted_sheets[i] for i in selected_indices]

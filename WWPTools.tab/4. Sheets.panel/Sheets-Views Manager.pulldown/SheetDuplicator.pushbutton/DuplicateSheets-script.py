@@ -109,6 +109,13 @@ def _set_owner(window):
         pass
 
 
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.IntegerValue)  # Revit 2023-
+
+
 def _element_id_value(elem_id):
     if elem_id is None:
         return None
@@ -579,13 +586,6 @@ class SheetDuplicatorDialog(object):
         self._preview_state = {"origin_x": origin_x, "origin_y": origin_y, "scale": scale}
 
         from System.Windows.Controls import Canvas
-
-
-def _elem_id_int(eid):
-    try:
-        return int(eid.Value)      # Revit 2024+
-    except AttributeError:
-        return int(eid.Value)  # Revit 2023-
 
         sheet_border = Border()
         sheet_border.Background = Brushes.WhiteSmoke
