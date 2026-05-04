@@ -27,9 +27,10 @@ OUTPUT_CATEGORY_OPTIONS = (
     {
         "category": DB.BuiltInCategory.OST_Mass,
         "label": "In-Place Mass (recommended)",
-        "use_directshape": True,
         "family_prefix": "WWP_InPlaceMass",
         "result_label": "In-place masses",
+        "template_keywords": ("conceptual mass", "mass"),
+        "exclude_keywords": ("generic model",),
     },
     {
         "category": DB.BuiltInCategory.OST_Mass,
