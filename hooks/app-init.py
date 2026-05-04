@@ -50,14 +50,18 @@ def _parse_semver(value):
 def _get_local_version():
 	try:
 		repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-		version_file = os.path.join(repo_root, "WWPTools.extension", "lib", "WWPTools.version.json")
-		if os.path.exists(version_file):
-			with open(version_file, "r") as fp:
-				data = json.load(fp)
-			version_value = data.get("version") if isinstance(data, dict) else None
-			parsed = _parse_semver(version_value)
-			if parsed:
-				return parsed
+		version_files = [
+			os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "lib", "WWPTools.version.json")),
+			os.path.join(repo_root, "WWPTools.extension", "lib", "WWPTools.version.json"),
+		]
+		for version_file in version_files:
+			if os.path.exists(version_file):
+				with open(version_file, "r") as fp:
+					data = json.load(fp)
+				version_value = data.get("version") if isinstance(data, dict) else None
+				parsed = _parse_semver(version_value)
+				if parsed:
+					return parsed
 
 		changelog = os.path.join(repo_root, "CHANGELOG.md")
 		if not os.path.exists(changelog):

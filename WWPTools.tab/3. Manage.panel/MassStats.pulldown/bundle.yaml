@@ -1,6 +1,7 @@
 title: "Mass\nStats"
 tooltip: |
   Live Mass Stats dashboards from Revit mass floor areas.
-
+  
   Use By Filters for filter rows, or By Selection to calculate only the currently selected mass/mass floors.
+  Version: 1.5.0
 author: "Jason Tian"

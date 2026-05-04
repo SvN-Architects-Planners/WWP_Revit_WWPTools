@@ -368,7 +368,9 @@ def _open_latest_release():
 def _show_not_repo_message():
     open_release = _confirm(
         "This installation is not a Git clone, so WWPTools can not update it with built-in Git.\n\n"
-        "Open the latest GitHub release instead?",
+        "Future installs and updates should be done through pyRevit Extension Manager using:\n"
+        "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools\n\n"
+        "Open the latest GitHub release?",
         TITLE,
     )
     if open_release:

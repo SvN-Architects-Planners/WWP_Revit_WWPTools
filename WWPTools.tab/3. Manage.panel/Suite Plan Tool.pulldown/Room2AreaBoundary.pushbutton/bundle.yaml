@@ -1,5 +1,5 @@
 title: "Room?Area\nBoundaries"
 tooltip: |
   Convert Rooms on a selected level into an Area Plan: creates Area Boundary Lines from Room boundaries, places Areas at Room locations, and copies matching instance/shared parameters from Rooms to Areas (when the parameters exist on both categories).
-  Version: 1.3.3
+  Version: 1.5.0
 author: "GitHub Copilot"

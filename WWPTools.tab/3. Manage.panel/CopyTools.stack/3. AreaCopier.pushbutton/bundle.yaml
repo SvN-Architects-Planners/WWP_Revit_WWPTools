@@ -1,6 +1,6 @@
 title: "Area Plan\nDuplicator"
 tooltip: |
   Purpose: Duplicate area plans from one area scheme into another, including boundaries, areas, tags, and instance parameters.\nUse: Select a source scheme, a target scheme, and levels. The tool recreates boundaries and areas in the target scheme to match the source.
-  Version: 1.3.3
+  Version: 1.5.0
 help_url: "https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.5-or-plugins/2.5.1-or-wwp-tools-toolbar/3-project-management#tool-reference"
 author: "Jason Tian"
