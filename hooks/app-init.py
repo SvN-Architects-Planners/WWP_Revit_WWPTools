@@ -8,13 +8,6 @@ import re
 from datetime import datetime
 from WWP_compat import Request, decode_to_text, urlopen
 
-# License check — must pass before anything else loads
-try:
-	from WWP_license import require_license
-	require_license()
-except Exception:
-	pass
-
 try:
 	import WWP_telemetry
 	WWP_telemetry.track_app_init()

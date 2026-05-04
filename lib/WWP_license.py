@@ -1,11 +1,13 @@
 import json
 import os
+import re
 
 _LICENSE_FILE = os.path.join(
     os.environ.get("APPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Roaming")),
     "pyRevit", "WWPTools", "license.json",
 )
 _ALLOWED_DOMAIN = "wwparchitects.com"
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@wwparchitects\.com$", re.IGNORECASE)
 
 
 def _ensure_dir(path):
@@ -31,7 +33,7 @@ def _save(email):
 
 
 def _valid(email):
-    return bool(email) and str(email).strip().lower().endswith("@" + _ALLOWED_DOMAIN)
+    return bool(email) and bool(_EMAIL_PATTERN.match(str(email).strip()))
 
 
 def is_licensed():
@@ -47,12 +49,12 @@ def activate(email):
 
 
 def require_license():
-    """Check license on startup; prompt for activation if not yet set up. Exits the script if not licensed."""
+    """Prompt once for a local WWPTools license and return True only when valid."""
     if is_licensed():
-        return
+        return True
 
     try:
-        from pyrevit import forms, script
+        from pyrevit import forms
 
         email = forms.ask_for_string(
             prompt=(
@@ -68,24 +70,22 @@ def require_license():
                 "WWPTools activated for {}.".format(email.strip().lower()),
                 title="WWPTools",
             )
-            return
+            return True
 
         if email:
-            # Wrong domain — show alert then exit
             forms.alert(
                 "Activation failed.\n\n"
                 "'{}' is not a valid @wwparchitects.com address.\n\n"
-                "WWPTools will not load.".format(email.strip()),
+                "This tool will not run.".format(email.strip()),
                 title="WWPTools Activation Failed",
             )
         else:
             forms.alert(
-                "No email entered. WWPTools will not load.",
+                "No email entered. This tool will not run.",
                 title="WWPTools Activation Required",
             )
 
-        script.exit()
+        return False
 
     except Exception:
-        # If forms/script are unavailable, silently allow (avoids crashing in test harness)
-        pass
+        return False
