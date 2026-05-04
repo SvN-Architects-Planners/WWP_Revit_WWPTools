@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!python3
 # -*- coding: utf-8 -*-
 """Create Fire Rating Lines for All Walls in FRR Views.

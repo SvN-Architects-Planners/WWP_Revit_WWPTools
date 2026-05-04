@@ -1,4 +1,5 @@
-﻿#! python3
+# -*- coding: utf-8 -*-
+#! python3
 import traceback
 
 from Autodesk.Revit import DB

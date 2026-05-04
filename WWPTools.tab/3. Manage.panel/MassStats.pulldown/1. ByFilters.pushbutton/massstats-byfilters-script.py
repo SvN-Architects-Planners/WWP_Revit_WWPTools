@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #! python3
 """Mass Stats By Filters - live back-of-house calculations from Revit mass elements."""
 

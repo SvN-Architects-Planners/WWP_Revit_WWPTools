@@ -1,4 +1,5 @@
-﻿#! python3
+# -*- coding: utf-8 -*-
+#! python3
 import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
