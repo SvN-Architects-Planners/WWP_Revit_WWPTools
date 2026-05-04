@@ -26,7 +26,14 @@ SOURCE_CATEGORIES = (
 OUTPUT_CATEGORY_OPTIONS = (
     {
         "category": DB.BuiltInCategory.OST_Mass,
-        "label": "Mass (recommended)",
+        "label": "In-Place Mass (recommended)",
+        "use_directshape": True,
+        "family_prefix": "WWP_InPlaceMass",
+        "result_label": "In-place masses",
+    },
+    {
+        "category": DB.BuiltInCategory.OST_Mass,
+        "label": "Mass Family",
         "family_prefix": "WWP_ConvertedMass",
         "result_label": "Mass families",
         "template_keywords": ("conceptual mass", "mass"),
@@ -137,6 +144,14 @@ def _get_string_parameter(element, parameter_name):
 
 def _get_exchange_name(element):
     return _get_string_parameter(element, "Exchange Name")
+
+
+class _SilenceWarningsPreprocessor(DB.IFailuresPreprocessor):
+    def PreprocessFailures(self, failuresAccessor):
+        for failure in list(failuresAccessor.GetFailureMessages()):
+            if failure.GetSeverity() == DB.FailureSeverity.Warning:
+                failuresAccessor.DeleteWarning(failure)
+        return DB.FailureProcessingResult.Continue
 
 
 class _OverwriteFamilyLoadOptions(DB.IFamilyLoadOptions):
@@ -448,45 +463,31 @@ def _load_family_into_project(doc, family_path, family_name):
         pass
     _log_debug("Project family count before load: {}".format(len(before_family_ids)))
 
+    # Caller is responsible for the active transaction.
     load_error = None
     family = None
-    transaction = DB.Transaction(doc, "Load Converted Mass Family")
-    started = False
-    try:
-        transaction.Start()
-        started = True
-        _log_debug("Project doc.IsModifiable inside load transaction: {}".format(getattr(doc, "IsModifiable", "<unknown>")))
 
-        load_attempts = [
-            ("doc.LoadFamily(path)", lambda: doc.LoadFamily(family_path)),
-            ("doc.LoadFamily(path, options)", lambda: doc.LoadFamily(family_path, _OverwriteFamilyLoadOptions())),
-        ]
-        for label, attempt in load_attempts:
-            try:
-                loaded = attempt()
-                _log_debug("{} returned type='{}' value='{}'".format(label, type(loaded).__name__, loaded))
-                if isinstance(loaded, DB.Family):
-                    family = loaded
-                    break
-                if isinstance(loaded, (list, tuple)):
-                    for item in loaded:
-                        if isinstance(item, DB.Family):
-                            family = item
-                            break
-                    if family is not None:
+    load_attempts = [
+        ("doc.LoadFamily(path)", lambda: doc.LoadFamily(family_path)),
+        ("doc.LoadFamily(path, options)", lambda: doc.LoadFamily(family_path, _OverwriteFamilyLoadOptions())),
+    ]
+    for label, attempt in load_attempts:
+        try:
+            loaded = attempt()
+            _log_debug("{} returned type='{}' value='{}'".format(label, type(loaded).__name__, loaded))
+            if isinstance(loaded, DB.Family):
+                family = loaded
+                break
+            if isinstance(loaded, (list, tuple)):
+                for item in loaded:
+                    if isinstance(item, DB.Family):
+                        family = item
                         break
-            except Exception as ex:
-                load_error = str(ex)
-                _log_debug("{} raised: {}".format(label, load_error))
-
-        transaction.Commit()
-    except Exception:
-        if started:
-            try:
-                transaction.RollBack()
-            except Exception:
-                pass
-        raise
+                if family is not None:
+                    break
+        except Exception as ex:
+            load_error = str(ex)
+            _log_debug("{} raised: {}".format(label, load_error))
 
     try:
         if family is None:
@@ -573,46 +574,33 @@ def _place_family_instance(doc, family, comment_text, placement_point=None):
     if symbol is None:
         raise Exception("Failed to access the loaded family type.")
 
-    transaction = DB.Transaction(doc, "Place Converted Mass Family")
-    started = False
+    # Caller is responsible for the active transaction.
     try:
-        transaction.Start()
-        started = True
-
-        try:
-            if hasattr(symbol, "IsActive") and not symbol.IsActive:
-                symbol.Activate()
-                doc.Regenerate()
-        except Exception:
-            pass
-
-        pt = placement_point
-        creation_attempts = [
-            lambda: doc.Create.NewFamilyInstance(pt, symbol, DB.Structure.StructuralType.NonStructural),
-            lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.ActiveView),
-            lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.GetElement(doc.ActiveView.GenLevel.Id), DB.Structure.StructuralType.NonStructural),
-        ]
-        errors = []
-        for attempt in creation_attempts:
-            try:
-                instance = attempt()
-                if instance is not None:
-                    _set_comment(instance, comment_text)
-                    transaction.Commit()
-                    _log_debug("Placed family instance id={}".format(_elem_id_int(instance.Id)))
-                    return instance
-            except Exception as ex:
-                errors.append(str(ex))
-                _log_debug("Family placement attempt failed: {}".format(str(ex)))
-
-        raise Exception("Failed to place the generated mass family instance. {}".format("; ".join(errors[:5])))
+        if hasattr(symbol, "IsActive") and not symbol.IsActive:
+            symbol.Activate()
+            doc.Regenerate()
     except Exception:
-        if started:
-            try:
-                transaction.RollBack()
-            except Exception:
-                pass
-        raise
+        pass
+
+    pt = placement_point
+    creation_attempts = [
+        lambda: doc.Create.NewFamilyInstance(pt, symbol, DB.Structure.StructuralType.NonStructural),
+        lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.ActiveView),
+        lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.GetElement(doc.ActiveView.GenLevel.Id), DB.Structure.StructuralType.NonStructural),
+    ]
+    errors = []
+    for attempt in creation_attempts:
+        try:
+            instance = attempt()
+            if instance is not None:
+                _set_comment(instance, comment_text)
+                _log_debug("Placed family instance id={}".format(_elem_id_int(instance.Id)))
+                return instance
+        except Exception as ex:
+            errors.append(str(ex))
+            _log_debug("Family placement attempt failed: {}".format(str(ex)))
+
+    raise Exception("Failed to place the generated mass family instance. {}".format("; ".join(errors[:5])))
 
 
 def _add_material_instance_param(family_doc, freeform_elements):
@@ -664,6 +652,72 @@ def _add_material_instance_param(family_doc, freeform_elements):
             _log_debug("Could not associate material parameter: {}".format(ex))
     else:
         _log_debug("No material parameter found on freeform element - association skipped.")
+
+
+def _convert_element_to_directshape(doc, element, solids, output_option, seen_family_names=None):
+    # Caller is responsible for the active transaction.
+    _log_debug("Converting source element id={} app_id='{}' app_data='{}' solids={} → DirectShape".format(
+        _elem_id_int(element.Id),
+        (getattr(element, "ApplicationId", None) or ""),
+        (getattr(element, "ApplicationDataId", None) or ""),
+        len(solids),
+    ))
+    elem_id = _elem_id_int(element.Id)
+
+    source_key = _get_string_parameter(element, "IfcGUID")
+    if not source_key:
+        source_key = _get_string_parameter(element, "IFC GUID")
+    if not source_key:
+        source_key = _get_exchange_name(element)
+    if not source_key:
+        source_key = (getattr(element, "ApplicationDataId", None) or "").strip()
+    if not source_key:
+        try:
+            type_id = element.GetTypeId()
+            if type_id is not None and type_id != DB.ElementId.InvalidElementId:
+                type_elem = doc.GetElement(type_id)
+                if type_elem is not None:
+                    source_key = (type_elem.Name or "").strip()
+        except Exception:
+            pass
+    if not source_key:
+        source_key = "Element_{}".format(elem_id)
+
+    family_prefix = output_option.get("family_prefix") or "WWP_InPlaceMass"
+    display_name = _make_safe_name("{}_{}".format(family_prefix, source_key), "{}_{}".format(family_prefix, elem_id))
+
+    if seen_family_names is not None and display_name in seen_family_names:
+        display_name = _make_safe_name(
+            "{}_{}".format(display_name, elem_id),
+            "{}_{}".format(family_prefix, elem_id),
+        )
+    if seen_family_names is not None:
+        seen_family_names.add(display_name)
+
+    built_in_category = output_option.get("category") or DB.BuiltInCategory.OST_Mass
+    comment_text = "Converted from DirectShape {}{}".format(
+        elem_id,
+        " | {}".format(_get_comment(element)) if _get_comment(element) else "",
+    )
+
+    category_id = DB.ElementId(built_in_category)
+    ds = DB.DirectShape.CreateElement(doc, category_id)
+    ds.ApplicationId = "WWPTools.DirectShapeToMass"
+    ds.ApplicationDataId = source_key
+
+    geometry_objects = List[DB.GeometryObject]()
+    for solid in solids:
+        geometry_objects.Add(solid)
+    ds.SetShape(geometry_objects)
+    _set_comment(ds, comment_text)
+
+    try:
+        ds.Name = display_name
+    except Exception:
+        pass
+
+    _log_debug("Created in-place mass id={} name='{}'".format(_elem_id_int(ds.Id), display_name))
+    return ds
 
 
 def _convert_element_to_family(doc, element, solids, output_option, seen_family_names=None):
@@ -936,15 +990,27 @@ def main():
             failures.append({"id": "element/{}".format(_elem_id_int(element.Id)), "reason": str(ex)})
             failed_element_ids.append(element.Id)
 
+    def _start_tx(name):
+        tx = DB.Transaction(doc, name)
+        fho = tx.GetFailureHandlingOptions()
+        fho.SetFailuresPreprocessor(_SilenceWarningsPreprocessor())
+        tx.SetFailureHandlingOptions(fho)
+        tx.Start()
+        return tx
+
+    convert_fn = _convert_element_to_directshape if output_option.get("use_directshape") else _convert_element_to_family
+    tx_name = "Create In-Place Masses" if output_option.get("use_directshape") else "Create Mass Families"
+    tx = _start_tx(tx_name)
     for element, solids in element_solids:
         try:
-            instance = _convert_element_to_family(doc, element, solids, output_option, seen_family_names)
+            instance = convert_fn(doc, element, solids, output_option, seen_family_names)
             if instance is not None:
                 created_instances.append(instance)
         except Exception as ex:
             _log_debug("Element {} failed: {}\n{}".format(_elem_id_int(element.Id), str(ex), traceback.format_exc()))
             failures.append({"id": "element/{}".format(_elem_id_int(element.Id)), "reason": str(ex)})
             failed_element_ids.append(element.Id)
+    tx.Commit()
 
     _highlight_failed_elements(doc, failed_element_ids)
 
