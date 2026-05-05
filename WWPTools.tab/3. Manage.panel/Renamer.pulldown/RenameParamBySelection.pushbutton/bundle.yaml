@@ -1,0 +1,6 @@
+title:  "Rename Param\nValue(by Selections)"
+tooltip: |
+  Rename instance parameter values for elements currently selected in the Revit session.
+  Choose a text parameter, then apply find/replace, prefix, or suffix to all matching values.
+  Version: 1.0.0
+author: "Jason Tian"
