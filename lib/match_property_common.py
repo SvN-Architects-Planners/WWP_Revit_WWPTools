@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
 
@@ -192,7 +193,7 @@ def run_match_property(script_dir, lib_path):
 			if invalid:
 				cat = get_element_category_name(source_elem)
 				ui.uiUtils_alert(
-					"{} element(s) skipped — not the same category as source ({}).".format(
+					"{} element(s) skipped - not the same category as source ({}).".format(
 						len(invalid), cat
 					),
 					title="Match Property",
@@ -210,7 +211,7 @@ def run_match_property(script_dir, lib_path):
 			cat = get_element_category_name(source_elem)
 			name = get_element_display_name(source_elem, doc)
 			ui.uiUtils_alert(
-				"Source: {} — {}\n\nClick OK, then pick target elements in the view.\n"
+				"Source: {} - {}\n\nClick OK, then pick target elements in the view.\n"
 				"Only {} elements will be accepted.".format(cat, name, cat),
 				title="Match Property",
 			)
@@ -226,7 +227,7 @@ def run_match_property(script_dir, lib_path):
 			target_elems, invalid = validate_same_category(source_elem, candidates)
 			if invalid:
 				ui.uiUtils_alert(
-					"{} element(s) skipped — category mismatch.".format(len(invalid)),
+					"{} element(s) skipped - category mismatch.".format(len(invalid)),
 					title="Match Property",
 				)
 			if not target_elems:
@@ -247,7 +248,7 @@ def run_match_property(script_dir, lib_path):
 			cat = get_element_category_name(source_elem)
 			name = get_element_display_name(source_elem, doc)
 			ui.uiUtils_alert(
-				"Source: {} — {}\n\nClick OK, then pick target elements in the view.\n"
+				"Source: {} - {}\n\nClick OK, then pick target elements in the view.\n"
 				"Only {} elements will be accepted.".format(cat, name, cat),
 				title="Match Property",
 			)
@@ -263,7 +264,7 @@ def run_match_property(script_dir, lib_path):
 			target_elems, invalid = validate_same_category(source_elem, candidates)
 			if invalid:
 				ui.uiUtils_alert(
-					"{} element(s) skipped — category mismatch.".format(len(invalid)),
+					"{} element(s) skipped - category mismatch.".format(len(invalid)),
 					title="Match Property",
 				)
 			if not target_elems:
