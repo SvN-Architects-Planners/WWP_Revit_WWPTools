@@ -1,4 +1,4 @@
-title:  "Project \nCleaner"
+title:  "Delete\nLocal Files"
 tooltip: |
   Delete all Temp files, Local files and Caches. \nPlease close all your BIM360/ACC projects, and open an empty revit file before doing so.
   Version: 1.5.0
