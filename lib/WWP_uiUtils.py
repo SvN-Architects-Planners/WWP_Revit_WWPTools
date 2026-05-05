@@ -978,3 +978,40 @@ def uiUtils_level_setup_inputs(
 		"height_p1_to_l1": result.HeightP1ToL1 or "",
 		"typical_depth": result.TypicalDepth or "",
 	}
+
+
+def uiUtils_match_property_select_params(
+	source_info,
+	target_info,
+	param_names,
+	param_values,
+	param_writable,
+	width=860,
+	height=700,
+):
+	"""Show the Match Property parameter selection dialog.
+
+	Returns a list of selected parameter names, or None if cancelled.
+	"""
+	_ensure_wpf()
+	from System.Collections.Generic import List as NetList
+	from System import Boolean
+
+	names_list = _to_net_string_list(param_names) or NetList[String]()
+	values_list = _to_net_string_list(param_values) or NetList[String]()
+
+	writable_list = NetList[Boolean]()
+	if param_writable:
+		for b in param_writable:
+			writable_list.Add(bool(b))
+
+	result = _DIALOGS.MatchPropertySelectParams(
+		str(source_info or ""),
+		str(target_info or ""),
+		names_list,
+		values_list,
+		writable_list,
+	)
+	if result is None:
+		return None
+	return list(result.SelectedParams) if result.SelectedParams else []
