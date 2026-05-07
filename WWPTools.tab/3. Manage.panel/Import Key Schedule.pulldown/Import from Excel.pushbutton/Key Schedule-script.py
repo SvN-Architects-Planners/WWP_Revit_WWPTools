@@ -259,10 +259,7 @@ def _show_area_keyplan_import_dialog(
 
     def _save_saved_sets():
         if callable(save_saved_setting_sets):
-            try:
-                save_saved_setting_sets(saved_sets)
-            except Exception:
-                pass
+            save_saved_setting_sets(saved_sets)
 
     def _apply_setting_set(set_data):
         if not isinstance(set_data, dict):
@@ -320,8 +317,12 @@ def _show_area_keyplan_import_dialog(
             _show_message("Type a saved set name before saving.")
             return
         saved_sets[name] = _current_mapping_payload()
-        _save_saved_sets()
-        _refresh_saved_set_combo(name)
+        try:
+            _save_saved_sets()
+            _refresh_saved_set_combo(name)
+            _show_message("Set '{}' saved.".format(name))
+        except Exception as exc:
+            _show_message("Failed to save set: {}".format(exc))
 
     def on_delete_set(sender, e):
         name = _selected_set_name()
@@ -334,8 +335,11 @@ def _show_area_keyplan_import_dialog(
 
     def on_export_set(sender, e):
         name = _selected_set_name()
-        if not name or name not in saved_sets:
-            _show_message("Select a saved set to export.")
+        if not name:
+            _show_message("Type a set name and click Save before exporting.")
+            return
+        if name not in saved_sets:
+            _show_message("'{}' has not been saved yet. Click Save first, then Export Setting.".format(name))
             return
         from Microsoft.Win32 import SaveFileDialog
         dlg = SaveFileDialog()
@@ -652,8 +656,8 @@ def _write_project_settings_payload(doc, payload):
         return False
 
     transaction = DB.Transaction(doc, "Save WWPTools Project Settings")
-    transaction.Start()
     try:
+        transaction.Start()
         param.Set(raw)
         transaction.Commit()
         return True
@@ -719,7 +723,11 @@ def _load_saved_setting_sets(doc, config):
 
 
 def _write_saved_setting_sets(doc, config, saved_sets):
-    wrote_doc = _write_saved_setting_sets_to_project_param(doc, saved_sets)
+    wrote_doc = False
+    try:
+        wrote_doc = _write_saved_setting_sets_to_project_param(doc, saved_sets)
+    except Exception:
+        pass
     if config is None:
         return wrote_doc
     try:
@@ -1677,6 +1685,8 @@ def _as_float(value):
 def set_parameter_value(param, value):
     if param is None:
         return False
+    if value is None or value == "":
+        return True
     storage = None
     try:
         storage = param.StorageType
