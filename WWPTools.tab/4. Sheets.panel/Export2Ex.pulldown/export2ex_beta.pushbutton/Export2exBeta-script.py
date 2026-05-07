@@ -332,12 +332,19 @@ def _pluralize(name):
         return name
     parts = name.rsplit(" ", 1)
     last = parts[-1]
-    if last.lower().endswith(("s", "x", "z", "ch", "sh")):
+    lower_last = last.lower()
+    if lower_last.endswith("s"):
+        return name
+    if lower_last.endswith(("x", "z", "ch", "sh")):
         last = last + "es"
     else:
         last = last + "s"
     parts[-1] = last
     return " ".join(parts)
+
+
+def default_sheet_name_for_category(category_name):
+    return sanitize_sheet_name(_pluralize(category_name or "Category Export"))
 
 
 def normalize_excel_output_path(path, default_ext=".xlsx"):
@@ -851,6 +858,23 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             return None
         return element_id_value(item.category_id)
 
+    def _category_name_for_id(category_id):
+        if category_id is None:
+            return ""
+        for item in category_items:
+            if item.id_value == category_id:
+                return item.record["name"]
+        return ""
+
+    def _default_sheet_name_for_item(item):
+        category_id = _resolve_category_id(item)
+        category_name = _category_name_for_id(category_id)
+        if category_name:
+            return default_sheet_name_for_category(category_name)
+        if item is not None and _current_mode() == MODE_BY_CATEGORY:
+            return default_sheet_name_for_category(item.record["name"])
+        return default_sheet_name_for_category("Category Export")
+
     def _get_parameter_names(category_id):
         if category_id is None:
             return []
@@ -923,6 +947,35 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         _refresh_parameter_list()
 
     _initialized = [False]
+    _sheet_name_autofill = [True]
+    _sheet_name_updating = [False]
+    _last_auto_sheet_name = [""]
+
+    def _set_sheet_name_text(value):
+        if sheet_name_box is None:
+            return
+        _sheet_name_updating[0] = True
+        try:
+            sheet_name_box.Text = value or ""
+        finally:
+            _sheet_name_updating[0] = False
+
+    def _refresh_sheet_name_default(force=False):
+        if sheet_name_box is None:
+            return
+        selected_item = source_list.SelectedItem
+        auto_name = _default_sheet_name_for_item(selected_item)
+        current = (sheet_name_box.Text or "").strip()
+        if force or _sheet_name_autofill[0] or not current or current == _last_auto_sheet_name[0]:
+            _last_auto_sheet_name[0] = auto_name
+            _sheet_name_autofill[0] = True
+            _set_sheet_name_text(auto_name)
+
+    def _sheet_name_changed(_sender=None, _args=None):
+        if _sheet_name_updating[0] or sheet_name_box is None:
+            return
+        current = (sheet_name_box.Text or "").strip()
+        _sheet_name_autofill[0] = not current or current == _last_auto_sheet_name[0]
 
     def _auto_populate_schedule_fields():
         if not _initialized[0] or _current_mode() != MODE_FROM_SCHEDULE:
@@ -950,6 +1003,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _source_selection_changed(_sender, _args):
         _auto_populate_schedule_fields()
         _refresh_parameter_list()
+        _refresh_sheet_name_default()
 
     def _add_parameters(_sender=None, _args=None):
         selected_item = source_list.SelectedItem
@@ -1164,6 +1218,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         save_set_button.Click += _save_set
     if delete_set_button is not None:
         delete_set_button.Click += _delete_set
+    if sheet_name_box is not None:
+        sheet_name_box.TextChanged += _sheet_name_changed
     _refresh_saved_set_dropdown()
     _refresh_source_list()
     _initialized[0] = True
@@ -1171,15 +1227,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     if sheet_name_box is not None:
         initial_sheet_name_stripped = (initial_sheet_name or "").strip()
         if initial_sheet_name_stripped:
-            sheet_name_box.Text = initial_sheet_name_stripped
+            _last_auto_sheet_name[0] = _default_sheet_name_for_item(source_list.SelectedItem)
+            _sheet_name_autofill[0] = initial_sheet_name_stripped == _last_auto_sheet_name[0]
+            _set_sheet_name_text(initial_sheet_name_stripped)
         else:
-            selected = source_list.SelectedItem
-            if selected is not None:
-                if _current_mode() == MODE_BY_CATEGORY:
-                    auto_name = _pluralize(selected.record["name"])
-                else:
-                    auto_name = selected.view.Name
-                sheet_name_box.Text = sanitize_sheet_name(auto_name)
+            _refresh_sheet_name_default(force=True)
 
     if not window.ShowDialog():
         return None
@@ -1769,7 +1821,6 @@ def main():
     )
     last_category_id = _coerce_int(config_get(config, CONFIG_LAST_CATEGORY_ID, None), None)
     last_param_names = _coerce_string_list(config_get(config, CONFIG_LAST_PARAM_NAMES, []))
-    last_sheet_name = str(config_get(config, CONFIG_LAST_SHEET_NAME, "") or "").strip()
     result = show_export_form(
         ui,
         doc,
@@ -1780,7 +1831,7 @@ def main():
         last_source_id,
         last_category_id,
         last_param_names,
-        last_sheet_name,
+        "",
     )
     if not result:
         return
