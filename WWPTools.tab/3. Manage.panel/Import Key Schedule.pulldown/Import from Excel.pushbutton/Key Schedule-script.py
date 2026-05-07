@@ -100,6 +100,14 @@ def _find_first_visual_child(parent, target_type):
     return None
 
 
+def _useful_selection_count(selections):
+    count = 0
+    for item in selections or []:
+        if item and item != SKIP_OPTION:
+            count += 1
+    return count
+
+
 def _show_area_keyplan_import_dialog(
     title="Import Area Key Schedule",
     file_path="",
@@ -165,6 +173,13 @@ def _show_area_keyplan_import_dialog(
     options = [str(o) for o in (parameter_options or [])]
     columns = [str(c) for c in (column_names or [])]
     defaults = [str(d) for d in (default_selections or [])]
+    auto_defaults = [str(d) for d in (auto_map_selections or [])]
+    if columns:
+        option_param_names = [o for o in options if o not in (SKIP_OPTION, KEY_NAME_OPTION)]
+        if not auto_defaults or len(auto_defaults) != len(columns) or _useful_selection_count(auto_defaults) == 0:
+            auto_defaults = build_default_selections([_strip_excel_column_prefix(c) for c in columns], option_param_names)
+        if len(defaults) != len(columns) or _useful_selection_count(defaults) == 0:
+            defaults = list(auto_defaults)
     saved_sets = saved_setting_sets if isinstance(saved_setting_sets, dict) else {}
     net_options = List[String]()
     for option in options:
