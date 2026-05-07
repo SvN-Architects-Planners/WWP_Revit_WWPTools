@@ -16,11 +16,13 @@ KEY_NAME_OPTION = "Key Name"
 TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
+PROJECT_SETTINGS_PARAM = "! P_STATS_KeyScheduleMap"
+PROJECT_SETTINGS_NAMESPACE = "import_key_schedule"
+PROJECT_SETTINGS_SAVED_SETS_KEY = "saved_sets"
 SAVED_SETTING_SETS_KEY = "area_key_import_saved_setting_sets_json"
 SAVED_SETTING_FILE_FILTER = "WWPTools Import Key Schedule Settings (*.json)|*.json|All Files (*.*)|*.*"
-SAVED_SETTING_SCHEMA_GUID = "79c6f037-2a4b-4b5d-8ab8-fb699f0785af"
-SAVED_SETTING_SCHEMA_NAME = "WWPToolsImportKeyScheduleSettings"
-SAVED_SETTING_SCHEMA_FIELD = "SavedSetsJson"
+LEGACY_SAVED_SETTING_SCHEMA_GUID = "79c6f037-2a4b-4b5d-8ab8-fb699f0785af"
+LEGACY_SAVED_SETTING_SCHEMA_FIELD = "SavedSetsJson"
 STANDARD_HEADER_PARAMETER_ALIASES = {
     "name": ["Name"],
     "unitcount": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
@@ -590,80 +592,118 @@ def _parse_saved_setting_sets(raw):
     return cleaned
 
 
-def _get_saved_setting_schema(create=False):
+def _get_project_settings_param(doc):
     try:
-        from System import Guid, String
-        schema_id = Guid(SAVED_SETTING_SCHEMA_GUID)
-        schema = DB.ExtensibleStorage.Schema.Lookup(schema_id)
-        if schema is not None or not create:
-            return schema
-
-        builder = DB.ExtensibleStorage.SchemaBuilder(schema_id)
-        builder.SetSchemaName(SAVED_SETTING_SCHEMA_NAME)
-        builder.SetReadAccessLevel(DB.ExtensibleStorage.AccessLevel.Public)
-        builder.SetWriteAccessLevel(DB.ExtensibleStorage.AccessLevel.Public)
-        builder.AddSimpleField(SAVED_SETTING_SCHEMA_FIELD, String)
-        return builder.Finish()
+        project_info = getattr(doc, "ProjectInformation", None)
+        if project_info is None:
+            return None
+        return project_info.LookupParameter(PROJECT_SETTINGS_PARAM)
     except Exception:
         return None
 
 
-def _read_saved_setting_sets_from_doc(doc):
+def _read_project_settings_payload(doc):
+    param = _get_project_settings_param(doc)
+    if param is None:
+        return {}
     try:
-        from System import String
+        raw = param.AsString() or ""
+    except Exception:
+        raw = ""
+    if not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _write_project_settings_payload(doc, payload):
+    param = _get_project_settings_param(doc)
+    if param is None:
+        return False
+    try:
+        if param.IsReadOnly:
+            return False
+    except Exception:
+        pass
+    try:
+        raw = json.dumps(payload or {}, sort_keys=True)
+    except Exception:
+        return False
+
+    transaction = DB.Transaction(doc, "Save WWPTools Project Settings")
+    transaction.Start()
+    try:
+        param.Set(raw)
+        transaction.Commit()
+        return True
+    except Exception:
+        try:
+            transaction.RollBack()
+        except Exception:
+            pass
+        return False
+
+
+def _read_saved_setting_sets_from_project_param(doc):
+    payload = _read_project_settings_payload(doc)
+    namespace_data = payload.get(PROJECT_SETTINGS_NAMESPACE)
+    if not isinstance(namespace_data, dict):
+        return {}
+    return _parse_saved_setting_sets(namespace_data.get(PROJECT_SETTINGS_SAVED_SETS_KEY))
+
+
+def _write_saved_setting_sets_to_project_param(doc, saved_sets):
+    payload = _read_project_settings_payload(doc)
+    if not isinstance(payload, dict):
+        payload = {}
+    namespace_data = payload.get(PROJECT_SETTINGS_NAMESPACE)
+    if not isinstance(namespace_data, dict):
+        namespace_data = {}
+    namespace_data[PROJECT_SETTINGS_SAVED_SETS_KEY] = saved_sets or {}
+    payload[PROJECT_SETTINGS_NAMESPACE] = namespace_data
+    return _write_project_settings_payload(doc, payload)
+
+
+def _read_legacy_saved_setting_sets_from_doc(doc):
+    try:
+        from System import Guid, String
         project_info = getattr(doc, "ProjectInformation", None)
         if project_info is None:
             return {}
-        schema = _get_saved_setting_schema(create=False)
+        schema = DB.ExtensibleStorage.Schema.Lookup(Guid(LEGACY_SAVED_SETTING_SCHEMA_GUID))
         if schema is None:
             return {}
         entity = project_info.GetEntity(schema)
         if entity is None or not entity.IsValid():
             return {}
-        raw = entity.Get[String](SAVED_SETTING_SCHEMA_FIELD) or ""
+        raw = entity.Get[String](LEGACY_SAVED_SETTING_SCHEMA_FIELD) or ""
         return _parse_saved_setting_sets(raw)
     except Exception:
         return {}
 
 
-def _write_saved_setting_sets_to_doc(doc, saved_sets):
-    try:
-        from System import String
-        project_info = getattr(doc, "ProjectInformation", None)
-        if project_info is None:
-            return False
-        schema = _get_saved_setting_schema(create=True)
-        if schema is None:
-            return False
-        payload = json.dumps(saved_sets or {}, sort_keys=True)
-        transaction = DB.Transaction(doc, "Save Import Key Schedule Settings")
-        transaction.Start()
-        try:
-            entity = DB.ExtensibleStorage.Entity(schema)
-            entity.Set[String](SAVED_SETTING_SCHEMA_FIELD, payload)
-            project_info.SetEntity(entity)
-            transaction.Commit()
-            return True
-        except Exception:
-            try:
-                transaction.RollBack()
-            except Exception:
-                pass
-            return False
-    except Exception:
-        return False
-
-
 def _load_saved_setting_sets(doc, config):
-    doc_sets = _read_saved_setting_sets_from_doc(doc)
+    doc_sets = _read_saved_setting_sets_from_project_param(doc)
     if doc_sets:
         return doc_sets
+    legacy_doc_sets = _read_legacy_saved_setting_sets_from_doc(doc)
+    if legacy_doc_sets:
+        _write_saved_setting_sets_to_project_param(doc, legacy_doc_sets)
+        return legacy_doc_sets
     raw = _safe_config_get(config, SAVED_SETTING_SETS_KEY, "") or ""
-    return _parse_saved_setting_sets(raw)
+    local_sets = _parse_saved_setting_sets(raw)
+    if local_sets:
+        _write_saved_setting_sets_to_project_param(doc, local_sets)
+    return local_sets
 
 
 def _write_saved_setting_sets(doc, config, saved_sets):
-    wrote_doc = _write_saved_setting_sets_to_doc(doc, saved_sets)
+    wrote_doc = _write_saved_setting_sets_to_project_param(doc, saved_sets)
     if config is None:
         return wrote_doc
     try:
