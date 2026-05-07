@@ -18,6 +18,9 @@ DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
 SAVED_SETTING_SETS_KEY = "area_key_import_saved_setting_sets_json"
 SAVED_SETTING_FILE_FILTER = "WWPTools Import Key Schedule Settings (*.json)|*.json|All Files (*.*)|*.*"
+SAVED_SETTING_SCHEMA_GUID = "79c6f037-2a4b-4b5d-8ab8-fb699f0785af"
+SAVED_SETTING_SCHEMA_NAME = "WWPToolsImportKeyScheduleSettings"
+SAVED_SETTING_SCHEMA_FIELD = "SavedSetsJson"
 STANDARD_HEADER_PARAMETER_ALIASES = {
     "name": ["Name"],
     "unitcount": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
@@ -568,8 +571,7 @@ def _save_config():
         pass
 
 
-def _load_saved_setting_sets(config):
-    raw = _safe_config_get(config, SAVED_SETTING_SETS_KEY, "") or ""
+def _parse_saved_setting_sets(raw):
     if isinstance(raw, dict):
         return raw
     if not raw:
@@ -588,15 +590,89 @@ def _load_saved_setting_sets(config):
     return cleaned
 
 
-def _write_saved_setting_sets(config, saved_sets):
+def _get_saved_setting_schema(create=False):
+    try:
+        from System import Guid, String
+        schema_id = Guid(SAVED_SETTING_SCHEMA_GUID)
+        schema = DB.ExtensibleStorage.Schema.Lookup(schema_id)
+        if schema is not None or not create:
+            return schema
+
+        builder = DB.ExtensibleStorage.SchemaBuilder(schema_id)
+        builder.SetSchemaName(SAVED_SETTING_SCHEMA_NAME)
+        builder.SetReadAccessLevel(DB.ExtensibleStorage.AccessLevel.Public)
+        builder.SetWriteAccessLevel(DB.ExtensibleStorage.AccessLevel.Public)
+        builder.AddSimpleField(SAVED_SETTING_SCHEMA_FIELD, String)
+        return builder.Finish()
+    except Exception:
+        return None
+
+
+def _read_saved_setting_sets_from_doc(doc):
+    try:
+        from System import String
+        project_info = getattr(doc, "ProjectInformation", None)
+        if project_info is None:
+            return {}
+        schema = _get_saved_setting_schema(create=False)
+        if schema is None:
+            return {}
+        entity = project_info.GetEntity(schema)
+        if entity is None or not entity.IsValid():
+            return {}
+        raw = entity.Get[String](SAVED_SETTING_SCHEMA_FIELD) or ""
+        return _parse_saved_setting_sets(raw)
+    except Exception:
+        return {}
+
+
+def _write_saved_setting_sets_to_doc(doc, saved_sets):
+    try:
+        from System import String
+        project_info = getattr(doc, "ProjectInformation", None)
+        if project_info is None:
+            return False
+        schema = _get_saved_setting_schema(create=True)
+        if schema is None:
+            return False
+        payload = json.dumps(saved_sets or {}, sort_keys=True)
+        transaction = DB.Transaction(doc, "Save Import Key Schedule Settings")
+        transaction.Start()
+        try:
+            entity = DB.ExtensibleStorage.Entity(schema)
+            entity.Set[String](SAVED_SETTING_SCHEMA_FIELD, payload)
+            project_info.SetEntity(entity)
+            transaction.Commit()
+            return True
+        except Exception:
+            try:
+                transaction.RollBack()
+            except Exception:
+                pass
+            return False
+    except Exception:
+        return False
+
+
+def _load_saved_setting_sets(doc, config):
+    doc_sets = _read_saved_setting_sets_from_doc(doc)
+    if doc_sets:
+        return doc_sets
+    raw = _safe_config_get(config, SAVED_SETTING_SETS_KEY, "") or ""
+    return _parse_saved_setting_sets(raw)
+
+
+def _write_saved_setting_sets(doc, config, saved_sets):
+    wrote_doc = _write_saved_setting_sets_to_doc(doc, saved_sets)
     if config is None:
-        return
+        return wrote_doc
     try:
         payload = json.dumps(saved_sets or {}, sort_keys=True)
     except Exception:
         payload = "{}"
     _safe_config_set(config, SAVED_SETTING_SETS_KEY, payload)
     _save_config()
+    return wrote_doc
 
 
 def _header_signature(headers):
@@ -1631,12 +1707,12 @@ def main():
 
     param_names, param_map = get_category_parameter_options(doc, category_bic)
     parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
-    saved_setting_sets = _load_saved_setting_sets(config)
+    saved_setting_sets = _load_saved_setting_sets(doc, config)
 
     def persist_saved_setting_sets(updated_sets):
         saved_setting_sets.clear()
         saved_setting_sets.update(updated_sets or {})
-        _write_saved_setting_sets(config, saved_setting_sets)
+        _write_saved_setting_sets(doc, config, saved_setting_sets)
 
     last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
 
