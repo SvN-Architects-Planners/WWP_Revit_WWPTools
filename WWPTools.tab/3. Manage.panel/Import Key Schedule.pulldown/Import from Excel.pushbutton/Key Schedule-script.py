@@ -20,6 +20,11 @@ PROJECT_SETTINGS_PARAM = "! P_STATS_KeyScheduleMap"
 PROJECT_SETTINGS_NAMESPACE = "import_key_schedule"
 PROJECT_SETTINGS_SAVED_SETS_KEY = "saved_sets"
 SAVED_SETTING_SETS_KEY = "area_key_import_saved_setting_sets_json"
+_APPDATA_ROOT = os.path.join(
+    os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
+    "pyRevit", "WWPTools",
+)
+SAVED_SETS_GLOBAL_FILE = os.path.join(_APPDATA_ROOT, "ImportAreaKeySchedule_saved_sets.json")
 SAVED_SETTING_FILE_FILTER = "WWPTools Import Key Schedule Settings (*.json)|*.json|All Files (*.*)|*.*"
 LEGACY_SAVED_SETTING_SCHEMA_GUID = "79c6f037-2a4b-4b5d-8ab8-fb699f0785af"
 LEGACY_SAVED_SETTING_SCHEMA_FIELD = "SavedSetsJson"
@@ -433,6 +438,11 @@ def _show_area_keyplan_import_dialog(
             combo = _find_first_visual_child(row, WpfComboBox)
             if combo is None:
                 continue
+            try:
+                if combo.ItemsSource is None:
+                    combo.ItemsSource = net_options
+            except Exception:
+                pass
             selected_value = str(getattr(item, "SelectedOption", "") or "")
             if selected_value:
                 try:
@@ -689,6 +699,27 @@ def _write_saved_setting_sets_to_project_param(doc, saved_sets):
     return _write_project_settings_payload(doc, payload)
 
 
+def _read_global_saved_sets():
+    if not os.path.isfile(SAVED_SETS_GLOBAL_FILE):
+        return {}
+    try:
+        with open(SAVED_SETS_GLOBAL_FILE, "r") as f:
+            data = json.load(f)
+        return _parse_saved_setting_sets(data)
+    except Exception:
+        return {}
+
+
+def _write_global_saved_sets(saved_sets):
+    try:
+        if not os.path.isdir(_APPDATA_ROOT):
+            os.makedirs(_APPDATA_ROOT)
+        with open(SAVED_SETS_GLOBAL_FILE, "w") as f:
+            json.dump(saved_sets or {}, f, indent=2, sort_keys=True)
+    except Exception:
+        pass
+
+
 def _read_legacy_saved_setting_sets_from_doc(doc):
     try:
         from System import Guid, String
@@ -719,7 +750,11 @@ def _load_saved_setting_sets(doc, config):
     local_sets = _parse_saved_setting_sets(raw)
     if local_sets:
         _write_saved_setting_sets_to_project_param(doc, local_sets)
-    return local_sets
+        return local_sets
+    global_sets = _read_global_saved_sets()
+    if global_sets:
+        _write_saved_setting_sets_to_project_param(doc, global_sets)
+    return global_sets
 
 
 def _write_saved_setting_sets(doc, config, saved_sets):
@@ -736,6 +771,7 @@ def _write_saved_setting_sets(doc, config, saved_sets):
         payload = "{}"
     _safe_config_set(config, SAVED_SETTING_SETS_KEY, payload)
     _save_config()
+    _write_global_saved_sets(saved_sets)
     return wrote_doc
 
 
