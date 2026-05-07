@@ -439,16 +439,19 @@ def _show_area_keyplan_import_dialog(
             if combo is None:
                 continue
             try:
-                if combo.ItemsSource is None:
-                    combo.ItemsSource = net_options
+                combo.ItemsSource = net_options
             except Exception:
                 pass
             selected_value = str(getattr(item, "SelectedOption", "") or "")
-            if selected_value:
-                try:
-                    combo.SelectedItem = selected_value
-                except Exception:
-                    pass
+            if not selected_value:
+                continue
+            try:
+                for idx in range(net_options.Count):
+                    if str(net_options[idx]) == selected_value:
+                        combo.SelectedIndex = idx
+                        break
+            except Exception:
+                pass
 
     def on_browse(sender, e):
         from Microsoft.Win32 import OpenFileDialog
