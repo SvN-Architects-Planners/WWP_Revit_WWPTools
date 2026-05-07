@@ -2,10 +2,23 @@ import os
 import sys
 import traceback
 
+import clr
 from pyrevit import DB, revit
 
+for assembly_name in (
+    "PresentationFramework",
+    "PresentationCore",
+    "WindowsBase",
+    "System.Xml",
+    "System.Xml.ReaderWriter",
+):
+    try:
+        clr.AddReference(assembly_name)
+    except Exception:
+        pass
+
 from System.IO import File, StringReader
-from System import Uri
+from System import Uri, Int64
 from System.Windows import RoutedEventHandler, Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
@@ -38,10 +51,30 @@ from WWP_versioning import apply_window_title
 
 
 def _elem_id_int(eid):
+    if eid is None:
+        return None
     try:
         return int(eid.Value)      # Revit 2024+
-    except AttributeError:
-        return int(eid.Value)  # Revit 2023-
+    except Exception:
+        pass
+    try:
+        return int(eid.IntegerValue)  # Revit 2023-
+    except Exception:
+        pass
+    try:
+        return int(eid)
+    except Exception:
+        return None
+
+
+def _to_element_id(value):
+    if isinstance(value, DB.ElementId):
+        return value
+    raw_value = int(value)
+    try:
+        return DB.ElementId(Int64(raw_value))
+    except Exception:
+        return DB.ElementId(raw_value)
 
 
 def _load_uiutils():
@@ -212,6 +245,7 @@ def _get_levels(doc):
 
 
 def _get_area_plans_by_level(doc, scheme_id):
+    scheme_id_value = _elem_id_int(scheme_id)
     plans = {}
     views = DB.FilteredElementCollector(doc).OfClass(DB.ViewPlan)
     for view in views:
@@ -243,7 +277,7 @@ def _get_area_plans_by_level(doc, scheme_id):
             except Exception:
                 view_scheme_id = None
 
-        if view_scheme_id is None or view_scheme_id != scheme_id:
+        if view_scheme_id is None or _elem_id_int(view_scheme_id) != scheme_id_value:
             continue
 
         level_id = None
@@ -263,8 +297,9 @@ def _get_area_plans_by_level(doc, scheme_id):
             except Exception:
                 level_id = None
 
-        if level_id is not None and level_id not in plans:
-            plans[level_id] = view
+        level_id_value = _elem_id_int(level_id)
+        if level_id_value is not None and level_id_value not in plans:
+            plans[level_id_value] = view
     return plans
 
 
@@ -467,18 +502,20 @@ def _collect_area_tags(doc, view):
 
 
 def _collect_areas_by_scheme_level(doc, scheme_id, level_id):
+    scheme_id_value = _elem_id_int(scheme_id)
+    level_id_value = _elem_id_int(level_id)
     areas = []
     for elem in DB.FilteredElementCollector(doc).OfClass(DB.SpatialElement):
         if not isinstance(elem, DB.Area):
             continue
         area = elem
         try:
-            if area.AreaScheme.Id != scheme_id:
+            if _elem_id_int(area.AreaScheme.Id) != scheme_id_value:
                 continue
         except Exception:
             continue
         try:
-            if area.LevelId != level_id:
+            if _elem_id_int(area.LevelId) != level_id_value:
                 continue
         except Exception:
             continue
@@ -544,13 +581,15 @@ def _tag_untagged_areas(doc, view, areas):
     tagged_ids = set()
     for tag in _collect_area_tags(doc, view):
         area_id = _get_tag_area_id(tag)
-        if area_id is not None:
-            tagged_ids.add(area_id)
+        area_id_value = _elem_id_int(area_id)
+        if area_id_value is not None:
+            tagged_ids.add(area_id_value)
 
     created = 0
     failed = 0
     for area in areas:
-        if area.Id in tagged_ids:
+        area_id_value = _elem_id_int(area.Id)
+        if area_id_value in tagged_ids:
             continue
         uv = _get_area_location_uv(area, view)
         if uv is None:
@@ -560,7 +599,7 @@ def _tag_untagged_areas(doc, view, areas):
         new_tag = _create_area_tag(doc, view, area, point, source_tag=None)
         if new_tag is not None:
             created += 1
-            tagged_ids.add(area.Id)
+            tagged_ids.add(area_id_value)
         else:
             failed += 1
     return created, failed
@@ -711,7 +750,7 @@ def _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id
 
 
 def _list_target_area_color_schemes(doc, target_area_scheme_id):
-    area_category_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
+    area_category_id = _to_element_id(DB.BuiltInCategory.OST_Areas)
     matches = []
     for scheme in _collect_color_fill_schemes(doc):
         try:
@@ -812,16 +851,17 @@ def main():
         transaction.Start()
         for level in selected_levels:
             level_id = level.Id
-            source_view = source_plans.get(level_id)
+            level_id_value = _elem_id_int(level_id)
+            source_view = source_plans.get(level_id_value)
             if not source_view:
                 report_lines.append("{}: no source area plan found".format(level.Name))
                 continue
 
-            target_view = target_plans.get(level_id)
+            target_view = target_plans.get(level_id_value)
             if not target_view:
                 try:
                     target_view = DB.ViewPlan.CreateAreaPlan(doc, target_scheme.Id, level_id)
-                    target_plans[level_id] = target_view
+                    target_plans[level_id_value] = target_view
                 except Exception as ex:
                     report_lines.append("{}: failed to create target area plan ({})".format(level.Name, ex))
                     total_failed += 1

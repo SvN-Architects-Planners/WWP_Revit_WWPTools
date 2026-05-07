@@ -4,6 +4,11 @@
 from pyrevit import DB
 
 try:
+    from System import Int64
+except Exception:
+    Int64 = int
+
+try:
     from System.Collections.Generic import List
 except Exception:
     List = None
@@ -27,13 +32,30 @@ def _to_entry_collection(entries):
 
 
 def _elem_id_int(elem_id):
+    if elem_id is None:
+        return None
     try:
-        return int(_elem_id_int(elem_id))
+        return int(elem_id.Value)  # Revit 2024+
     except Exception:
-        try:
-            return int(elem_id)
-        except Exception:
-            return None
+        pass
+    try:
+        return int(elem_id.IntegerValue)  # Revit 2023-
+    except Exception:
+        pass
+    try:
+        return int(elem_id)
+    except Exception:
+        return None
+
+
+def _to_element_id(value):
+    if isinstance(value, DB.ElementId):
+        return value
+    raw_value = int(value)
+    try:
+        return DB.ElementId(Int64(raw_value))
+    except Exception:
+        return DB.ElementId(raw_value)
 
 
 def _scheme_area_scheme_id(scheme):
@@ -649,7 +671,7 @@ def _set_view_color_fill_scheme_id(view, category_id, scheme_id):
 
 
 def _list_target_area_color_schemes(doc, target_area_scheme_id):
-    area_category_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
+    area_category_id = _to_element_id(DB.BuiltInCategory.OST_Areas)
     matches = []
     for scheme in _collect_color_fill_schemes(doc):
         try:
@@ -664,7 +686,7 @@ def _list_target_area_color_schemes(doc, target_area_scheme_id):
 
 
 def copy_view_area_color_scheme_with_scope(doc, source_view, target_view, target_area_scheme_id):
-    area_category_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
+    area_category_id = _to_element_id(DB.BuiltInCategory.OST_Areas)
     source_scheme_id = _get_view_color_fill_scheme_id(source_view, area_category_id)
     if source_scheme_id is None or source_scheme_id == DB.ElementId.InvalidElementId:
         return False, "source view has no area color scheme assignment"
