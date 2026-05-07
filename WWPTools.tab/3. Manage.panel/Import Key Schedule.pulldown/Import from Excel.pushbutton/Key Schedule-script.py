@@ -1776,8 +1776,9 @@ def main():
     saved_setting_sets = _load_saved_setting_sets(doc, config)
 
     def persist_saved_setting_sets(updated_sets):
+        new_data = dict(updated_sets or {})
         saved_setting_sets.clear()
-        saved_setting_sets.update(updated_sets or {})
+        saved_setting_sets.update(new_data)
         _write_saved_setting_sets(doc, config, saved_setting_sets)
 
     last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
