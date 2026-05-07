@@ -92,6 +92,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -174,14 +175,70 @@
             </Grid>
         </Border>
 
-        <TextBlock Grid.Row="2"
+        <Border Grid.Row="2"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="12"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Saved set"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TitleBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox x:Name="SavedSetCombo"
+                          Grid.Column="1"
+                          IsEditable="True"
+                          MinHeight="32"
+                          Margin="0,0,8,0" />
+                <Button x:Name="LoadSetButton"
+                        Grid.Column="2"
+                        Content="Load"
+                        MinWidth="72"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button x:Name="SaveSetButton"
+                        Grid.Column="3"
+                        Content="Save"
+                        MinWidth="72"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button x:Name="DeleteSetButton"
+                        Grid.Column="4"
+                        Content="Delete"
+                        MinWidth="72"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button x:Name="ExportSetButton"
+                        Grid.Column="5"
+                        Content="Export Setting"
+                        MinWidth="118"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button x:Name="ImportSetButton"
+                        Grid.Column="6"
+                        Content="Import Setting"
+                        MinWidth="118"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="3"
                    Text="Map Excel columns to parameters"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource MutedBrush}"
                    Margin="0,0,0,8" />
 
         <DataGrid x:Name="MappingGrid"
-                  Grid.Row="3"
+                  Grid.Row="4"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   CanUserDeleteRows="False"
@@ -208,7 +265,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <DockPanel Grid.Row="4">
+        <DockPanel Grid.Row="5">
             <Image x:Name="LogoImage"
                    DockPanel.Dock="Left"
                    Width="56"

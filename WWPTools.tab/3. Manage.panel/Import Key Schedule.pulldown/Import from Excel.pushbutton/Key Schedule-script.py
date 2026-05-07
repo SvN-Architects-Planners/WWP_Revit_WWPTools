@@ -1,5 +1,6 @@
 #!python3
 import clr
+import json
 import os
 import re
 import sys
@@ -15,6 +16,33 @@ KEY_NAME_OPTION = "Key Name"
 TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
+SAVED_SETTING_SETS_KEY = "area_key_import_saved_setting_sets_json"
+SAVED_SETTING_FILE_FILTER = "WWPTools Import Key Schedule Settings (*.json)|*.json|All Files (*.*)|*.*"
+STANDARD_HEADER_PARAMETER_ALIASES = {
+    "name": ["Name"],
+    "unitcount": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
+    "unit count": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
+    "program": ["! P_STATS_Program_Text", "P_STATS_Program_Text"],
+    "gca": ["! P_STATS_Area/Room_GCA_YesNo", "P_STATS_Area/Room_GCA_YesNo"],
+    "gfa": ["! P_STATS_Area/Room_GFA_YesNo", "P_STATS_Area/Room_GFA_YesNo"],
+    "gfa by law": ["! P_STATS_Area/Room_GFA_YesNo", "P_STATS_Area/Room_GFA_YesNo"],
+    "gfa bylaw": ["! P_STATS_Area/Room_GFA_YesNo", "P_STATS_Area/Room_GFA_YesNo"],
+    "nsa": ["! P_STATS_Area/Room_NSA_YesNo", "P_STATS_Area/Room_NSA_YesNo"],
+    "display category": ["! P_STATS_Area/Room_GFACategory_Text", "P_STATS_Area/Room_GFACategory_Text"],
+    "gfa category": ["! P_STATS_Area/Room_GFACategory_Text", "P_STATS_Area/Room_GFACategory_Text"],
+    "color": ["! P_STATS_Area/Room_Fill Colour_Text", "P_STATS_Area/Room_Fill Colour_Text"],
+    "colour": ["! P_STATS_Area/Room_Fill Colour_Text", "P_STATS_Area/Room_Fill Colour_Text"],
+    "fill color": ["! P_STATS_Area/Room_Fill Colour_Text", "P_STATS_Area/Room_Fill Colour_Text"],
+    "fill colour": ["! P_STATS_Area/Room_Fill Colour_Text", "P_STATS_Area/Room_Fill Colour_Text"],
+    "boma area category": [
+        "! P_STATS_Area/Room_BOMAAreaCategory_Text",
+        "P_STATS_Area/Room_BOMAAreaCategory_Text",
+        "! P_STATS_Area/Room_BOMA Area Category_Text",
+        "P_STATS_Area/Room_BOMA Area Category_Text",
+        "! P_STATS_Area/Room_BOMACategory_Text",
+        "P_STATS_Area/Room_BOMACategory_Text",
+    ],
+}
 
 
 def _load_local_window_xaml(xaml_name):
@@ -81,6 +109,8 @@ def _show_area_keyplan_import_dialog(
     parameter_options=None,
     default_selections=None,
     auto_map_selections=None,
+    saved_setting_sets=None,
+    save_saved_setting_sets=None,
     width=980,
     height=720,
 ):
@@ -89,6 +119,7 @@ def _show_area_keyplan_import_dialog(
     from System.Collections.Generic import List
     from System.Windows.Controls import ComboBox as WpfComboBox
     from System.Windows.Interop import WindowInteropHelper
+    from System.Windows import MessageBox
 
     window = _load_local_window_xaml("AreaKeyplanImportWindow.xaml")
     window.Title = title or "Import Area Key Schedule"
@@ -112,6 +143,12 @@ def _show_area_keyplan_import_dialog(
     mapping_grid = window.FindName("MappingGrid")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
+    saved_set_combo = window.FindName("SavedSetCombo")
+    load_set_button = window.FindName("LoadSetButton")
+    save_set_button = window.FindName("SaveSetButton")
+    delete_set_button = window.FindName("DeleteSetButton")
+    export_set_button = window.FindName("ExportSetButton")
+    import_set_button = window.FindName("ImportSetButton")
 
     if file_path_box is not None:
         file_path_box.Text = file_path or ""
@@ -128,6 +165,7 @@ def _show_area_keyplan_import_dialog(
     options = [str(o) for o in (parameter_options or [])]
     columns = [str(c) for c in (column_names or [])]
     defaults = [str(d) for d in (default_selections or [])]
+    saved_sets = saved_setting_sets if isinstance(saved_setting_sets, dict) else {}
     net_options = List[String]()
     for option in options:
         net_options.Add(option)
@@ -147,6 +185,12 @@ def _show_area_keyplan_import_dialog(
     for i, col in enumerate(columns):
         mappings.Add(_ColumnMapping(col, _normalize_mapped_selection(i, defaults)))
 
+    def _show_message(message):
+        try:
+            MessageBox.Show(window, message, title)
+        except Exception:
+            pass
+
     if mapping_grid is not None:
         mapping_grid.Tag = net_options
         mapping_grid.ItemsSource = mappings
@@ -156,6 +200,165 @@ def _show_area_keyplan_import_dialog(
             ok_button.IsEnabled = has_data
 
     result_state = {"load_requested": False}
+
+    def _refresh_saved_set_combo(selected_name=None):
+        if saved_set_combo is None:
+            return
+        current = selected_name if selected_name is not None else str(saved_set_combo.Text or "")
+        saved_set_combo.Items.Clear()
+        for name in sorted(saved_sets.keys()):
+            saved_set_combo.Items.Add(name)
+        if current:
+            saved_set_combo.Text = current
+
+    def _current_target_type():
+        return str(target_combo.SelectedItem or "") if target_combo is not None else ""
+
+    def _current_mapping_payload():
+        _sync_mapping_grid_combos()
+        items = []
+        if mapping_grid is not None and mapping_grid.ItemsSource is not None:
+            for i in range(mapping_grid.Items.Count):
+                item = mapping_grid.Items[i]
+                label = str(getattr(item, "ColumnName", "") or "")
+                header = _strip_excel_column_prefix(label)
+                option = str(getattr(item, "SelectedOption", "") or "")
+                items.append(
+                    {
+                        "index": i,
+                        "column": label,
+                        "header": header,
+                        "option": option,
+                    }
+                )
+        return {
+            "version": 1,
+            "target_type": _current_target_type(),
+            "mappings": items,
+        }
+
+    def _save_saved_sets():
+        if callable(save_saved_setting_sets):
+            try:
+                save_saved_setting_sets(saved_sets)
+            except Exception:
+                pass
+
+    def _apply_setting_set(set_data):
+        if not isinstance(set_data, dict):
+            _show_message("Saved set data is not valid.")
+            return
+        mappings_data = set_data.get("mappings") or []
+        by_header = {}
+        by_column = {}
+        by_index = {}
+        for entry in mappings_data:
+            if not isinstance(entry, dict):
+                continue
+            option = str(entry.get("option") or "")
+            if option not in options:
+                continue
+            header_key = _normalize_name(_strip_excel_column_prefix(entry.get("header") or ""))
+            column_key = _normalize_name(entry.get("column") or "")
+            if header_key:
+                by_header[header_key] = option
+            if column_key:
+                by_column[column_key] = option
+            try:
+                by_index[int(entry.get("index"))] = option
+            except Exception:
+                pass
+
+        applied = 0
+        if mapping_grid is not None and mapping_grid.ItemsSource is not None:
+            for i in range(mapping_grid.Items.Count):
+                item = mapping_grid.Items[i]
+                label = str(getattr(item, "ColumnName", "") or "")
+                header_key = _normalize_name(_strip_excel_column_prefix(label))
+                column_key = _normalize_name(label)
+                option = by_header.get(header_key) or by_column.get(column_key) or by_index.get(i)
+                if option and option in options:
+                    item.SelectedOption = option
+                    applied += 1
+        _sync_mapping_grid_combos()
+        if applied == 0 and mappings_data:
+            _show_message("Saved set loaded, but none of its mapped parameters are available for the current target.")
+
+    def _selected_set_name():
+        return str(saved_set_combo.Text or "").strip() if saved_set_combo is not None else ""
+
+    def on_load_set(sender, e):
+        name = _selected_set_name()
+        if not name or name not in saved_sets:
+            _show_message("Select a saved set to load.")
+            return
+        _apply_setting_set(saved_sets[name])
+
+    def on_save_set(sender, e):
+        name = _selected_set_name()
+        if not name:
+            _show_message("Type a saved set name before saving.")
+            return
+        saved_sets[name] = _current_mapping_payload()
+        _save_saved_sets()
+        _refresh_saved_set_combo(name)
+
+    def on_delete_set(sender, e):
+        name = _selected_set_name()
+        if not name or name not in saved_sets:
+            _show_message("Select a saved set to delete.")
+            return
+        del saved_sets[name]
+        _save_saved_sets()
+        _refresh_saved_set_combo("")
+
+    def on_export_set(sender, e):
+        name = _selected_set_name()
+        if not name or name not in saved_sets:
+            _show_message("Select a saved set to export.")
+            return
+        from Microsoft.Win32 import SaveFileDialog
+        dlg = SaveFileDialog()
+        dlg.Title = "Export Key Schedule Setting"
+        dlg.Filter = SAVED_SETTING_FILE_FILTER
+        dlg.DefaultExt = "json"
+        dlg.FileName = "{}.json".format(re.sub(r"[^A-Za-z0-9_. -]+", "_", name).strip(" .") or "ImportKeyScheduleSetting")
+        if dlg.ShowDialog() == True:
+            data = {
+                "tool": "WWPTools Import Key Schedule",
+                "version": 1,
+                "name": name,
+                "setting": saved_sets[name],
+            }
+            try:
+                with open(dlg.FileName, "w") as f:
+                    json.dump(data, f, indent=2, sort_keys=True)
+            except Exception as exc:
+                _show_message("Could not export setting file.\n{}".format(exc))
+
+    def on_import_set(sender, e):
+        from Microsoft.Win32 import OpenFileDialog
+        dlg = OpenFileDialog()
+        dlg.Title = "Import Key Schedule Setting"
+        dlg.Filter = SAVED_SETTING_FILE_FILTER
+        dlg.CheckFileExists = True
+        if dlg.ShowDialog() != True:
+            return
+        try:
+            with open(dlg.FileName, "r") as f:
+                data = json.load(f)
+        except Exception as exc:
+            _show_message("Could not read setting file.\n{}".format(exc))
+            return
+        name = str(data.get("name") or os.path.splitext(os.path.basename(dlg.FileName))[0]).strip()
+        setting = data.get("setting") if isinstance(data, dict) else None
+        if not isinstance(setting, dict):
+            _show_message("Setting file is not valid.")
+            return
+        saved_sets[name] = setting
+        _save_saved_sets()
+        _refresh_saved_set_combo(name)
+        _apply_setting_set(setting)
 
     def _sync_mapping_grid_combos():
         if mapping_grid is None or mapping_grid.ItemsSource is None:
@@ -228,6 +431,17 @@ def _show_area_keyplan_import_dialog(
         load_button.Click += on_load
     if cancel_button is not None:
         cancel_button.Click += on_cancel
+    if load_set_button is not None:
+        load_set_button.Click += on_load_set
+    if save_set_button is not None:
+        save_set_button.Click += on_save_set
+    if delete_set_button is not None:
+        delete_set_button.Click += on_delete_set
+    if export_set_button is not None:
+        export_set_button.Click += on_export_set
+    if import_set_button is not None:
+        import_set_button.Click += on_import_set
+    _refresh_saved_set_combo()
     window.ContentRendered += on_content_rendered
 
     if window.ShowDialog() != True:
@@ -339,6 +553,37 @@ def _save_config():
         pass
 
 
+def _load_saved_setting_sets(config):
+    raw = _safe_config_get(config, SAVED_SETTING_SETS_KEY, "") or ""
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    cleaned = {}
+    for name, setting in data.items():
+        if not name or not isinstance(setting, dict):
+            continue
+        cleaned[str(name)] = setting
+    return cleaned
+
+
+def _write_saved_setting_sets(config, saved_sets):
+    if config is None:
+        return
+    try:
+        payload = json.dumps(saved_sets or {}, sort_keys=True)
+    except Exception:
+        payload = "{}"
+    _safe_config_set(config, SAVED_SETTING_SETS_KEY, payload)
+    _save_config()
+
+
 def _header_signature(headers):
     return "|".join([_normalize_name(h) for h in headers or []])
 
@@ -356,22 +601,38 @@ def _target_category_key(selected_target_type):
     return _normalize_name(target.get("label"))
 
 
-def _load_saved_mapping(config, category_key, signature, column_count, parameter_options):
+def _load_saved_mapping(config, category_key, signature, column_count, parameter_options, auto_defaults=None):
     saved_signature = _safe_config_get(config, _mapping_signature_key(category_key), "") or ""
     saved_selections = _safe_config_get(config, _mapping_selection_key(category_key), None)
     defaults = None
     if saved_signature == signature:
         defaults = _sanitize_selections(saved_selections, column_count, parameter_options)
     if defaults is not None:
-        return defaults
+        return _merge_defaults_with_saved(auto_defaults, defaults)
 
     legacy_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
     legacy_target = _safe_config_get(config, "area_key_import_target", "") or ""
     legacy_target_key = _target_category_key(legacy_target) if legacy_target else ""
     legacy_selections = _safe_config_get(config, "area_key_import_selected_options", None)
     if legacy_signature == signature and legacy_target_key == category_key:
-        return _sanitize_selections(legacy_selections, column_count, parameter_options)
+        defaults = _sanitize_selections(legacy_selections, column_count, parameter_options)
+        return _merge_defaults_with_saved(auto_defaults, defaults)
     return None
+
+
+def _merge_defaults_with_saved(auto_defaults, saved_defaults):
+    if not auto_defaults:
+        return saved_defaults
+    if not saved_defaults or len(saved_defaults) != len(auto_defaults):
+        return list(auto_defaults)
+    merged = []
+    for index, auto_value in enumerate(auto_defaults):
+        saved_value = saved_defaults[index]
+        if auto_value and auto_value != SKIP_OPTION:
+            merged.append(auto_value)
+        else:
+            merged.append(saved_value)
+    return merged
 
 
 def _sanitize_selections(selections, column_count, parameter_options):
@@ -681,6 +942,15 @@ def _strip_excel_column_prefix(value):
     return raw
 
 
+def _alias_key(value):
+    raw = _strip_excel_column_prefix(value)
+    text = raw.replace("&", " and ")
+    text = re.sub(r"[_\-/]+", " ", text)
+    text = re.sub(r"[^a-zA-Z0-9\s]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    return text
+
+
 def _match_text_variants(value):
     source_values = []
     raw = (value or "").strip()
@@ -751,6 +1021,47 @@ def _build_parameter_candidates(param_display_names):
             }
         )
     return candidates
+
+
+def _build_parameter_lookup(param_display_names):
+    lookup = {}
+    for name in param_display_names or []:
+        raw = (name or "").strip()
+        if not raw:
+            continue
+        keys = [_normalize_name(raw), _alias_key(raw)]
+        base = _base_parameter_name(raw)
+        if base != raw:
+            keys.extend([_normalize_name(base), _alias_key(base)])
+        for variant in _match_text_variants(raw):
+            keys.append(variant)
+            keys.append(variant.replace(" ", ""))
+        for key in keys:
+            if key and key not in lookup:
+                lookup[key] = name
+    return lookup
+
+
+def _standard_parameter_match(header, param_display_names):
+    header_key = _alias_key(header)
+    if not header_key:
+        return None
+    target_names = STANDARD_HEADER_PARAMETER_ALIASES.get(header_key)
+    if not target_names:
+        return None
+
+    lookup = _build_parameter_lookup(param_display_names)
+    for target_name in target_names:
+        for key in (_normalize_name(target_name), _alias_key(target_name)):
+            if key in lookup:
+                return lookup[key]
+        for variant in _match_text_variants(target_name):
+            if variant in lookup:
+                return lookup[variant]
+            compact = variant.replace(" ", "")
+            if compact in lookup:
+                return lookup[compact]
+    return None
 
 
 def _contains_parameter_match(header, param_display_names):
@@ -887,36 +1198,28 @@ def _fuzzy_match_parameter(header, param_display_names):
 
 def build_default_selections(headers, param_display_names):
     defaults = []
-    name_lookup = {}
-    for name in param_display_names:
-        raw = (name or "").strip()
-        if not raw:
-            continue
-        key = _normalize_name(raw)
-        if key and key not in name_lookup:
-            name_lookup[key] = name
-        # Also support display names like "Param Name (Id 123)".
-        base = raw
-        if base.endswith(")") and " (id " in _normalize_name(base):
-            base = base.rsplit(" (", 1)[0].strip()
-            base_key = _normalize_name(base)
-            if base_key and base_key not in name_lookup:
-                name_lookup[base_key] = name
+    name_lookup = _build_parameter_lookup(param_display_names)
     for header in headers:
         header_text = (header or "").strip()
         if not header_text:
             defaults.append(SKIP_OPTION)
             continue
         header_lower = _normalize_name(header_text)
-        if header_lower in ("key", "key name", "keyname"):
+        header_alias = _alias_key(header_text)
+        if header_lower in ("key", "key name", "keyname") or header_alias in ("key", "key name", "keyname"):
             defaults.append(KEY_NAME_OPTION)
             continue
-        if header_lower in name_lookup:
-            defaults.append(name_lookup[header_lower])
+        standard_match = _standard_parameter_match(header_text, param_display_names)
+        if standard_match:
+            defaults.append(standard_match)
             continue
-        contains_match = _contains_parameter_match(header_text, param_display_names)
-        if contains_match:
-            defaults.append(contains_match)
+        exact_match = None
+        for key in (_normalize_name(header_text), _alias_key(header_text)):
+            if key in name_lookup:
+                exact_match = name_lookup[key]
+                break
+        if exact_match:
+            defaults.append(exact_match)
             continue
         fuzzy_match = _fuzzy_match_parameter(header_text, param_display_names)
         if fuzzy_match:
@@ -1313,6 +1616,12 @@ def main():
 
     param_names, param_map = get_category_parameter_options(doc, category_bic)
     parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
+    saved_setting_sets = _load_saved_setting_sets(config)
+
+    def persist_saved_setting_sets(updated_sets):
+        saved_setting_sets.clear()
+        saved_setting_sets.update(updated_sets or {})
+        _write_saved_setting_sets(config, saved_setting_sets)
 
     last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
 
@@ -1341,6 +1650,7 @@ def main():
                     signature,
                     len(column_labels),
                     parameter_options,
+                    auto_defaults,
                 )
                 if defaults is None:
                     defaults = list(auto_defaults)
@@ -1371,8 +1681,10 @@ def main():
             parameter_options=parameter_options,
             default_selections=state["defaults"],
             auto_map_selections=state.get("auto_defaults", []),
+            saved_setting_sets=saved_setting_sets,
+            save_saved_setting_sets=persist_saved_setting_sets,
             width=980,
-            height=720,
+            height=780,
         )
         if result is None:
             return
@@ -1438,6 +1750,7 @@ def main():
                 signature,
                 len(column_labels),
                 parameter_options,
+                auto_defaults,
             )
             if defaults is None:
                 defaults = list(auto_defaults)
