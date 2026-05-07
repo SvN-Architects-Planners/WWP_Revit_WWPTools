@@ -300,7 +300,7 @@ def _show_area_keyplan_import_dialog(
                 if option and option in options:
                     item.SelectedOption = option
                     applied += 1
-        _sync_mapping_grid_combos()
+        _push_items_to_combos()
         if applied == 0 and mappings_data:
             _show_message("Saved set loaded, but none of its mapped parameters are available for the current target.")
 
@@ -401,24 +401,40 @@ def _show_area_keyplan_import_dialog(
             combo = _find_first_visual_child(row, WpfComboBox)
             if combo is None:
                 continue
-            try:
-                combo.ItemsSource = net_options
-            except Exception:
-                pass
-            selected_value = str(getattr(item, "SelectedOption", "") or "")
-            try:
-                combo.SelectedItem = selected_value
-            except Exception:
-                pass
-            if (not str(combo.SelectedItem or "")) and options:
+            sel = str(combo.SelectedItem or "")
+            if sel:
                 try:
-                    combo.SelectedIndex = 0
+                    item.SelectedOption = sel
                 except Exception:
                     pass
+
+    def _push_items_to_combos():
+        if mapping_grid is None or mapping_grid.ItemsSource is None:
+            return
+        try:
+            mapping_grid.UpdateLayout()
+        except Exception:
+            pass
+        for i in range(mapping_grid.Items.Count):
             try:
-                item.SelectedOption = str(combo.SelectedItem or "")
+                item = mapping_grid.Items[i]
             except Exception:
-                pass
+                continue
+            try:
+                row = mapping_grid.ItemContainerGenerator.ContainerFromIndex(i)
+            except Exception:
+                row = None
+            if row is None:
+                continue
+            combo = _find_first_visual_child(row, WpfComboBox)
+            if combo is None:
+                continue
+            selected_value = str(getattr(item, "SelectedOption", "") or "")
+            if selected_value:
+                try:
+                    combo.SelectedItem = selected_value
+                except Exception:
+                    pass
 
     def on_browse(sender, e):
         from Microsoft.Win32 import OpenFileDialog
@@ -441,7 +457,7 @@ def _show_area_keyplan_import_dialog(
         window.DialogResult = False
 
     def on_content_rendered(sender, e):
-        _sync_mapping_grid_combos()
+        _push_items_to_combos()
 
     if browse_button is not None:
         browse_button.Click += on_browse
