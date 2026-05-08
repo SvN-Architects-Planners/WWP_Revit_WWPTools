@@ -148,8 +148,30 @@ def main():
     t.Start()
     try:
         for target_level in target_levels:
+            # Build a set of (ViewType, key) signatures already on this target level
+            # so we never create a view that already exists there.
+            existing_sigs = set()
+            for ev in _views_for_level(doc, target_level):
+                if ev.ViewType == DB.ViewType.AreaPlan:
+                    scheme = ev.AreaScheme
+                    sig_key = scheme.Id.IntegerValue if scheme else -1
+                else:
+                    sig_key = ev.GetTypeId().IntegerValue
+                existing_sigs.add((ev.ViewType, sig_key))
+
             for src_view in source_views:
                 vtype = src_view.ViewType
+
+                # Build the signature for this source view
+                if vtype == DB.ViewType.AreaPlan:
+                    src_scheme = src_view.AreaScheme
+                    sig = (vtype, src_scheme.Id.IntegerValue if src_scheme else -1)
+                else:
+                    sig = (vtype, src_view.GetTypeId().IntegerValue)
+
+                if sig in existing_sigs:
+                    skipped.append("'{}' already exists on '{}'".format(src_view.Name, target_level.Name))
+                    continue
 
                 try:
                     if vtype in (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan):
@@ -157,7 +179,6 @@ def main():
                         new_view = DB.ViewPlan.Create(doc, src_view.GetTypeId(), target_level.Id)
 
                     elif vtype == DB.ViewType.AreaPlan:
-                        src_scheme = src_view.AreaScheme
                         if src_scheme is None:
                             failed.append("No area scheme on source view '{}'".format(src_view.Name))
                             continue
@@ -166,6 +187,10 @@ def main():
                     else:
                         skipped.append("'{}' — unsupported type ({})".format(src_view.Name, vtype))
                         continue
+
+                    # Track the new signature so subsequent source views in the same
+                    # loop don't accidentally create a second view of the same type
+                    existing_sigs.add(sig)
 
                     # Apply view template first (before params, template may lock some)
                     tmpl_id = src_view.ViewTemplateId
