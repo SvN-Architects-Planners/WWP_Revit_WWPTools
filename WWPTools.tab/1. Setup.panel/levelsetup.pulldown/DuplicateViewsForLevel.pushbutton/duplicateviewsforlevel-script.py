@@ -5,10 +5,44 @@ For each source view on a chosen level, create an equivalent view on the
 target level(s), copying the exact ViewFamilyType, ViewTemplate, and all
 writable instance parameters (browser-organisation fields, subcategory, etc.).
 """
+import re
 import traceback
 
 from Autodesk.Revit import DB
 import WWP_uiUtils as ui
+
+
+def _derive_view_name(src_name, src_level_name, tgt_level_name):
+    """
+    Replace the level number inside src_name with the target level number.
+
+    e.g. src="SD_LEVEL 02", src_level="LEVEL 02", tgt_level="LEVEL 00"
+         → "SD_LEVEL 00"
+
+    Works by finding the last run of digits in each level name and doing a
+    digit-boundary-aware substitution throughout the view name.
+    Returns the derived name, or None if no numeric part could be found.
+    """
+    src_nums = re.findall(r'\d+', src_level_name)
+    tgt_nums = re.findall(r'\d+', tgt_level_name)
+    if not src_nums or not tgt_nums:
+        return None
+    src_num = src_nums[-1]
+    tgt_num = tgt_nums[-1]
+    derived = re.sub(r'(?<!\d)' + re.escape(src_num) + r'(?!\d)', tgt_num, src_name)
+    return derived if derived != src_name else None
+
+
+def _set_view_name(doc, view, desired_name):
+    """Attempt to rename view, appending a counter on conflict."""
+    name = desired_name
+    for suffix in [''] + [' ({})'.format(i) for i in range(1, 20)]:
+        try:
+            view.Name = name + suffix
+            return name + suffix
+        except Exception:
+            pass
+    return view.Name  # give up, keep whatever Revit assigned
 
 
 def _collect_levels(doc):
@@ -199,7 +233,16 @@ def main():
                     # loop don't accidentally create a second view of the same type
                     existing_sigs.add(sig)
 
-                    # Apply view template first (before params, template may lock some)
+                    # Derive and apply view name before template (template may lock it)
+                    desired_name = _derive_view_name(
+                        src_view.Name, source_level.Name, target_level.Name
+                    )
+                    if desired_name:
+                        final_name = _set_view_name(doc, new_view, desired_name)
+                    else:
+                        final_name = new_view.Name
+
+                    # Apply view template
                     tmpl_id = src_view.ViewTemplateId
                     if tmpl_id and tmpl_id != DB.ElementId.InvalidElementId:
                         try:
@@ -210,7 +253,7 @@ def main():
                     # Copy all writable instance parameters
                     _copy_writable_params(src_view, new_view)
 
-                    created.append("{} → {}".format(src_view.Name, new_view.Name))
+                    created.append("{} → {}".format(src_view.Name, final_name))
 
                 except Exception as ex:
                     failed.append("'{}' on '{}': {}".format(src_view.Name, target_level.Name, str(ex)))
