@@ -38,6 +38,7 @@ def _copy_writable_params(src, dst):
     # Built-in parameters that are set automatically or are meaningless to copy
     _SKIP_BIPS = {
         DB.BuiltInParameter.VIEW_NAME,
+        DB.BuiltInParameter.VIEW_DESCRIPTION,   # Title on Sheet / Name on Sheet
         DB.BuiltInParameter.ELEM_FAMILY_AND_TYPE_PARAM,
         DB.BuiltInParameter.ELEM_FAMILY_PARAM,
         DB.BuiltInParameter.ELEM_TYPE_PARAM,
@@ -45,6 +46,8 @@ def _copy_writable_params(src, dst):
         DB.BuiltInParameter.VIEW_PHASE,
         DB.BuiltInParameter.VIEW_PHASE_FILTER,
     }
+    # Also skip by name in case the param is shared/project and not a BIP
+    _SKIP_NAMES = {"View Name", "Name on Sheet", "Title on Sheet"}
 
     for param in src.Parameters:
         if param.IsReadOnly:
@@ -56,13 +59,17 @@ def _copy_writable_params(src, dst):
         if defn is None:
             continue
 
-        # Skip specific built-in params
+        # Skip by built-in parameter enum
         try:
             bip = defn.BuiltInParameter
             if bip in _SKIP_BIPS:
                 continue
         except Exception:
             pass
+
+        # Skip by parameter name (catches shared/project params with the same intent)
+        if defn.Name in _SKIP_NAMES:
+            continue
 
         try:
             dst_param = dst.LookupParameter(defn.Name)
