@@ -10,7 +10,7 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import DB
 from System.IO import File
-from System.Windows import RoutedEventHandler
+from System.Windows import RoutedEventHandler, Visibility
 from System.Windows.Controls import ComboBoxItem, SelectionChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -65,6 +65,29 @@ def _mode_config(mode):
     }
 
 
+TARGET_OPTIONS = [
+    ("Element names", "element_names"),
+    ("Family names", "family_names"),
+    ("Type names", "type_names"),
+    ("Instance parameter values", "instance_params"),
+]
+
+ELEMENT_SCOPE_OPTIONS = [
+    ("Materials", "Materials"),
+    ("Views", "Views"),
+    ("View Templates", "View Templates"),
+    ("Sheets", "Sheets"),
+    ("Levels", "Levels"),
+    ("Grids", "Grids"),
+    ("Rooms", "Rooms"),
+    ("Spaces", "Spaces"),
+    ("Areas", "Areas"),
+    ("View Filters", "View Filters"),
+    ("Phases", "Phases"),
+    ("Types (Selection)", "Types (Selection)"),
+]
+
+
 def _source_label(scope_key):
     if scope_key in ("Types (Selection)", "Current Selection"):
         return "Source: Current selection"
@@ -80,6 +103,14 @@ def _get_name(element):
 
 def _set_name(element, name):
     element.Name = name
+
+
+def _is_in_group(element):
+    try:
+        gid = element.GroupId
+        return gid is not None and gid != DB.ElementId.InvalidElementId
+    except Exception:
+        return False
 
 
 def _build_new_name(current, find_text, replace_text, prefix, suffix):
@@ -106,6 +137,46 @@ def _add_unique(targets, seen_ids, element):
         return
     seen_ids.add(element_id)
     targets.append(element)
+
+
+def _get_family_from_element_type(element_type):
+    if element_type is None:
+        return None
+    try:
+        family = element_type.Family
+        if family is not None:
+            return family
+    except Exception:
+        pass
+    try:
+        family_name = element_type.FamilyName
+        if not family_name:
+            return None
+        families = DB.FilteredElementCollector(doc).OfClass(DB.Family).ToElements()
+        for family in families:
+            if _get_name(family) == family_name:
+                return family
+    except Exception:
+        pass
+    return None
+
+
+def _get_type_from_instance(current_doc, element):
+    try:
+        type_id = element.GetTypeId()
+        if type_id and type_id != DB.ElementId.InvalidElementId:
+            return current_doc.GetElement(type_id)
+    except Exception:
+        pass
+    return None
+
+
+def _add_type_for_instance(targets, seen_ids, current_doc, element):
+    _add_unique(targets, seen_ids, _get_type_from_instance(current_doc, element))
+
+
+def _add_family_for_instance(targets, seen_ids, current_doc, element):
+    _add_unique(targets, seen_ids, _get_family_from_element_type(_get_type_from_instance(current_doc, element)))
 
 
 def _get_selected_targets(current_doc):
@@ -160,6 +231,162 @@ def _get_selected_targets(current_doc):
         except Exception:
             pass
     return targets
+
+
+def _get_selected_instances(current_doc, ignore_groups):
+    try:
+        current_uidoc = __revit__.ActiveUIDocument
+        selected_ids = list(current_uidoc.Selection.GetElementIds())
+    except Exception:
+        return []
+    elements = []
+    seen_ids = set()
+    for element_id in selected_ids:
+        element = current_doc.GetElement(element_id)
+        if element is None or isinstance(element, DB.ElementType):
+            continue
+        if ignore_groups and _is_in_group(element):
+            continue
+        try:
+            element_key = _elem_id_int(element.Id)
+        except Exception:
+            continue
+        if element_key in seen_ids:
+            continue
+        seen_ids.add(element_key)
+        elements.append(element)
+    return elements
+
+
+def _get_selected_types(current_doc):
+    try:
+        current_uidoc = __revit__.ActiveUIDocument
+        selected_ids = list(current_uidoc.Selection.GetElementIds())
+    except Exception:
+        return []
+    targets = []
+    seen_ids = set()
+    for element_id in selected_ids:
+        element = current_doc.GetElement(element_id)
+        if element is None:
+            continue
+        if isinstance(element, DB.ElementType):
+            _add_unique(targets, seen_ids, element)
+        else:
+            _add_type_for_instance(targets, seen_ids, current_doc, element)
+    return targets
+
+
+def _get_selected_families(current_doc):
+    try:
+        current_uidoc = __revit__.ActiveUIDocument
+        selected_ids = list(current_uidoc.Selection.GetElementIds())
+    except Exception:
+        return []
+    targets = []
+    seen_ids = set()
+    for element_id in selected_ids:
+        element = current_doc.GetElement(element_id)
+        if element is None:
+            continue
+        if isinstance(element, DB.Family):
+            _add_unique(targets, seen_ids, element)
+        elif isinstance(element, DB.ElementType):
+            _add_unique(targets, seen_ids, _get_family_from_element_type(element))
+        else:
+            _add_family_for_instance(targets, seen_ids, current_doc, element)
+    return targets
+
+
+def _get_category_options(current_doc):
+    cats = {}
+    try:
+        all_elems = (
+            DB.FilteredElementCollector(current_doc)
+            .WhereElementIsNotElementType()
+            .ToElements()
+        )
+        for element in all_elems:
+            try:
+                cat = element.Category
+                if cat is not None and cat.CategoryType == DB.CategoryType.Model:
+                    cats[cat.Name] = cat.Id
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return sorted(cats.items())
+
+
+def _collect_instances_by_category(current_doc, cat_id, ignore_groups):
+    try:
+        elements = list(
+            DB.FilteredElementCollector(current_doc)
+            .OfCategoryId(cat_id)
+            .WhereElementIsNotElementType()
+            .ToElements()
+        )
+    except Exception:
+        return []
+    if ignore_groups:
+        elements = [e for e in elements if not _is_in_group(e)]
+    return elements
+
+
+def _collect_types_by_category(current_doc, cat_id):
+    targets = []
+    seen_ids = set()
+    try:
+        for element_type in (
+            DB.FilteredElementCollector(current_doc)
+            .OfCategoryId(cat_id)
+            .WhereElementIsElementType()
+            .ToElements()
+        ):
+            _add_unique(targets, seen_ids, element_type)
+    except Exception:
+        pass
+    for element in _collect_instances_by_category(current_doc, cat_id, ignore_groups=False):
+        _add_type_for_instance(targets, seen_ids, current_doc, element)
+    return targets
+
+
+def _collect_families_by_category(current_doc, cat_id):
+    targets = []
+    seen_ids = set()
+    for element_type in _collect_types_by_category(current_doc, cat_id):
+        _add_unique(targets, seen_ids, _get_family_from_element_type(element_type))
+    return targets
+
+
+def _get_string_parameter_names(elements):
+    names = set()
+    for element in elements:
+        try:
+            for param in element.Parameters:
+                try:
+                    if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
+                        names.add(param.Definition.Name)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    return sorted(names)
+
+
+def _get_param_value(element, param_name):
+    param = element.LookupParameter(param_name)
+    if param is None or param.StorageType != DB.StorageType.String or param.IsReadOnly:
+        return None
+    value = param.AsString()
+    return value if value is not None else ""
+
+
+def _set_param_value(element, param_name, new_value):
+    param = element.LookupParameter(param_name)
+    if param is None or param.StorageType != DB.StorageType.String or param.IsReadOnly:
+        raise Exception("Parameter '{}' not found or read-only".format(param_name))
+    param.Set(new_value)
 
 
 def collect_elements(current_doc, scope_key):
@@ -220,6 +447,26 @@ def collect_elements(current_doc, scope_key):
     return []
 
 
+def collect_target_elements(current_doc, target_key, scope_key, cat_id=None, ignore_groups=False):
+    if current_doc is None:
+        return []
+    if target_key == "element_names":
+        return collect_elements(current_doc, scope_key)
+    if target_key == "type_names":
+        if scope_key == "Current Selection":
+            return _get_selected_types(current_doc)
+        return _collect_types_by_category(current_doc, cat_id)
+    if target_key == "family_names":
+        if scope_key == "Current Selection":
+            return _get_selected_families(current_doc)
+        return _collect_families_by_category(current_doc, cat_id)
+    if target_key == "instance_params":
+        if scope_key == "Current Selection":
+            return _get_selected_instances(current_doc, ignore_groups)
+        return _collect_instances_by_category(current_doc, cat_id, ignore_groups)
+    return []
+
+
 def plan_renames(elements, find_text, replace_text, prefix, suffix):
     existing_lower = {_get_name(e).lower() for e in elements if _get_name(e)}
     planned = []
@@ -248,6 +495,23 @@ def plan_renames(elements, find_text, replace_text, prefix, suffix):
     return planned, skipped
 
 
+def plan_param_renames(elements, param_name, find_text, replace_text, prefix, suffix):
+    planned = []
+    skipped = []
+    for element in elements:
+        old_value = _get_param_value(element, param_name)
+        if old_value is None:
+            continue
+        new_value = _build_new_name(old_value, find_text, replace_text, prefix, suffix).strip()
+        if new_value == old_value:
+            continue
+        if len(new_value) > 255:
+            skipped.append((old_value, new_value, "value too long"))
+            continue
+        planned.append((element, old_value, new_value))
+    return planned, skipped
+
+
 def apply_renames(current_doc, planned, transaction_title, scope_name):
     renamed = []
     failed = []
@@ -260,6 +524,28 @@ def apply_renames(current_doc, planned, transaction_title, scope_name):
                 renamed.append((old_name, new_name))
             except Exception as ex:
                 failed.append((old_name, new_name, str(ex)))
+        transaction.Commit()
+    except Exception as ex:
+        try:
+            transaction.RollBack()
+        except Exception:
+            pass
+        return [], failed + [("<transaction>", "<commit>", str(ex))]
+    return renamed, failed
+
+
+def apply_param_renames(current_doc, planned, param_name, transaction_title, scope_name):
+    renamed = []
+    failed = []
+    transaction = DB.Transaction(current_doc, "{}: {} - {}".format(transaction_title, scope_name, param_name))
+    try:
+        transaction.Start()
+        for element, old_value, new_value in planned:
+            try:
+                _set_param_value(element, param_name, new_value)
+                renamed.append((old_value, new_value))
+            except Exception as ex:
+                failed.append((old_value, new_value, str(ex)))
         transaction.Commit()
     except Exception as ex:
         try:
@@ -308,9 +594,15 @@ def show_dialog(script_dir, lib_path, mode):
     _set_owner(window)
 
     lbl_selector = window.FindName("LblSelector")
+    lbl_target = window.FindName("LblTarget")
     txt_header = window.FindName("TxtHeader")
     txt_subtitle = window.FindName("TxtSubtitle")
+    cmb_target = window.FindName("CmbTarget")
     cmb_category = window.FindName("CmbCategory")
+    row_parameter = window.FindName("RowParameter")
+    cmb_parameter = window.FindName("CmbParameter")
+    chk_ignore_groups = window.FindName("ChkIgnoreGroups")
+    row_ignore_groups = window.FindName("RowIgnoreGroups") or chk_ignore_groups
     txt_source = window.FindName("TxtSource")
     txt_find = window.FindName("TxtFind")
     txt_replace = window.FindName("TxtReplace")
@@ -322,25 +614,46 @@ def show_dialog(script_dir, lib_path, mode):
     window.Title = config["title"]
     txt_header.Text = config["header"]
     txt_subtitle.Text = config["subtitle"]
+    lbl_target.Content = "Rename:"
     lbl_selector.Content = config["selector_label"]
-    cmb_category.Items.Clear()
-    key_by_index = []
-    for display_name, scope_key in config["options"]:
+
+    target_keys = []
+    for display_name, target_key in TARGET_OPTIONS:
         item = ComboBoxItem()
         item.Content = display_name
-        cmb_category.Items.Add(item)
-        key_by_index.append(scope_key)
-    cmb_category.IsEnabled = config["selector_enabled"]
-    cmb_category.SelectedIndex = 0
-    txt_source.Text = _source_label(key_by_index[0])
+        cmb_target.Items.Add(item)
+        target_keys.append(target_key)
+    cmb_target.SelectedIndex = 0
 
-    result = [None]
+    category_keys = []
+    category_ids = []
+    category_names = []
+    param_names = []
+
+    def _target_key():
+        idx = cmb_target.SelectedIndex
+        if idx < 0 or idx >= len(target_keys):
+            return "element_names"
+        return target_keys[idx]
+
+    def _target_display():
+        item = cmb_target.SelectedItem
+        try:
+            return str(item.Content or "")
+        except Exception:
+            return str(item or "")
 
     def _selected_key():
         idx = cmb_category.SelectedIndex
-        if idx < 0 or idx >= len(key_by_index):
+        if idx < 0 or idx >= len(category_keys):
             return ""
-        return key_by_index[idx]
+        return category_keys[idx]
+
+    def _selected_category_id():
+        idx = cmb_category.SelectedIndex
+        if idx < 0 or idx >= len(category_ids):
+            return None
+        return category_ids[idx]
 
     def _selected_display():
         item = cmb_category.SelectedItem
@@ -349,17 +662,118 @@ def show_dialog(script_dir, lib_path, mode):
         except Exception:
             return str(item or "")
 
+    def _populate_parameter_combo(elements):
+        cmb_parameter.Items.Clear()
+        del param_names[:]
+        names = _get_string_parameter_names(elements)
+        param_names.extend(names)
+        if not names:
+            item = ComboBoxItem()
+            item.Content = "(no editable text parameters)"
+            item.IsEnabled = False
+            cmb_parameter.Items.Add(item)
+            cmb_parameter.SelectedIndex = 0
+            return
+        for name in names:
+            item = ComboBoxItem()
+            item.Content = name
+            cmb_parameter.Items.Add(item)
+        cmb_parameter.SelectedIndex = 0
+
+    def _refresh_parameter_combo():
+        if _target_key() != "instance_params":
+            cmb_parameter.Items.Clear()
+            del param_names[:]
+            return
+        elements = collect_target_elements(
+            doc,
+            "instance_params",
+            _selected_key(),
+            _selected_category_id(),
+            chk_ignore_groups.IsChecked == True,
+        )
+        _populate_parameter_combo(elements)
+
+    def _refresh_category_combo():
+        cmb_category.Items.Clear()
+        del category_keys[:]
+        del category_ids[:]
+        del category_names[:]
+        if mode == "selection":
+            item = ComboBoxItem()
+            item.Content = "Current Selection"
+            cmb_category.Items.Add(item)
+            category_keys.append("Current Selection")
+            category_ids.append(None)
+            category_names.append("Current Selection")
+            cmb_category.IsEnabled = False
+            cmb_category.SelectedIndex = 0
+            return
+        if _target_key() == "element_names":
+            for display_name, scope_key in ELEMENT_SCOPE_OPTIONS:
+                item = ComboBoxItem()
+                item.Content = display_name
+                cmb_category.Items.Add(item)
+                category_keys.append(scope_key)
+                category_ids.append(None)
+                category_names.append(display_name)
+        else:
+            for cat_name, cat_id in _get_category_options(doc):
+                item = ComboBoxItem()
+                item.Content = cat_name
+                cmb_category.Items.Add(item)
+                category_keys.append(cat_name)
+                category_ids.append(cat_id)
+                category_names.append(cat_name)
+        cmb_category.IsEnabled = config["selector_enabled"]
+        if cmb_category.Items.Count > 0:
+            cmb_category.SelectedIndex = 0
+
+    def _refresh_target_controls():
+        is_param = _target_key() == "instance_params"
+        if row_parameter is not None:
+            row_parameter.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
+        if row_ignore_groups is not None:
+            row_ignore_groups.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
+        _refresh_category_combo()
+        txt_source.Text = _source_label(_selected_key())
+        _refresh_parameter_combo()
+
+    _refresh_target_controls()
+    cmb_category.IsEnabled = config["selector_enabled"]
+
+    result = [None]
+
     def _on_selector_changed(sender, args):
         txt_source.Text = _source_label(_selected_key())
+        _refresh_parameter_combo()
+
+    def _on_target_changed(sender, args):
+        _refresh_target_controls()
+
+    def _on_ignore_groups_changed(sender, args):
+        _refresh_parameter_combo()
 
     def _on_apply(sender, args):
+        param_name = ""
+        if _target_key() == "instance_params":
+            param_idx = cmb_parameter.SelectedIndex
+            if param_idx < 0 or param_idx >= len(param_names):
+                ui.uiUtils_alert("No editable text parameters available for the current scope.", title=config["title"])
+                return
+            param_name = param_names[param_idx]
         result[0] = {
+            "target_key": _target_key(),
+            "target_display": _target_display(),
             "scope_key": _selected_key(),
             "scope_display": _selected_display(),
+            "cat_id": _selected_category_id(),
+            "param_name": param_name,
             "find": txt_find.Text or "",
             "replace": txt_replace.Text or "",
             "prefix": txt_prefix.Text or "",
             "suffix": txt_suffix.Text or "",
+            "ignore_groups": chk_ignore_groups.IsChecked == True,
         }
         window.DialogResult = True
         window.Close()
@@ -368,7 +782,10 @@ def show_dialog(script_dir, lib_path, mode):
         window.DialogResult = False
         window.Close()
 
+    cmb_target.SelectionChanged += SelectionChangedEventHandler(_on_target_changed)
     cmb_category.SelectionChanged += SelectionChangedEventHandler(_on_selector_changed)
+    chk_ignore_groups.Checked += RoutedEventHandler(_on_ignore_groups_changed)
+    chk_ignore_groups.Unchecked += RoutedEventHandler(_on_ignore_groups_changed)
     btn_apply.Click += RoutedEventHandler(_on_apply)
     btn_cancel.Click += RoutedEventHandler(_on_cancel)
 
@@ -385,32 +802,45 @@ def run(script_dir, lib_path, mode):
 
     scope_key = inputs["scope_key"]
     scope_display = inputs["scope_display"]
+    target_key = inputs["target_key"]
+    target_display = inputs["target_display"]
+    cat_id = inputs["cat_id"]
+    param_name = inputs["param_name"]
     find_text = inputs["find"]
     replace_text = inputs["replace"]
     prefix = inputs["prefix"]
     suffix = inputs["suffix"]
+    ignore_groups = inputs["ignore_groups"]
 
     if not any([find_text, prefix, suffix]):
         ui.uiUtils_alert("Provide at least a Find text, Prefix, or Suffix value.", title=config["title"])
         return
 
-    elements = collect_elements(doc, scope_key)
+    elements = collect_target_elements(doc, target_key, scope_key, cat_id, ignore_groups)
     if not elements:
         if scope_key in ("Current Selection", "Types (Selection)"):
             msg = "No renameable items found in the current selection."
         else:
-            msg = "No {} found in the document.".format(scope_display.lower())
+            msg = "No {} found for {}.".format(target_display.lower(), scope_display.lower())
         ui.uiUtils_alert(msg, title=config["title"])
         return
 
-    planned, skipped = plan_renames(elements, find_text, replace_text, prefix, suffix)
+    if target_key == "instance_params":
+        planned, skipped = plan_param_renames(elements, param_name, find_text, replace_text, prefix, suffix)
+    else:
+        planned, skipped = plan_renames(elements, find_text, replace_text, prefix, suffix)
     if not planned:
-        ui.uiUtils_alert("No elements matched the criteria.\nSkipped: {}".format(len(skipped)), title=config["title"])
+        ui.uiUtils_alert("No values matched the criteria.\nSkipped: {}".format(len(skipped)), title=config["title"])
         return
 
     lines = [
         "Scope:     {}".format(scope_display),
-        "To rename: {}".format(len(planned)),
+        "Target:    {}".format(target_display),
+    ]
+    if target_key == "instance_params":
+        lines.append("Parameter: {}".format(param_name))
+    lines += [
+        "To update: {}".format(len(planned)),
         "Skipped:   {}".format(len(skipped)),
         "",
     ]
@@ -435,9 +865,12 @@ def run(script_dir, lib_path, mode):
     if not proceed:
         return
 
-    renamed, failed = apply_renames(doc, planned, config["transaction_title"], scope_display)
+    if target_key == "instance_params":
+        renamed, failed = apply_param_renames(doc, planned, param_name, config["transaction_title"], scope_display)
+    else:
+        renamed, failed = apply_renames(doc, planned, config["transaction_title"], scope_display)
 
-    result_lines = ["Renamed: {}".format(len(renamed)), "Failed:  {}".format(len(failed))]
+    result_lines = ["Updated: {}".format(len(renamed)), "Failed:  {}".format(len(failed))]
     if failed:
         result_lines += ["", "Failed (first 20):"]
         for old_name, new_name, error_text in failed[:20]:

@@ -2,9 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Super Renamer"
         Width="500"
-        Height="470"
+        Height="560"
         MinWidth="420"
-        MinHeight="430"
+        MinHeight="520"
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
@@ -33,7 +33,13 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="10" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="14" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -57,17 +63,35 @@
                 <ColumnDefinition Width="80" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <Label x:Name="LblTarget" Grid.Column="0" Content="Rename:" />
+            <ComboBox x:Name="CmbTarget" Grid.Column="1" />
+        </Grid>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <Label x:Name="LblSelector" Grid.Column="0" Content="Category:" />
             <ComboBox x:Name="CmbCategory" Grid.Column="1" />
         </Grid>
 
+        <Grid x:Name="RowParameter" Grid.Row="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Content="Parameter:" />
+            <ComboBox x:Name="CmbParameter" Grid.Column="1" />
+        </Grid>
+
         <TextBlock x:Name="TxtSource"
-                   Grid.Row="4"
+                   Grid.Row="8"
                    Foreground="{StaticResource MutedBrush}"
                    FontSize="11"
                    Text="Source: All elements in document" />
 
-        <Border Grid.Row="6"
+        <Border Grid.Row="10"
                 Padding="14,12"
                 Background="{StaticResource PanelBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -102,7 +126,14 @@
             </Grid>
         </Border>
 
-        <DockPanel Grid.Row="8" Margin="0,16,0,0">
+        <CheckBox x:Name="ChkIgnoreGroups"
+                  Grid.Row="12"
+                  IsChecked="True"
+                  Content="Ignore elements in groups"
+                  VerticalAlignment="Center"
+                  Foreground="{StaticResource TextBrush}" />
+
+        <DockPanel Grid.Row="14" Margin="0,16,0,0">
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">

@@ -51,8 +51,70 @@ def load_uiutils():
     return ui
 
 
+def get_revit_class(*class_names):
+    for class_name in class_names:
+        for namespace in (DB, DBArch):
+            try:
+                revit_class = getattr(namespace, class_name, None)
+            except Exception:
+                revit_class = None
+            if revit_class is not None:
+                return revit_class
+    return None
+
+
+def get_built_in_category(category_name):
+    try:
+        return getattr(DB.BuiltInCategory, category_name, None)
+    except Exception:
+        return None
+
+
+def add_class_definition(definitions, label, short_label, class_names, element_types=True):
+    revit_class = get_revit_class(*class_names)
+    if revit_class is None:
+        return
+    definitions.append(
+        {
+            "label": label,
+            "short_label": short_label,
+            "collector": collect_element_types_by_class if element_types else collect_elements_by_class,
+            "revit_class": revit_class,
+            "display_name": get_default_display_name,
+            "comparison_key": get_default_comparison_key,
+        }
+    )
+
+
+def add_category_type_definition(definitions, label, short_label, category_names):
+    built_in_categories = []
+    for category_name in category_names:
+        built_in_category = get_built_in_category(category_name)
+        if built_in_category is not None:
+            built_in_categories.append(built_in_category)
+    if not built_in_categories:
+        return
+    definitions.append(
+        {
+            "label": label,
+            "short_label": short_label,
+            "collector": collect_element_types_by_built_in_categories,
+            "built_in_categories": built_in_categories,
+            "display_name": get_default_display_name,
+            "comparison_key": get_default_comparison_key,
+        }
+    )
+
+
 def get_category_definitions():
     definitions = [
+        {
+            "label": "All Tag Types",
+            "short_label": "Tag Types",
+            "collector": collect_tag_types,
+            "display_name": get_tag_type_display_name,
+            "comparison_key": get_tag_type_comparison_key,
+        },
         {
             "label": "Wall Types",
             "short_label": "Walls",
@@ -116,6 +178,24 @@ def get_category_definitions():
             "display_name": get_project_parameter_display_name,
             "comparison_key": get_project_parameter_comparison_key,
             "copy_func": copy_project_parameter,
+        },
+        {
+            "label": "Project Info",
+            "short_label": "Project Info",
+            "collector": collect_project_info,
+            "display_name": get_project_info_display_name,
+            "comparison_key": get_project_info_comparison_key,
+            "copy_func": copy_project_info,
+            "overwrite_existing": True,
+        },
+        {
+            "label": "Object Styles",
+            "short_label": "Object Styles",
+            "collector": collect_object_style_records,
+            "display_name": get_object_style_display_name,
+            "comparison_key": get_object_style_comparison_key,
+            "copy_func": copy_object_style,
+            "overwrite_existing": True,
         },
         {
             "label": "Color Fill Schemes",
@@ -212,6 +292,32 @@ def get_category_definitions():
             "comparison_key": get_line_style_comparison_key,
         },
     ]
+
+    add_class_definition(definitions, "Area and Volume Computations", "Area and Volume Computations", ["AreaVolumeSettings"], element_types=False)
+    add_class_definition(definitions, "Browser Organizations", "Browser Organizations", ["BrowserOrganization"], element_types=False)
+    add_class_definition(definitions, "Cut Mark Types", "Cut Mark Types", ["CutMarkType"])
+    add_class_definition(definitions, "DWG Export Setup Settings", "DWG Export Setups", ["ExportDWGSettings"], element_types=False)
+    add_class_definition(definitions, "Filters", "Filters", ["ParameterFilterElement"], element_types=False)
+    add_class_definition(definitions, "Guide Grids", "Guide Grids", ["GuideGrid"], element_types=False)
+    add_class_definition(definitions, "Keynoting Settings", "Keynoting Settings", ["KeynoteTable"], element_types=False)
+    add_class_definition(definitions, "Line Patterns", "Line Patterns", ["LinePatternElement"], element_types=False)
+    add_class_definition(definitions, "Line Weights", "Line Weights", ["LineWeightSettings", "LineWeights"], element_types=False)
+    add_class_definition(definitions, "PDF Export Setup Settings", "PDF Export Setups", ["ExportPDFSettings", "PDFExportSettings", "PDFExportSetting"], element_types=False)
+    add_class_definition(definitions, "Print Settings", "Print Settings", ["PrintSetting"], element_types=False)
+    add_class_definition(definitions, "Railing Types", "Railing Types", ["RailingType", "RailType"])
+    add_class_definition(definitions, "Ramp Types", "Ramp Types", ["RampType"])
+    add_class_definition(definitions, "Spot Dimension Settings", "Spot Dimension Settings", ["SpotDimensionType", "SpotDimensionSettings"])
+    add_class_definition(definitions, "Stair Path Types", "Stair Path Types", ["StairsPathType", "StairPathType"])
+    add_class_definition(definitions, "Sun Settings", "Sun Settings", ["SunAndShadowSettings"], element_types=False)
+    add_class_definition(definitions, "View Position Types", "View Positions", ["ViewPositionType", "ViewPosition"])
+    add_class_definition(definitions, "View Reference Types", "View Reference Types", ["ViewReferenceType"])
+    add_class_definition(definitions, "Viewport Types", "Viewport Types", ["ViewportType"])
+    add_class_definition(definitions, "Wall Reveal Types", "Wall Reveal Types", ["WallRevealType"])
+    add_class_definition(definitions, "Wall Sweep Types", "Wall Sweep Types", ["WallSweepType"])
+
+    add_category_type_definition(definitions, "Arrowhead Styles", "Arrowhead Styles", ["OST_Arrowheads"])
+    add_category_type_definition(definitions, "Grid Types", "Grid Types", ["OST_Grids"])
+
     definitions.sort(key=lambda item: (item.get("label") or "").lower())
     return definitions
 
@@ -362,6 +468,193 @@ def get_project_parameter_comparison_key(doc, record):
     return "{}|{}".format(name, binding_kind)
 
 
+def collect_project_info(doc, category_def):
+    try:
+        project_info = doc.ProjectInformation
+    except Exception:
+        project_info = None
+    return [project_info] if project_info is not None else []
+
+
+def get_project_info_display_name(doc, element):
+    return "Project Information"
+
+
+def get_project_info_comparison_key(doc, element):
+    return "project-information"
+
+
+def copy_project_info(source_doc, target_doc, source_project_info):
+    target_project_info = target_doc.ProjectInformation
+    copied = 0
+    for source_param in source_project_info.Parameters:
+        try:
+            if source_param.IsReadOnly:
+                continue
+            definition = source_param.Definition
+            if definition is None:
+                continue
+            target_param = target_project_info.LookupParameter(definition.Name)
+            if target_param is None or target_param.IsReadOnly:
+                continue
+            if set_parameter_value(target_param, source_param):
+                copied += 1
+        except Exception:
+            pass
+    return copied
+
+
+def set_parameter_value(target_param, source_param):
+    try:
+        storage_type = source_param.StorageType
+        if storage_type == DB.StorageType.String:
+            target_param.Set(source_param.AsString() or "")
+            return True
+        if storage_type == DB.StorageType.Integer:
+            target_param.Set(source_param.AsInteger())
+            return True
+        if storage_type == DB.StorageType.Double:
+            target_param.Set(source_param.AsDouble())
+            return True
+        if storage_type == DB.StorageType.ElementId:
+            target_param.Set(source_param.AsElementId())
+            return True
+    except Exception:
+        return False
+    return False
+
+
+def collect_object_style_records(doc, category_def):
+    records = []
+    try:
+        categories = list(doc.Settings.Categories)
+    except Exception:
+        categories = []
+    for category in categories:
+        append_object_style_records(doc, records, category, "")
+    records.sort(key=lambda item: item["path"].lower())
+    return records
+
+
+def append_object_style_records(doc, records, category, parent_path):
+    if category is None:
+        return
+    try:
+        name = category.Name or ""
+    except Exception:
+        name = ""
+    if not name:
+        return
+    path = "{} > {}".format(parent_path, name) if parent_path else name
+    records.append({"category": category, "path": path})
+    try:
+        subcategories = list(category.SubCategories)
+    except Exception:
+        subcategories = []
+    for subcategory in subcategories:
+        append_object_style_records(doc, records, subcategory, path)
+
+
+def get_object_style_display_name(doc, record):
+    return record.get("path") or "Object Style"
+
+
+def get_object_style_comparison_key(doc, record):
+    return normalize_name(get_object_style_display_name(doc, record))
+
+
+def copy_object_style(source_doc, target_doc, source_record):
+    source_category = source_record.get("category")
+    source_path = source_record.get("path")
+    target_category = find_category_by_path(target_doc, source_path)
+    if source_category is None or target_category is None:
+        raise Exception("Matching target object style category was not found.")
+
+    copy_category_line_style(source_doc, target_doc, source_category, target_category, DB.GraphicsStyleType.Projection)
+    copy_category_line_style(source_doc, target_doc, source_category, target_category, DB.GraphicsStyleType.Cut)
+
+    try:
+        target_category.LineColor = source_category.LineColor
+    except Exception:
+        pass
+    try:
+        target_category.Material = map_element_id_by_name(source_doc, target_doc, source_category.Material)
+    except Exception:
+        pass
+    return [target_category.Id]
+
+
+def copy_category_line_style(source_doc, target_doc, source_category, target_category, style_type):
+    try:
+        target_category.SetLineWeight(source_category.GetLineWeight(style_type), style_type)
+    except Exception:
+        pass
+    try:
+        source_pattern_id = source_category.GetLinePatternId(style_type)
+        target_pattern_id = map_line_pattern_id_by_name(source_doc, target_doc, source_pattern_id)
+        if target_pattern_id is not None:
+            target_category.SetLinePatternId(target_pattern_id, style_type)
+    except Exception:
+        pass
+
+
+def find_category_by_path(doc, category_path):
+    parts = [part.strip() for part in (category_path or "").split(">") if part.strip()]
+    if not parts:
+        return None
+    try:
+        categories = list(doc.Settings.Categories)
+    except Exception:
+        categories = []
+    current = find_named_category(categories, parts[0])
+    for part in parts[1:]:
+        if current is None:
+            return None
+        try:
+            subcategories = list(current.SubCategories)
+        except Exception:
+            subcategories = []
+        current = find_named_category(subcategories, part)
+    return current
+
+
+def find_named_category(categories, name):
+    for category in categories:
+        try:
+            if normalize_name(category.Name) == normalize_name(name):
+                return category
+        except Exception:
+            pass
+    return None
+
+
+def map_line_pattern_id_by_name(source_doc, target_doc, source_pattern_id):
+    if source_pattern_id is None or source_pattern_id == DB.ElementId.InvalidElementId:
+        return source_pattern_id
+    source_pattern = source_doc.GetElement(source_pattern_id)
+    if source_pattern is None:
+        return None
+    pattern_name = get_type_name(source_pattern)
+    for target_pattern in DB.FilteredElementCollector(target_doc).OfClass(DB.LinePatternElement):
+        if normalize_name(get_type_name(target_pattern)) == normalize_name(pattern_name):
+            return target_pattern.Id
+    return None
+
+
+def map_element_id_by_name(source_doc, target_doc, source_element_id):
+    if source_element_id is None or source_element_id == DB.ElementId.InvalidElementId:
+        return source_element_id
+    source_element = source_doc.GetElement(source_element_id)
+    if source_element is None:
+        return DB.ElementId.InvalidElementId
+    source_name = get_type_name(source_element)
+    target_class = source_element.GetType()
+    for target_element in DB.FilteredElementCollector(target_doc).OfClass(target_class):
+        if normalize_name(get_type_name(target_element)) == normalize_name(source_name):
+            return target_element.Id
+    return DB.ElementId.InvalidElementId
+
+
 def get_category_name(doc, category_id):
     if category_id is None:
         return "Unknown Category"
@@ -456,6 +749,31 @@ def collect_elements_by_class(doc, category_def):
     return elements
 
 
+def collect_element_types_by_built_in_categories(doc, category_def):
+    elements = []
+    seen_ids = set()
+    for built_in_category in category_def.get("built_in_categories", []):
+        try:
+            collector = (
+                DB.FilteredElementCollector(doc)
+                .OfCategory(built_in_category)
+                .WhereElementIsElementType()
+            )
+        except Exception:
+            continue
+        for element in collector:
+            try:
+                key = element.Id.IntegerValue
+            except Exception:
+                key = str(element.Id)
+            if key in seen_ids:
+                continue
+            seen_ids.add(key)
+            elements.append(element)
+    elements.sort(key=lambda item: category_def["display_name"](doc, item).lower())
+    return elements
+
+
 def collect_project_parameters(doc, category_def):
     records = get_project_parameter_binding_records(doc)
     records.sort(key=lambda item: category_def["display_name"](doc, item).lower())
@@ -497,6 +815,82 @@ def collect_elevation_view_family_types(doc, category_def):
         except Exception:
             pass
     return filtered
+
+
+TAG_TYPE_CATEGORY_NAMES = [
+    "OST_AreaTags",
+    "OST_CaseworkTags",
+    "OST_CeilingTags",
+    "OST_CommunicationDeviceTags",
+    "OST_CurtainWallPanelTags",
+    "OST_DataDeviceTags",
+    "OST_DoorTags",
+    "OST_DuctAccessoryTags",
+    "OST_DuctFittingTags",
+    "OST_DuctInsulationsTags",
+    "OST_DuctLiningsTags",
+    "OST_DuctTags",
+    "OST_ElectricalEquipmentTags",
+    "OST_ElectricalFixtureTags",
+    "OST_FireAlarmDeviceTags",
+    "OST_FlexDuctTags",
+    "OST_FlexPipeTags",
+    "OST_FloorTags",
+    "OST_FurnitureSystemTags",
+    "OST_FurnitureTags",
+    "OST_GenericAnnotation",
+    "OST_GenericModelTags",
+    "OST_KeynoteTags",
+    "OST_LightingDeviceTags",
+    "OST_LightingFixtureTags",
+    "OST_MassTags",
+    "OST_MaterialTags",
+    "OST_MechanicalEquipmentTags",
+    "OST_MultiCategoryTags",
+    "OST_ParkingTags",
+    "OST_PipeAccessoryTags",
+    "OST_PipeFittingTags",
+    "OST_PipeInsulationsTags",
+    "OST_PipeTags",
+    "OST_PlantingTags",
+    "OST_PlumbingFixtureTags",
+    "OST_RailingTags",
+    "OST_RoomTags",
+    "OST_SpecialityEquipmentTags",
+    "OST_StairsTags",
+    "OST_StructuralColumnTags",
+    "OST_StructuralConnectionTags",
+    "OST_StructuralFoundationTags",
+    "OST_StructuralFramingTags",
+    "OST_StructuralStiffenerTags",
+    "OST_WallTags",
+    "OST_WindowTags",
+    "OST_WireTags",
+]
+
+
+def collect_tag_types(doc, category_def):
+    category_def = dict(category_def)
+    category_def["built_in_categories"] = [
+        built_in_category
+        for built_in_category in [get_built_in_category(name) for name in TAG_TYPE_CATEGORY_NAMES]
+        if built_in_category is not None
+    ]
+    return collect_element_types_by_built_in_categories(doc, category_def)
+
+
+def get_tag_type_display_name(doc, element):
+    category_name = "Tag"
+    try:
+        if element.Category and element.Category.Name:
+            category_name = element.Category.Name
+    except Exception:
+        pass
+    return "{} : {}".format(category_name, get_default_display_name(doc, element))
+
+
+def get_tag_type_comparison_key(doc, element):
+    return normalize_name(get_tag_type_display_name(doc, element))
 
 
 def collect_line_styles(doc, category_def):
@@ -594,6 +988,9 @@ def choose_type_elements(ui, source_doc, category_def):
 
 
 def partition_selected_types(target_doc, selected_types, category_def):
+    if category_def.get("overwrite_existing"):
+        return selected_types, []
+
     existing_types = category_def["collector"](target_doc, category_def)
     existing_names = {category_def["comparison_key"](target_doc, item) for item in existing_types}
 
