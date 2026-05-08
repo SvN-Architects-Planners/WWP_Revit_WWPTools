@@ -851,7 +851,12 @@ def _default_schedule_name(file_path, category_label):
     default_name = "{} {}".format(category_label, DEFAULT_SCHEDULE_SUFFIX)
     if file_path:
         try:
-            base = os.path.splitext(os.path.basename(file_path))[0]
+            if _is_url(file_path):
+                from urllib.parse import urlparse, unquote
+                name = os.path.basename(urlparse(file_path).path)
+                base = os.path.splitext(unquote(name))[0]
+            else:
+                base = os.path.splitext(os.path.basename(file_path))[0]
             if base:
                 return base
         except Exception:
@@ -1027,6 +1032,21 @@ def _get_schedulable_parameter_options(doc, category_bic):
     return params
 
 
+def _is_url(path):
+    return bool(path) and path.startswith(("http://", "https://"))
+
+
+def _download_url_to_temp(url):
+    import tempfile
+    import urllib.request
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".xlsx")
+    os.close(tmp_fd)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as response, open(tmp_path, "wb") as f:
+        f.write(response.read())
+    return tmp_path
+
+
 def read_workbook(path, ui):
     add_lib_path()
     try:
@@ -1034,11 +1054,32 @@ def read_workbook(path, ui):
     except Exception as exc:
         ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title=TITLE)
         return None
+
+    tmp_path = None
+    actual_path = path
+    if _is_url(path):
+        try:
+            tmp_path = _download_url_to_temp(path)
+            actual_path = tmp_path
+        except Exception as exc:
+            ui.uiUtils_alert(
+                "Failed to download file from URL.\n{}\n\n"
+                "Tip: use a direct download link. For SharePoint, try appending ?download=1 to the file URL.".format(exc),
+                title=TITLE,
+            )
+            return None
+
     try:
-        return openpyxl.load_workbook(path, data_only=True)
+        return openpyxl.load_workbook(actual_path, data_only=True)
     except Exception as exc:
         ui.uiUtils_alert("Failed to open workbook.\n{}".format(exc), title=TITLE)
         return None
+    finally:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
 
 def _excel_column_letter(index):
@@ -1834,7 +1875,7 @@ def main():
     }
 
     # Preload the most recently used workbook for this target type.
-    if state["file_path"] and os.path.exists(state["file_path"]):
+    if state["file_path"] and (_is_url(state["file_path"]) or os.path.exists(state["file_path"])):
         workbook = read_workbook(state["file_path"], ui)
         if workbook is not None:
             headers, column_labels, rows = extract_excel_data(workbook)
