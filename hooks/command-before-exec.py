@@ -1,4 +1,5 @@
 import os
+import sys
 
 try:
     from pyrevit import EXEC_PARAMS
@@ -9,14 +10,6 @@ try:
     from WWP_license import require_license
 except Exception:
     require_license = None
-
-
-def _cancel_command():
-    try:
-        if EXEC_PARAMS is not None and getattr(EXEC_PARAMS, "event_args", None) is not None:
-            EXEC_PARAMS.event_args.Cancel = True
-    except Exception:
-        pass
 
 
 def _is_wwptools_command():
@@ -33,5 +26,5 @@ def _is_wwptools_command():
         return False
 
 
-if _is_wwptools_command() and (require_license is None or not require_license()):
-    _cancel_command()
+if _is_wwptools_command() and require_license is not None and not require_license():
+    sys.exit(0)
