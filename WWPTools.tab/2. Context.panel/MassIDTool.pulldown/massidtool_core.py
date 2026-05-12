@@ -1,6 +1,7 @@
 from System import Int64
 import clr
 import os
+import re
 import traceback
 
 clr.AddReference("RevitAPI")
@@ -432,13 +433,16 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
 
         count_combo = window.FindName("CountParamCombo")
         area_combo = window.FindName("AreaParamCombo")
+        highest_level_combo = window.FindName("HighestLevelParamCombo")
         ok_button = window.FindName("OkButton")
         cancel_button = window.FindName("CancelButton")
 
         count_combo.ItemsSource = options
         area_combo.ItemsSource = options
+        highest_level_combo.ItemsSource = options
         count_combo.SelectedIndex = 0
         area_combo.SelectedIndex = 0
+        highest_level_combo.SelectedIndex = 0
 
         def ok_clicked(_sender, _args):
             window.DialogResult = True
@@ -456,9 +460,11 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
 
         count_param = str(count_combo.SelectedItem) if count_combo.SelectedItem is not None else SKIP_LABEL
         area_param = str(area_combo.SelectedItem) if area_combo.SelectedItem is not None else SKIP_LABEL
+        highest_level_param = str(highest_level_combo.SelectedItem) if highest_level_combo.SelectedItem is not None else SKIP_LABEL
         return {
             "count_param": None if count_param == SKIP_LABEL else count_param,
             "area_param": None if area_param == SKIP_LABEL else area_param,
+            "highest_level_param": None if highest_level_param == SKIP_LABEL else highest_level_param,
         }
     except Exception:
         return None
@@ -501,9 +507,18 @@ def choose_publish_mapping(param_names, xaml_dir=None):
     if area_param_name == CANCELLED:
         return CANCELLED
 
+    highest_level_param_name = choose_destination_parameter(
+        param_names,
+        "highest floor level number",
+        "Publish Highest Floor Level",
+    )
+    if highest_level_param_name == CANCELLED:
+        return CANCELLED
+
     return {
         "count_param": count_param_name,
         "area_param": area_param_name,
+        "highest_level_param": highest_level_param_name,
     }
 
 
@@ -624,6 +639,48 @@ def set_area_param(doc, param, area_internal):
     return False
 
 
+def get_highest_level_number(floors, doc):
+    """Return the integer extracted from the name of the topmost mass floor's level by elevation."""
+    best_num = None
+    best_elev = None
+    for floor in floors:
+        try:
+            level_id = floor.LevelId
+            if level_id is None:
+                continue
+            level = doc.GetElement(level_id)
+            if level is None:
+                continue
+            elev = level.Elevation
+            name = level.Name or ""
+            match = re.search(r'(\d+)\s*$', name.strip())
+            num = int(match.group(1)) if match else None
+            if best_elev is None or elev > best_elev:
+                best_elev = elev
+                best_num = num
+        except Exception:
+            pass
+    return best_num
+
+
+def set_highest_level_param(param, level_num):
+    if not is_writable_metric_param(param):
+        return False
+    try:
+        if param.StorageType == StorageType.String:
+            param.Set(str(level_num))
+            return True
+        if param.StorageType == StorageType.Integer:
+            param.Set(int(level_num))
+            return True
+        if param.StorageType == StorageType.Double:
+            param.Set(float(level_num))
+            return True
+    except Exception:
+        return False
+    return False
+
+
 def get_param_by_name(element, name):
     try:
         return element.LookupParameter(name)
@@ -674,17 +731,21 @@ def publish_mass_level_metrics(xaml_dir=None):
         return
     count_param_name = mapping.get("count_param")
     area_param_name = mapping.get("area_param")
+    highest_level_param_name = mapping.get("highest_level_param")
 
-    if not count_param_name and not area_param_name:
+    if not count_param_name and not area_param_name and not highest_level_param_name:
         alert("No destination parameters were selected.", title="Publish Mass Level Counts")
         return
-    if count_param_name and area_param_name and count_param_name == area_param_name:
-        alert("Choose different destination parameters for count and typical floor area.", title="Publish Mass Level Counts")
+
+    selected = [n for n in (count_param_name, area_param_name, highest_level_param_name) if n]
+    if len(selected) != len(set(selected)):
+        alert("Each metric must map to a different destination parameter.", title="Publish Mass Level Counts")
         return
 
     updated_masses = 0
     count_written = 0
     area_written = 0
+    highest_level_written = 0
     no_floors = 0
     no_area = 0
     failures = 0
@@ -726,6 +787,16 @@ def publish_mass_level_metrics(xaml_dir=None):
                 else:
                     no_area += 1
 
+            if highest_level_param_name:
+                level_num = get_highest_level_number(floors, doc)
+                if level_num is not None:
+                    param = get_param_by_name(mass, highest_level_param_name)
+                    if set_highest_level_param(param, level_num):
+                        highest_level_written += 1
+                        wrote_any = True
+                    else:
+                        failures += 1
+
             if wrote_any:
                 updated_masses += 1
 
@@ -743,11 +814,13 @@ def publish_mass_level_metrics(xaml_dir=None):
         "Masses updated: {}".format(updated_masses),
         "Mass Floor counts written: {}".format(count_written),
         "Typical floor areas written: {}".format(area_written),
+        "Highest floor level numbers written: {}".format(highest_level_written),
         "Skipped (no associated Mass Floors): {}".format(no_floors),
         "Skipped (no Floor Area values): {}".format(no_area),
         "Failures: {}".format(failures),
         "",
         "Count parameter: {}".format(count_param_name or SKIP_LABEL),
         "Typical floor area parameter: {}".format(area_param_name or SKIP_LABEL),
+        "Highest floor level parameter: {}".format(highest_level_param_name or SKIP_LABEL),
     ]
     alert("\n".join(report), title="Publish Mass Level Counts")
