@@ -758,7 +758,12 @@ def publish_mass_level_metrics(xaml_dir=None):
 
         for mass in masses:
             key = elem_id_int(mass.Id)
-            floors = groups.get(key, [])
+            all_floors = groups.get(key, [])
+            # Only count floors that actually have geometry (area > 0).
+            # Revit creates MassFloor elements for every checked level even when
+            # the mass shape doesn't reach that level, so zero-area entries must
+            # be excluded from the count and highest-level calculation.
+            floors = [f for f in all_floors if get_floor_area_internal(f) > 0]
             if not floors:
                 no_floors += 1
                 continue
