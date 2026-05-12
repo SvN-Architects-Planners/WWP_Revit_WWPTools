@@ -431,15 +431,18 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         except Exception:
             pass
 
+        building_combo = window.FindName("BuildingParamCombo")
         count_combo = window.FindName("CountParamCombo")
         area_combo = window.FindName("AreaParamCombo")
         highest_level_combo = window.FindName("HighestLevelParamCombo")
         ok_button = window.FindName("OkButton")
         cancel_button = window.FindName("CancelButton")
 
+        building_combo.ItemsSource = options
         count_combo.ItemsSource = options
         area_combo.ItemsSource = options
         highest_level_combo.ItemsSource = options
+        building_combo.SelectedIndex = 0
         count_combo.SelectedIndex = 0
         area_combo.SelectedIndex = 0
         highest_level_combo.SelectedIndex = 0
@@ -458,10 +461,12 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         if not window.ShowDialog():
             return CANCELLED
 
+        building_param = str(building_combo.SelectedItem) if building_combo.SelectedItem is not None else SKIP_LABEL
         count_param = str(count_combo.SelectedItem) if count_combo.SelectedItem is not None else SKIP_LABEL
         area_param = str(area_combo.SelectedItem) if area_combo.SelectedItem is not None else SKIP_LABEL
         highest_level_param = str(highest_level_combo.SelectedItem) if highest_level_combo.SelectedItem is not None else SKIP_LABEL
         return {
+            "building_param": None if building_param == SKIP_LABEL else building_param,
             "count_param": None if count_param == SKIP_LABEL else count_param,
             "area_param": None if area_param == SKIP_LABEL else area_param,
             "highest_level_param": None if highest_level_param == SKIP_LABEL else highest_level_param,
@@ -724,8 +729,9 @@ def publish_mass_level_metrics(xaml_dir=None):
         return
 
     mapping = choose_publish_mapping(param_names, xaml_dir=xaml_dir)
-    if mapping == CANCELLED:
+    if mapping is CANCELLED or mapping == CANCELLED:
         return
+    building_param_name = mapping.get("building_param")
     count_param_name = mapping.get("count_param")
     area_param_name = mapping.get("area_param")
     highest_level_param_name = mapping.get("highest_level_param")
@@ -734,10 +740,41 @@ def publish_mass_level_metrics(xaml_dir=None):
         alert("No destination parameters were selected.", title="Publish Mass Level Counts")
         return
 
-    selected = [n for n in (count_param_name, area_param_name, highest_level_param_name) if n]
-    if len(selected) != len(set(selected)):
+    dest_params = [n for n in (count_param_name, area_param_name, highest_level_param_name) if n]
+    if len(dest_params) != len(set(dest_params)):
         alert("Each metric must map to a different destination parameter.", title="Publish Mass Level Counts")
         return
+
+    # Pre-compute highest level per building (or per mass when no building param is chosen).
+    # Done outside the transaction since it only reads data.
+    mass_highest_level = {}  # {elem_id_int: level_num}
+    if highest_level_param_name:
+        if building_param_name:
+            # Collect active floors per building value
+            building_active_floors = {}
+            for mass in masses:
+                val = get_param_value(get_param_by_name(mass, building_param_name))
+                bval = str(val).strip() if val is not None else ""
+                key = elem_id_int(mass.Id)
+                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
+                if bval not in building_active_floors:
+                    building_active_floors[bval] = []
+                building_active_floors[bval].extend(active)
+            # Resolve per-building highest level and map back to each mass
+            building_highest = {
+                bval: get_highest_level_number(bfloors, doc) if bfloors else None
+                for bval, bfloors in building_active_floors.items()
+            }
+            for mass in masses:
+                val = get_param_value(get_param_by_name(mass, building_param_name))
+                bval = str(val).strip() if val is not None else ""
+                mass_highest_level[elem_id_int(mass.Id)] = building_highest.get(bval)
+        else:
+            # Fall back to per-mass highest level
+            for mass in masses:
+                key = elem_id_int(mass.Id)
+                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
+                mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
 
     updated_masses = 0
     count_written = 0
@@ -790,7 +827,7 @@ def publish_mass_level_metrics(xaml_dir=None):
                     no_area += 1
 
             if highest_level_param_name:
-                level_num = get_highest_level_number(floors, doc)
+                level_num = mass_highest_level.get(key)
                 if level_num is not None:
                     param = get_param_by_name(mass, highest_level_param_name)
                     if set_highest_level_param(param, level_num):
@@ -821,6 +858,7 @@ def publish_mass_level_metrics(xaml_dir=None):
         "Skipped (no Floor Area values): {}".format(no_area),
         "Failures: {}".format(failures),
         "",
+        "Building grouping parameter: {}".format(building_param_name or SKIP_LABEL),
         "Count parameter: {}".format(count_param_name or SKIP_LABEL),
         "Typical floor area parameter: {}".format(area_param_name or SKIP_LABEL),
         "Highest floor level parameter: {}".format(highest_level_param_name or SKIP_LABEL),
