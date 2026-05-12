@@ -466,8 +466,9 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
             "area_param": None if area_param == SKIP_LABEL else area_param,
             "highest_level_param": None if highest_level_param == SKIP_LABEL else highest_level_param,
         }
-    except Exception:
-        return None
+    except Exception as exc:
+        alert("Could not load the parameter mapping dialog:\n{}".format(exc), title="Publish Mass Level Counts")
+        return CANCELLED
 
 
 def choose_destination_parameter(param_names, metric_name, title):
@@ -486,40 +487,12 @@ def choose_destination_parameter(param_names, metric_name, title):
 
 def choose_publish_mapping(param_names, xaml_dir=None):
     result = show_publish_mapping_dialog(param_names, xaml_dir)
-    if result == CANCELLED:
+    if result is CANCELLED or result == CANCELLED:
         return CANCELLED
     if isinstance(result, dict):
         return result
-
-    count_param_name = choose_destination_parameter(
-        param_names,
-        "Mass Floor count",
-        "Publish Mass Level Counts",
-    )
-    if count_param_name == CANCELLED:
-        return CANCELLED
-
-    area_param_name = choose_destination_parameter(
-        param_names,
-        "typical floor area",
-        "Publish Mass Typical Floor Area",
-    )
-    if area_param_name == CANCELLED:
-        return CANCELLED
-
-    highest_level_param_name = choose_destination_parameter(
-        param_names,
-        "highest floor level number",
-        "Publish Highest Floor Level",
-    )
-    if highest_level_param_name == CANCELLED:
-        return CANCELLED
-
-    return {
-        "count_param": count_param_name,
-        "area_param": area_param_name,
-        "highest_level_param": highest_level_param_name,
-    }
+    alert("Parameter mapping dialog could not be opened.", title="Publish Mass Level Counts")
+    return CANCELLED
 
 
 def get_floor_area_internal(mass_floor):
@@ -640,9 +613,19 @@ def set_area_param(doc, param, area_internal):
 
 
 def get_highest_level_number(floors, doc):
-    """Return the integer extracted from the name of the topmost mass floor's level by elevation."""
-    best_num = None
-    best_elev = None
+    """Return the highest floor level number adjusted for regional and mezzanine conventions.
+
+    Adjustments applied to the raw number extracted from the highest level's name:
+      +1  if UK numbering is detected (ground floor is numbered 0, e.g. "Level 00")
+      +N  where N is the number of mezzanine levels present (level name contains "mez")
+
+    Examples:
+      NA, no mez  – Level 13            → 13
+      UK, no mez  – Level 12 (00=GF)   → 13  (+1 for 00-based ground)
+      NA, 1 mez   – Level 13 + Mez     → 14  (+1 for mez)
+      UK, 1 mez   – Level 12 + Mez     → 14  (+1 UK +1 mez)
+    """
+    level_info = []
     for floor in floors:
         try:
             level_id = floor.LevelId
@@ -651,16 +634,30 @@ def get_highest_level_number(floors, doc):
             level = doc.GetElement(level_id)
             if level is None:
                 continue
+            name = (level.Name or "").strip()
             elev = level.Elevation
-            name = level.Name or ""
-            match = re.search(r'(\d+)\s*$', name.strip())
-            num = int(match.group(1)) if match else None
-            if best_elev is None or elev > best_elev:
-                best_elev = elev
-                best_num = num
+            is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
+            match = re.search(r'\d+', name)
+            num = int(match.group(0)) if match else None
+            level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
         except Exception:
             pass
-    return best_num
+
+    if not level_info:
+        return None
+
+    # UK convention: ground floor is numbered 0 (e.g. "Level 00")
+    non_mez_nums = [li["num"] for li in level_info if not li["is_mez"] and li["num"] is not None]
+    is_uk = bool(non_mez_nums) and min(non_mez_nums) == 0
+
+    mez_count = sum(1 for li in level_info if li["is_mez"])
+
+    highest = max(level_info, key=lambda li: li["elev"])
+    raw_num = highest["num"]
+    if raw_num is None:
+        return None
+
+    return raw_num + (1 if is_uk else 0) + mez_count
 
 
 def set_highest_level_param(param, level_num):
