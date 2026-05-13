@@ -408,6 +408,7 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         clr.AddReference("PresentationFramework")
         clr.AddReference("PresentationCore")
         clr.AddReference("WindowsBase")
+        clr.AddReference("System.Xml")
         from System import String
         from System.Collections.Generic import List
         from System.IO import File, StringReader
