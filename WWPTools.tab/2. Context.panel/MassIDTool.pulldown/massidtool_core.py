@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from System import Int64
 import clr
 import os
