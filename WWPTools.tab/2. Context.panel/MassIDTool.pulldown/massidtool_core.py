@@ -718,9 +718,22 @@ def get_highest_level_number(floors, doc):
     if not level_info:
         return None
 
-    # UK convention: ground floor is numbered 0 (e.g. "Level 00")
+    # UK convention: ground floor is numbered 0 (e.g. "Level 00").
+    # Detect UK numbering more robustly by checking numeric tokens and explicit '00' naming.
     non_mez_nums = [li["num"] for li in level_info if not li["is_mez"] and li["num"] is not None]
-    is_uk = bool(non_mez_nums) and min(non_mez_nums) == 0
+    is_uk = False
+    if non_mez_nums:
+        if min(non_mez_nums) == 0:
+            is_uk = True
+        else:
+            # fallback: look for explicit '0' or '00' tokens in level names
+            for li in level_info:
+                try:
+                    if re.search(r'\b0+\b', li["name"], re.IGNORECASE):
+                        is_uk = True
+                        break
+                except Exception:
+                    continue
 
     mez_count = sum(1 for li in level_info if li["is_mez"])
 
