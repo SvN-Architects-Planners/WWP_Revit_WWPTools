@@ -396,7 +396,7 @@ def select_one(options, title, prompt):
         return None
 
 
-def show_publish_mapping_dialog(param_names, xaml_dir):
+def show_publish_mapping_dialog(param_names, xaml_dir, preselect=None):
     if not xaml_dir:
         return None
 
@@ -458,6 +458,28 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         count_combo.SelectedIndex = 0
         area_combo.SelectedIndex = 0
         highest_level_combo.SelectedIndex = 0
+
+        # Apply any preselected values (match by exact string)
+        try:
+            if preselect and isinstance(preselect, dict):
+                def set_combo_to(combo, value):
+                    if not combo or not value:
+                        return
+                    try:
+                        # find the item equal to value
+                        for i in range(combo.Items.Count):
+                            if str(combo.Items[i]) == str(value):
+                                combo.SelectedIndex = i
+                                return
+                    except Exception:
+                        pass
+
+                set_combo_to(building_combo, preselect.get("building_param"))
+                set_combo_to(count_combo, preselect.get("count_param"))
+                set_combo_to(area_combo, preselect.get("area_param"))
+                set_combo_to(highest_level_combo, preselect.get("highest_level_param"))
+        except Exception:
+            pass
 
         def ok_clicked(_sender, _args):
             window.DialogResult = True
@@ -830,10 +852,32 @@ def publish_mass_level_metrics(xaml_dir=None):
     # even when they share a building grouping value.
     mass_highest_level = {}  # {elem_id_int: level_num}
     if highest_level_param_name:
+        first_debug = True
         for mass in masses:
             key = elem_id_int(mass.Id)
             active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
             mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
+
+            # Show a one-time diagnostic for the first mass so we can inspect level parsing
+            if first_debug and active:
+                try:
+                    info_lines = ["Level diagnostic for Mass id {}:".format(key)]
+                    for f in active:
+                        try:
+                            lid = f.LevelId
+                            lvl = doc.GetElement(lid) if lid is not None else None
+                            name = (lvl.Name or "") if lvl is not None else "(no level)"
+                            match = re.search(r'\d+', name)
+                            num = int(match.group(0)) if match else None
+                            info_lines.append("  - {} -> num={}".format(name, num))
+                        except Exception:
+                            pass
+                    info_lines.append("")
+                    info_lines.append("Computed highest (raw + UK/mezz adj): {}".format(mass_highest_level[key]))
+                    alert("\n".join(info_lines), title="Publish Mass Level Counts - Debug")
+                except Exception:
+                    pass
+                first_debug = False
 
     updated_masses = 0
     count_written = 0
