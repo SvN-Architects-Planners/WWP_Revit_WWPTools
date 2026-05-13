@@ -784,10 +784,16 @@ def get_highest_level_number(floors, doc):
         if not unique_elevs or abs(e - unique_elevs[-1]) > tol:
             unique_elevs.append(e)
 
-    # Map elevation -> index (1-based)
-    elev_to_index = {e: i + 1 for i, e in enumerate(unique_elevs)}
+    # Use project baseline at elevation 0.0: index levels from the first elevation >= 0.0
+    baseline = 0.0
+    elevs_at_or_above = [e for e in unique_elevs if e >= baseline - tol]
+    if not elevs_at_or_above:
+        elevs_at_or_above = unique_elevs
 
-    # For each floor, find its level elevation and map to closest unique elevation
+    # Map elevation -> index (1-based) starting from baseline group
+    elev_to_index = {e: i + 1 for i, e in enumerate(elevs_at_or_above)}
+
+    # For each floor, find its level elevation and map to nearest elevation in elevs_at_or_above
     indices = []
     for floor in floors:
         try:
@@ -798,8 +804,8 @@ def get_highest_level_number(floors, doc):
             if lvl is None:
                 continue
             lev = float(lvl.Elevation)
-            # find nearest in unique_elevs
-            nearest = min(unique_elevs, key=lambda ue: abs(ue - lev))
+            # find nearest in elevs_at_or_above
+            nearest = min(elevs_at_or_above, key=lambda ue: abs(ue - lev))
             indices.append(elev_to_index[nearest])
         except Exception:
             continue
@@ -921,6 +927,44 @@ def publish_mass_level_metrics(xaml_dir=None):
                 except Exception:
                     pass
                 first_debug = False
+
+    # Build preview and ask for confirmation before starting transaction
+    try:
+        try:
+            import WWP_uiUtils as ui
+            have_ui = True
+        except Exception:
+            have_ui = False
+
+        preview_lines = ["Preview of changes to be written:"]
+        for mass in masses:
+            try:
+                key = elem_id_int(mass.Id)
+                all_floors = groups.get(key, [])
+                floors = [f for f in all_floors if get_floor_area_internal(f) > 0]
+                count_val = len(floors)
+                areas = [get_floor_area_internal(f) for f in floors]
+                areas = [a for a in areas if a > 0]
+                typical_area = format_area_value(doc, sum(areas) / float(len(areas))) if areas else "(none)"
+                highest_val = mass_highest_level.get(key)
+                try:
+                    mname = getattr(mass, 'Name', None) or mass.GetType().Name
+                except Exception:
+                    mname = str(key)
+                preview_lines.append("- {} (id={}): floors={}, area={}, highest={}".format(mname, key, count_val, typical_area, highest_val if highest_val is not None else '(none)'))
+            except Exception:
+                continue
+
+        # If any destination mapping is missing but we still have values, prompt user anyway
+        preview_text = "\n".join(preview_lines)
+        if have_ui:
+            try:
+                if not ui.uiUtils_confirm(preview_text, title="Publish Mass Level Counts - Preview"):
+                    return
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     updated_masses = 0
     count_written = 0
