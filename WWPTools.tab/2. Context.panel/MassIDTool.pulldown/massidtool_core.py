@@ -520,13 +520,51 @@ def choose_destination_parameter(param_names, metric_name, title):
 
 
 def choose_publish_mapping(param_names, xaml_dir=None):
-    result = show_publish_mapping_dialog(param_names, xaml_dir)
-    if result is CANCELLED or result == CANCELLED:
+    # Try to auto-detect sensible defaults from parameter names.
+    def guess_mapping(names):
+        lower = [n.lower() for n in names]
+        mapping = {"building_param": None, "count_param": None, "area_param": None, "highest_level_param": None}
+
+        # building: contains 'build' or 'building'
+        for n in names:
+            nl = n.lower()
+            if mapping["building_param"] is None and ("build" in nl or "building" in nl):
+                mapping["building_param"] = n
+
+        # count: contains 'count' or 'massfloorcount' or 'floorcount'
+        for n in names:
+            nl = n.lower()
+            if mapping["count_param"] is None and ("count" in nl or "floorcount" in nl or "massfloor" in nl):
+                mapping["count_param"] = n
+
+        # area: contains 'area' or 'typicalfloor'
+        for n in names:
+            nl = n.lower()
+            if mapping["area_param"] is None and ("area" in nl or "typical" in nl):
+                mapping["area_param"] = n
+
+        # highest level: contains 'highest' or 'level' with 'highest' or 'highestlevel' or 'highest_level'
+        for n in names:
+            nl = n.lower()
+            if mapping["highest_level_param"] is None and ("highest" in nl or ("level" in nl and ("highest" in nl or "top" in nl))):
+                mapping["highest_level_param"] = n
+
+        return mapping
+
+    guessed = guess_mapping(param_names)
+
+    # If any of the main destination params (count/area/highest) are missing, prompt the user.
+    if not guessed.get("count_param") or not guessed.get("area_param") or not guessed.get("highest_level_param"):
+        result = show_publish_mapping_dialog(param_names, xaml_dir)
+        if result is CANCELLED or result == CANCELLED:
+            return CANCELLED
+        if isinstance(result, dict):
+            return result
+        alert("Parameter mapping dialog could not be opened.", title="Publish Mass Level Counts")
         return CANCELLED
-    if isinstance(result, dict):
-        return result
-    alert("Parameter mapping dialog could not be opened.", title="Publish Mass Level Counts")
-    return CANCELLED
+
+    # Use guessed mapping by default
+    return guessed
 
 
 def get_floor_area_internal(mass_floor):
@@ -774,36 +812,15 @@ def publish_mass_level_metrics(xaml_dir=None):
         alert("Each metric must map to a different destination parameter.", title="Publish Mass Level Counts")
         return
 
-    # Pre-compute highest level per building (or per mass when no building param is chosen).
-    # Done outside the transaction since it only reads data.
+    # Pre-compute highest level per-mass (each Mass uses its own highest floor).
+    # This ensures separate masses (eg. twin towers) get their own highest numbers
+    # even when they share a building grouping value.
     mass_highest_level = {}  # {elem_id_int: level_num}
     if highest_level_param_name:
-        if building_param_name:
-            # Collect active floors per building value
-            building_active_floors = {}
-            for mass in masses:
-                val = get_param_value(get_param_by_name(mass, building_param_name))
-                bval = str(val).strip() if val is not None else ""
-                key = elem_id_int(mass.Id)
-                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
-                if bval not in building_active_floors:
-                    building_active_floors[bval] = []
-                building_active_floors[bval].extend(active)
-            # Resolve per-building highest level and map back to each mass
-            building_highest = {
-                bval: get_highest_level_number(bfloors, doc) if bfloors else None
-                for bval, bfloors in building_active_floors.items()
-            }
-            for mass in masses:
-                val = get_param_value(get_param_by_name(mass, building_param_name))
-                bval = str(val).strip() if val is not None else ""
-                mass_highest_level[elem_id_int(mass.Id)] = building_highest.get(bval)
-        else:
-            # Fall back to per-mass highest level
-            for mass in masses:
-                key = elem_id_int(mass.Id)
-                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
-                mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
+        for mass in masses:
+            key = elem_id_int(mass.Id)
+            active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
+            mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
 
     updated_masses = 0
     count_written = 0
