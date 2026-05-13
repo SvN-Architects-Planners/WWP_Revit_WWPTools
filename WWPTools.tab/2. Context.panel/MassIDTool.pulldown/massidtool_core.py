@@ -707,64 +707,107 @@ def set_area_param(doc, param, area_internal):
 
 
 def get_highest_level_number(floors, doc):
-    """Return the highest floor level number adjusted for regional and mezzanine conventions.
+    """Return the highest floor level index for the given floors using a project-wide
+    elevation-indexed scheme.
 
-    Adjustments applied to the raw number extracted from the highest level's name:
-      +1  if UK numbering is detected (ground floor is numbered 0, e.g. "Level 00")
-      +N  where N is the number of mezzanine levels present (level name contains "mez")
+    Approach:
+      - Collect all `Level` elements in the project and sort them by `Elevation`.
+      - Index the sorted unique elevations starting at 1 (lowest elevation -> 1).
+      - For each floor, find its associated level elevation and map to the index.
+      - Return the maximum index among the provided floors.
 
-    Examples:
-      NA, no mez  – Level 13            → 13
-      UK, no mez  – Level 12 (00=GF)   → 13  (+1 for 00-based ground)
-      NA, 1 mez   – Level 13 + Mez     → 14  (+1 for mez)
-      UK, 1 mez   – Level 12 + Mez     → 14  (+1 UK +1 mez)
+    This yields:
+      - UK projects with a "Level 00" at lowest elevation will index that as 1,
+        so a labelled top floor "25" that is the 26th distinct elevation will return 26.
+      - North American projects where lowest labelled floor is "Level 01" will index
+        from that label as 1 and Level 05 will map to 5 when there are no mezzs.
     """
-    level_info = []
+    try:
+        clr.AddReference("RevitAPI")
+        from Autodesk.Revit.DB import Level
+    except Exception:
+        Level = None
+
+    # Gather all project levels and their elevations
+    try:
+        if Level is not None:
+            all_levels = list(__revit__.ActiveUIDocument.Document.GetElementsByClass(Level))
+        else:
+            # Fallback: use FilteredElementCollector if Level class import failed
+            from Autodesk.Revit.DB import FilteredElementCollector
+            all_levels = list(FilteredElementCollector(doc).OfClass(type(doc.GetElement(doc.GetElementId(ElementId.InvalidElementId)))))
+    except Exception:
+        all_levels = []
+
+    elevations = []
+    try:
+        for lvl in all_levels:
+            try:
+                elevations.append(float(lvl.Elevation))
+            except Exception:
+                continue
+    except Exception:
+        elevations = []
+
+    if not elevations:
+        # Fall back to previous name-based approach if no levels found
+        level_info = []
+        for floor in floors:
+            try:
+                level_id = floor.LevelId
+                if level_id is None:
+                    continue
+                level = doc.GetElement(level_id)
+                if level is None:
+                    continue
+                name = (level.Name or "").strip()
+                elev = level.Elevation
+                is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
+                match = re.search(r'\d+', name)
+                num = int(match.group(0)) if match else None
+                level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
+            except Exception:
+                pass
+
+        if not level_info:
+            return None
+
+        # Best-effort: return the raw numeric parsed from name (old behaviour)
+        highest = max(level_info, key=lambda li: li["elev"])
+        raw_num = highest["num"]
+        return raw_num if raw_num is not None else None
+
+    # Build sorted unique elevations with tolerance
+    unique_elevs = []
+    tol = 1e-6
+    for e in sorted(elevations):
+        if not unique_elevs or abs(e - unique_elevs[-1]) > tol:
+            unique_elevs.append(e)
+
+    # Map elevation -> index (1-based)
+    elev_to_index = {e: i + 1 for i, e in enumerate(unique_elevs)}
+
+    # For each floor, find its level elevation and map to closest unique elevation
+    indices = []
     for floor in floors:
         try:
-            level_id = floor.LevelId
-            if level_id is None:
+            lid = floor.LevelId
+            if lid is None:
                 continue
-            level = doc.GetElement(level_id)
-            if level is None:
+            lvl = doc.GetElement(lid)
+            if lvl is None:
                 continue
-            name = (level.Name or "").strip()
-            elev = level.Elevation
-            is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
-            match = re.search(r'\d+', name)
-            num = int(match.group(0)) if match else None
-            level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
+            lev = float(lvl.Elevation)
+            # find nearest in unique_elevs
+            nearest = min(unique_elevs, key=lambda ue: abs(ue - lev))
+            indices.append(elev_to_index[nearest])
         except Exception:
-            pass
+            continue
 
-    if not level_info:
+    if not indices:
         return None
 
-    # UK convention: ground floor is numbered 0 (e.g. "Level 00").
-    # Detect UK numbering more robustly by checking numeric tokens and explicit '00' naming.
-    non_mez_nums = [li["num"] for li in level_info if not li["is_mez"] and li["num"] is not None]
-    is_uk = False
-    if non_mez_nums:
-        if min(non_mez_nums) == 0:
-            is_uk = True
-        else:
-            # fallback: look for explicit '0' or '00' tokens in level names
-            for li in level_info:
-                try:
-                    if re.search(r'\b0+\b', li["name"], re.IGNORECASE):
-                        is_uk = True
-                        break
-                except Exception:
-                    continue
-
-    mez_count = sum(1 for li in level_info if li["is_mez"])
-
-    highest = max(level_info, key=lambda li: li["elev"])
-    raw_num = highest["num"]
-    if raw_num is None:
-        return None
-
-    return raw_num + (1 if is_uk else 0) + mez_count
+    return max(indices)
 
 
 def set_highest_level_param(param, level_num):
