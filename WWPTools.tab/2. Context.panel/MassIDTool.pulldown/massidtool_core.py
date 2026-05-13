@@ -433,6 +433,16 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         except Exception:
             pass
 
+        # Ensure window sizes to its content and that buttons are visible
+        try:
+            from System.Windows import SizeToContent, Visibility
+            try:
+                window.SizeToContent = SizeToContent.Height
+            except Exception:
+                pass
+        except Exception:
+            Visibility = None
+
         building_combo = window.FindName("BuildingParamCombo")
         count_combo = window.FindName("CountParamCombo")
         area_combo = window.FindName("AreaParamCombo")
@@ -457,8 +467,25 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
             window.DialogResult = False
             window.Close()
 
-        ok_button.Click += ok_clicked
-        cancel_button.Click += cancel_clicked
+        try:
+            if cancel_button is not None:
+                try:
+                    cancel_button.Visibility = Visibility.Visible
+                except Exception:
+                    pass
+                cancel_button.Click += cancel_clicked
+        except Exception:
+            pass
+
+        try:
+            if ok_button is not None:
+                try:
+                    ok_button.Visibility = Visibility.Visible
+                except Exception:
+                    pass
+                ok_button.Click += ok_clicked
+        except Exception:
+            pass
 
         if not window.ShowDialog():
             return CANCELLED
