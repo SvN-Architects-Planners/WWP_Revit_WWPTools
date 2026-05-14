@@ -1,10 +1,36 @@
 # -*- coding: utf-8 -*-
+import clr
+import os
+import re
+import traceback
 from System import Int64
+
 # Local constants used by the publish tool
 TITLE = "Publish Mass Level Counts"
 SKIP_LABEL = "(skip)"
 # Sentinel value returned by dialog helpers when the user cancels
 CANCELLED = object()
+
+
+def get_uidoc():
+    try:
+        return __revit__.ActiveUIDocument
+    except Exception:
+        try:
+            from pyrevit import revit
+            return getattr(revit, 'uidoc', None)
+        except Exception:
+            return None
+
+
+def get_doc():
+    uidoc = get_uidoc()
+    if uidoc is None:
+        return None
+    try:
+        return uidoc.Document
+    except Exception:
+        return None
 def get_project_level_index(doc, baseline=0.0, tol=1e-6):
     """Build project-level elevation index mapping starting from `baseline`.
 
