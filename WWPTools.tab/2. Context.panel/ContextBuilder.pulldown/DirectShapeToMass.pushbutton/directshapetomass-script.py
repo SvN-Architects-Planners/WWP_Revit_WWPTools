@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import traceback
+import uuid
 
 from System.Collections.Generic import List
 
@@ -184,6 +185,37 @@ def _make_safe_name(text, fallback, max_length=80):
         h = hashlib.md5(safe.encode("utf-8", errors="replace")).hexdigest()[:8]
         safe = safe[:max_length - 9].rstrip("_.") + "_" + h
     return safe
+
+
+def _get_source_guid(element):
+    for attr_name in ("UniqueId", "ApplicationDataId"):
+        try:
+            value = (getattr(element, attr_name, None) or "").strip()
+            if value:
+                return value
+        except Exception:
+            pass
+
+    for parameter_name in ("IfcGUID", "IFC GUID"):
+        value = _get_string_parameter(element, parameter_name)
+        if value:
+            return value
+
+    try:
+        return "Element_{}".format(_elem_id_int(element.Id))
+    except Exception:
+        return ""
+
+
+def _make_generation_token(element, length=24):
+    source_guid = _get_source_guid(element)
+    source_part = re.sub(r"[^A-Za-z0-9]+", "", source_guid or "")
+    random_part = uuid.uuid4().hex
+    source_length = min(len(source_part), length // 2)
+    token = "{}{}".format(source_part[:source_length], random_part)
+    if len(token) < length:
+        token = "{}{}".format(token, uuid.uuid4().hex)
+    return token[:length]
 
 
 def _category_display_name(built_in_category):
@@ -767,7 +799,17 @@ def _convert_element_to_family(doc, element, solids, output_option, seen_family_
         source_key = "Element_{}".format(elem_id)
 
     family_prefix = output_option.get("family_prefix") or "WWP_ConvertedFamily"
-    family_name = _make_safe_name("{}_{}".format(family_prefix, source_key), "{}_{}".format(family_prefix, elem_id))
+    generation_token = _make_generation_token(element)
+    family_name_base = _make_safe_name(
+        "{}_{}".format(family_prefix, source_key),
+        "{}_{}".format(family_prefix, elem_id),
+        max_length=55,
+    )
+    family_name = _make_safe_name(
+        "{}_{}".format(family_name_base, generation_token),
+        "{}_{}_{}".format(family_prefix, elem_id, generation_token),
+    )
+    _log_debug("Generated unique family name '{}' using token '{}'.".format(family_name, generation_token))
 
     # If another element in this run already claimed this name (e.g. Revit Parts that
     # share a parent's IfcGUID/ApplicationDataId, or elements sharing a type name),
