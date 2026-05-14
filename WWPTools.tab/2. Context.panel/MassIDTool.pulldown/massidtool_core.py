@@ -429,6 +429,12 @@ def show_publish_mapping_dialog(param_names, xaml_dir, preselect=None):
         window = XamlReader.Load(reader)
 
         try:
+            from System.Windows import SizeToContent
+            window.SizeToContent = SizeToContent.Height
+        except Exception:
+            pass
+
+        try:
             helper = WindowInteropHelper(window)
             uidoc = get_uidoc()
             if uidoc is not None:
