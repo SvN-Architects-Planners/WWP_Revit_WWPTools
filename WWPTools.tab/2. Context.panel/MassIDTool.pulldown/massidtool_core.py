@@ -84,10 +84,14 @@ def get_highest_level_number(floors, doc, project_index=None):
         raw_num = highest["num"]
         return raw_num if raw_num is not None else None
 
-    # Map each floor's level to nearest project baseline elevation and return the max index.
-    indices = []
+    # Identify the highest associated Mass Floor first, then resolve that floor's level
+    # to the project-wide index.
+    highest_floor = None
+    highest_floor_elev = None
     for floor in floors:
         try:
+            if get_floor_area_internal(floor) <= 0:
+                continue
             lid = floor.LevelId
             if lid is None:
                 continue
@@ -95,15 +99,24 @@ def get_highest_level_number(floors, doc, project_index=None):
             if lvl is None:
                 continue
             lev = float(lvl.Elevation)
-            nearest = min(elevs_at_or_above, key=lambda ue: abs(ue - lev))
-            indices.append(elev_to_index[nearest])
+            if highest_floor_elev is None or lev > highest_floor_elev:
+                highest_floor = floor
+                highest_floor_elev = lev
         except Exception:
             continue
 
-    if not indices:
+    if highest_floor is None:
         return None
 
-    return max(indices)
+    try:
+        lvl = doc.GetElement(highest_floor.LevelId)
+        if lvl is None:
+            return None
+        lev = float(lvl.Elevation)
+        nearest = min(elevs_at_or_above, key=lambda ue: abs(ue - lev))
+        return elev_to_index[nearest]
+    except Exception:
+        return None
             return True
         if stype == StorageType.ElementId:
             if isinstance(value, ElementId):
@@ -571,18 +584,15 @@ def choose_publish_mapping(param_names, xaml_dir=None):
 
     guessed = guess_mapping(param_names)
 
-    # If any of the main destination params (count/area/highest) are missing, prompt the user.
-    if not guessed.get("count_param") or not guessed.get("area_param") or not guessed.get("highest_level_param"):
-        result = show_publish_mapping_dialog(param_names, xaml_dir)
-        if result is CANCELLED or result == CANCELLED:
-            return CANCELLED
-        if isinstance(result, dict):
-            return result
-        alert("Parameter mapping dialog could not be opened.", title="Publish Mass Level Counts")
+    # Always show the mapping dialog, but preselect sensible defaults so the user
+    # can confirm or override them without rebuilding the mapping every time.
+    result = show_publish_mapping_dialog(param_names, xaml_dir, preselect=guessed)
+    if result is CANCELLED or result == CANCELLED:
         return CANCELLED
-
-    # Use guessed mapping by default
-    return guessed
+    if isinstance(result, dict):
+        return result
+    alert("Parameter mapping dialog could not be opened.", title="Publish Mass Level Counts")
+    return CANCELLED
 
 
 def get_floor_area_internal(mass_floor):
@@ -702,116 +712,6 @@ def set_area_param(doc, param, area_internal):
     return False
 
 
-def get_highest_level_number(floors, doc):
-    """Return the highest floor level index for the given floors using a project-wide
-    elevation-indexed scheme.
-
-    Approach:
-      - Collect all `Level` elements in the project and sort them by `Elevation`.
-      - Index the sorted unique elevations starting at 1 (lowest elevation -> 1).
-      - For each floor, find its associated level elevation and map to the index.
-      - Return the maximum index among the provided floors.
-
-    This yields:
-      - UK projects with a "Level 00" at lowest elevation will index that as 1,
-        so a labelled top floor "25" that is the 26th distinct elevation will return 26.
-      - North American projects where lowest labelled floor is "Level 01" will index
-        from that label as 1 and Level 05 will map to 5 when there are no mezzs.
-    """
-    try:
-        clr.AddReference("RevitAPI")
-        from Autodesk.Revit.DB import Level
-    except Exception:
-        Level = None
-
-    # Gather all project levels and their elevations
-    try:
-        if Level is not None:
-            all_levels = list(__revit__.ActiveUIDocument.Document.GetElementsByClass(Level))
-        else:
-            # Fallback: use FilteredElementCollector if Level class import failed
-            from Autodesk.Revit.DB import FilteredElementCollector
-            all_levels = list(FilteredElementCollector(doc).OfClass(type(doc.GetElement(doc.GetElementId(ElementId.InvalidElementId)))))
-    except Exception:
-        all_levels = []
-
-    elevations = []
-    try:
-        for lvl in all_levels:
-            try:
-                elevations.append(float(lvl.Elevation))
-            except Exception:
-                continue
-    except Exception:
-        elevations = []
-
-    if not elevations:
-        # Fall back to previous name-based approach if no levels found
-        level_info = []
-        for floor in floors:
-            try:
-                level_id = floor.LevelId
-                if level_id is None:
-                    continue
-                level = doc.GetElement(level_id)
-                if level is None:
-                    continue
-                name = (level.Name or "").strip()
-                elev = level.Elevation
-                is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
-                match = re.search(r'\d+', name)
-                num = int(match.group(0)) if match else None
-                level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
-            except Exception:
-                pass
-
-        if not level_info:
-            return None
-
-        # Best-effort: return the raw numeric parsed from name (old behaviour)
-        highest = max(level_info, key=lambda li: li["elev"])
-        raw_num = highest["num"]
-        return raw_num if raw_num is not None else None
-
-    # Build sorted unique elevations with tolerance
-    unique_elevs = []
-    tol = 1e-6
-    for e in sorted(elevations):
-        if not unique_elevs or abs(e - unique_elevs[-1]) > tol:
-            unique_elevs.append(e)
-
-    # Use project baseline at elevation 0.0: index levels from the first elevation >= 0.0
-    baseline = 0.0
-    elevs_at_or_above = [e for e in unique_elevs if e >= baseline - tol]
-    if not elevs_at_or_above:
-        elevs_at_or_above = unique_elevs
-
-    # Map elevation -> index (1-based) starting from baseline group
-    elev_to_index = {e: i + 1 for i, e in enumerate(elevs_at_or_above)}
-
-    # For each floor, find its level elevation and map to nearest elevation in elevs_at_or_above
-    indices = []
-    for floor in floors:
-        try:
-            lid = floor.LevelId
-            if lid is None:
-                continue
-            lvl = doc.GetElement(lid)
-            if lvl is None:
-                continue
-            lev = float(lvl.Elevation)
-            # find nearest in elevs_at_or_above
-            nearest = min(elevs_at_or_above, key=lambda ue: abs(ue - lev))
-            indices.append(elev_to_index[nearest])
-        except Exception:
-            continue
-
-    if not indices:
-        return None
-
-    return max(indices)
-
-
 def set_highest_level_param(param, level_num):
     if not is_writable_metric_param(param):
         return False
@@ -902,32 +802,10 @@ def publish_mass_level_metrics(xaml_dir=None):
             project_index = get_project_level_index(doc)
         except Exception:
             project_index = None
-        first_debug = True
         for mass in masses:
             key = elem_id_int(mass.Id)
             active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
             mass_highest_level[key] = get_highest_level_number(active, doc, project_index) if active else None
-
-            # Show a one-time diagnostic for the first mass so we can inspect level parsing
-            if first_debug and active:
-                try:
-                    info_lines = ["Level diagnostic for Mass id {}:".format(key)]
-                    for f in active:
-                        try:
-                            lid = f.LevelId
-                            lvl = doc.GetElement(lid) if lid is not None else None
-                            name = (lvl.Name or "") if lvl is not None else "(no level)"
-                            match = re.search(r'\d+', name)
-                            num = int(match.group(0)) if match else None
-                            info_lines.append("  - {} -> num={}".format(name, num))
-                        except Exception:
-                            pass
-                    info_lines.append("")
-                    info_lines.append("Computed highest (raw + UK/mezz adj): {}".format(mass_highest_level[key]))
-                    alert("\n".join(info_lines), title="Publish Mass Level Counts - Debug")
-                except Exception:
-                    pass
-                first_debug = False
 
     # Build preview and ask for confirmation before starting transaction
     try:
@@ -948,11 +826,27 @@ def publish_mass_level_metrics(xaml_dir=None):
                 areas = [a for a in areas if a > 0]
                 typical_area = format_area_value(doc, sum(areas) / float(len(areas))) if areas else "(none)"
                 highest_val = mass_highest_level.get(key)
+                floor_labels = []
+                for floor in floors:
+                    try:
+                        lid = floor.LevelId
+                        lvl = doc.GetElement(lid) if lid is not None else None
+                        name = (lvl.Name or "") if lvl is not None else "(no level)"
+                        floor_labels.append(name)
+                    except Exception:
+                        continue
                 try:
                     mname = getattr(mass, 'Name', None) or mass.GetType().Name
                 except Exception:
                     mname = str(key)
-                preview_lines.append("- {} (id={}): floors={}, area={}, highest={}".format(mname, key, count_val, typical_area, highest_val if highest_val is not None else '(none)'))
+                preview_lines.append("- {} (id={}): floors={}, area={}, highest={}, mass floors=[{}]".format(
+                    mname,
+                    key,
+                    count_val,
+                    typical_area,
+                    highest_val if highest_val is not None else '(none)',
+                    ", ".join(floor_labels) if floor_labels else "(none)"
+                ))
             except Exception:
                 continue
 
