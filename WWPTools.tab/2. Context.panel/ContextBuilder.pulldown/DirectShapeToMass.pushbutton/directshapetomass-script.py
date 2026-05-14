@@ -591,7 +591,75 @@ def _get_solid_base_point(solids):
     return DB.XYZ(0.0, 0.0, 0.0)
 
 
-def _place_family_instance(doc, family, comment_text, placement_point=None):
+def _create_project_material(doc, base_name):
+    material_base_name = _make_safe_name("{}_Material".format(base_name), "WWP_Converted_Material", max_length=90)
+    existing_names = set()
+    try:
+        for material in DB.FilteredElementCollector(doc).OfClass(DB.Material):
+            try:
+                existing_names.add(material.Name)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    material_name = material_base_name
+    suffix = 1
+    while material_name in existing_names:
+        suffix += 1
+        material_name = _make_safe_name("{}_{:02d}".format(material_base_name, suffix), "WWP_Converted_Material", max_length=90)
+
+    try:
+        material_id = DB.Material.Create(doc, material_name)
+        material = doc.GetElement(material_id)
+        if material is not None:
+            try:
+                material.Color = DB.Color(186, 186, 186)
+            except Exception:
+                pass
+            _log_debug("Created default material '{}' id={}.".format(material_name, _elem_id_int(material_id)))
+        return material_id
+    except Exception as ex:
+        _log_debug("Could not create default material '{}': {}".format(material_name, ex))
+    return DB.ElementId.InvalidElementId
+
+
+def _assign_instance_material(instance, material_id):
+    if instance is None or material_id is None or material_id == DB.ElementId.InvalidElementId:
+        return False
+
+    parameters = []
+    try:
+        parameter = instance.LookupParameter("Material")
+        if parameter is not None:
+            parameters.append(parameter)
+    except Exception:
+        pass
+
+    try:
+        parameter = instance.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+        if parameter is not None:
+            parameters.append(parameter)
+    except Exception:
+        pass
+
+    for parameter in parameters:
+        try:
+            if not parameter.IsReadOnly:
+                parameter.Set(material_id)
+                _log_debug("Assigned default material id={} to placed instance id={}.".format(
+                    _elem_id_int(material_id),
+                    _elem_id_int(instance.Id),
+                ))
+                return True
+        except Exception as ex:
+            _log_debug("Could not assign default material parameter: {}".format(ex))
+
+    _log_debug("Placed instance id={} has no writable Material parameter.".format(_elem_id_int(instance.Id)))
+    return False
+
+
+def _place_family_instance(doc, family, comment_text, placement_point=None, default_material_id=None):
     if placement_point is None:
         placement_point = DB.XYZ(0.0, 0.0, 0.0)
     try:
@@ -626,6 +694,7 @@ def _place_family_instance(doc, family, comment_text, placement_point=None):
             instance = attempt()
             if instance is not None:
                 _set_comment(instance, comment_text)
+                _assign_instance_material(instance, default_material_id)
                 _log_debug("Placed family instance id={}".format(_elem_id_int(instance.Id)))
                 return instance
         except Exception as ex:
@@ -888,7 +957,8 @@ def _convert_element_to_family(doc, element, solids, output_option, seen_family_
         " | {}".format(_get_comment(element)) if _get_comment(element) else "",
     )
     placement_point = _get_solid_base_point(solids)
-    return _place_family_instance(doc, family, comment_text, placement_point)
+    default_material_id = _create_project_material(doc, family_name)
+    return _place_family_instance(doc, family, comment_text, placement_point, default_material_id)
 
 
 def _get_solid_fill_pattern_id(doc):
