@@ -644,6 +644,16 @@ def set_area_param(doc, param, area_internal):
     return False
 
 
+def get_level_project_elevation(level):
+    try:
+        return float(level.ProjectElevation)
+    except Exception:
+        try:
+            return float(level.Elevation)
+        except Exception:
+            return None
+
+
 def build_project_level_index(doc):
     level_rows = []
     try:
@@ -652,9 +662,8 @@ def build_project_level_index(doc):
         levels = []
 
     for level in levels:
-        try:
-            elevation = float(level.Elevation)
-        except Exception:
+        elevation = get_level_project_elevation(level)
+        if elevation is None:
             continue
         if elevation < 0.0:
             continue
@@ -691,9 +700,8 @@ def get_highest_level_index(floors, doc, level_index):
         if level_key not in level_index:
             continue
 
-        try:
-            elevation = float(level.Elevation)
-        except Exception:
+        elevation = get_level_project_elevation(level)
+        if elevation is None:
             continue
 
         if highest_elevation is None or elevation > highest_elevation:
