@@ -1,113 +1,109 @@
 # -*- coding: utf-8 -*-
 from System import Int64
-import clr
-import os
-import re
-import traceback
+def get_project_level_index(doc, baseline=0.0, tol=1e-6):
+    """Build project-level elevation index mapping starting from `baseline`.
 
-clr.AddReference("RevitAPI")
-clr.AddReference("RevitAPIUI")
-from Autodesk.Revit.DB import (
-    BuiltInCategory,
-    BuiltInParameter,
-    ElementId,
-    FilteredElementCollector,
-    StorageType,
-    Transaction,
-)
-from Autodesk.Revit import UI
-
-
-TITLE = "Sync Mass Tool"
-SKIP_LABEL = "(Skip)"
-CANCELLED = object()
-
-
-def get_uidoc():
+    Returns (elevs_at_or_above, elev_to_index) where elevs_at_or_above is a
+    sorted list of unique elevations >= baseline and elev_to_index maps each
+    elevation to a 1-based index.
+    """
     try:
-        return __revit__.ActiveUIDocument
+        clr.AddReference("RevitAPI")
+        from Autodesk.Revit.DB import Level
     except Exception:
-        pass
+        Level = None
+
     try:
-        from pyrevit import revit
-        return revit.uidoc
+        if Level is not None:
+            all_levels = list(__revit__.ActiveUIDocument.Document.GetElementsByClass(Level))
+        else:
+            from Autodesk.Revit.DB import FilteredElementCollector
+            all_levels = list(FilteredElementCollector(doc).OfClass(type(doc.GetElement(doc.GetElementId(ElementId.InvalidElementId)))))
     except Exception:
-        return None
+        all_levels = []
 
-
-def get_doc():
-    uidoc = get_uidoc()
-    if uidoc is None:
-        return None
-    try:
-        return uidoc.Document
-    except Exception:
-        return None
-
-
-def alert(message, title=TITLE):
-    UI.TaskDialog.Show(title, "" if message is None else str(message))
-
-
-def elem_id_int(eid):
-    try:
-        return int(eid.Value)  # Revit 2024+
-    except Exception:
+    elevations = []
+    for lvl in all_levels:
         try:
-            return int(eid.IntegerValue)  # Revit 2023-
+            elevations.append(float(lvl.Elevation))
         except Exception:
+            continue
+
+    if not elevations:
+        return [], {}
+
+    unique_elevs = []
+    for e in sorted(elevations):
+        if not unique_elevs or abs(e - unique_elevs[-1]) > tol:
+            unique_elevs.append(e)
+
+    elevs_at_or_above = [e for e in unique_elevs if e >= baseline - tol]
+    if not elevs_at_or_above:
+        elevs_at_or_above = unique_elevs
+
+    elev_to_index = {e: i + 1 for i, e in enumerate(elevs_at_or_above)}
+    return elevs_at_or_above, elev_to_index
+
+
+def get_highest_level_number(floors, doc, project_index=None):
+    """Return the highest floor level index for the given floors using a project-wide
+    elevation-indexed scheme. If `project_index` is supplied, it must be the
+    tuple returned by `get_project_level_index` and will be used instead of
+    building a fresh mapping.
+    """
+    # If a project index mapping is supplied, use it; otherwise build one on demand.
+    if project_index and isinstance(project_index, tuple) and len(project_index) == 2:
+        elevs_at_or_above, elev_to_index = project_index
+    else:
+        elevs_at_or_above, elev_to_index = get_project_level_index(doc)
+
+    if not elevs_at_or_above:
+        # Fall back to name-based parsing if project index couldn't be built
+        level_info = []
+        for floor in floors:
+            try:
+                level_id = floor.LevelId
+                if level_id is None:
+                    continue
+                level = doc.GetElement(level_id)
+                if level is None:
+                    continue
+                name = (level.Name or "").strip()
+                elev = level.Elevation
+                is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
+                match = re.search(r'\d+', name)
+                num = int(match.group(0)) if match else None
+                level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
+            except Exception:
+                pass
+
+        if not level_info:
             return None
 
+        highest = max(level_info, key=lambda li: li["elev"])
+        raw_num = highest["num"]
+        return raw_num if raw_num is not None else None
 
-def collect_instances(doc, bic):
-    return list(
-        FilteredElementCollector(doc)
-        .OfCategory(bic)
-        .WhereElementIsNotElementType()
-        .ToElements()
-    )
+    # Map each floor's level to nearest project baseline elevation and return the max index.
+    indices = []
+    for floor in floors:
+        try:
+            lid = floor.LevelId
+            if lid is None:
+                continue
+            lvl = doc.GetElement(lid)
+            if lvl is None:
+                continue
+            lev = float(lvl.Elevation)
+            nearest = min(elevs_at_or_above, key=lambda ue: abs(ue - lev))
+            indices.append(elev_to_index[nearest])
+        except Exception:
+            continue
 
-
-def category_matches(element, bic):
-    try:
-        return elem_id_int(element.Category.Id) == int(bic)
-    except Exception:
-        return False
-
-
-def get_param_value(param):
-    if param is None:
+    if not indices:
         return None
-    stype = param.StorageType
-    if stype == StorageType.String:
-        return param.AsString()
-    if stype == StorageType.Integer:
-        return param.AsInteger()
-    if stype == StorageType.Double:
-        return param.AsDouble()
-    if stype == StorageType.ElementId:
-        return param.AsElementId()
-    return None
 
-
-def set_param_value(param, value):
-    if param is None or param.IsReadOnly:
-        return False
-
-    stype = param.StorageType
-    try:
-        if stype == StorageType.String:
-            param.Set("" if value is None else str(value))
-            return True
-        if stype == StorageType.Integer:
-            if value is None:
-                return False
-            param.Set(int(value))
-            return True
-        if stype == StorageType.Double:
-            if value is None:
-                return False
-            param.Set(float(value))
+    return max(indices)
             return True
         if stype == StorageType.ElementId:
             if isinstance(value, ElementId):
@@ -901,11 +897,16 @@ def publish_mass_level_metrics(xaml_dir=None):
     # even when they share a building grouping value.
     mass_highest_level = {}  # {elem_id_int: level_num}
     if highest_level_param_name:
+        # Build a single project-level elevation index once and reuse for all masses
+        try:
+            project_index = get_project_level_index(doc)
+        except Exception:
+            project_index = None
         first_debug = True
         for mass in masses:
             key = elem_id_int(mass.Id)
             active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
-            mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
+            mass_highest_level[key] = get_highest_level_number(active, doc, project_index) if active else None
 
             # Show a one-time diagnostic for the first mass so we can inspect level parsing
             if first_debug and active:
