@@ -2,7 +2,6 @@
 from System import Int64
 import clr
 import os
-import re
 import traceback
 
 clr.AddReference("RevitAPI")
@@ -12,6 +11,7 @@ from Autodesk.Revit.DB import (
     BuiltInParameter,
     ElementId,
     FilteredElementCollector,
+    Level,
     StorageType,
     Transaction,
 )
@@ -21,6 +21,9 @@ from Autodesk.Revit import UI
 TITLE = "Sync Mass Tool"
 SKIP_LABEL = "(Skip)"
 CANCELLED = object()
+DEFAULT_AREA_PARAM = "! S_MASS_TypicalFloor_Area"
+DEFAULT_COUNT_PARAM = "! S_MASS_MassFloorCounts_Int"
+DEFAULT_HIGHEST_LEVEL_PARAM = "! S_MASS_HighestLevel_Number"
 
 
 def get_uidoc():
@@ -396,7 +399,7 @@ def select_one(options, title, prompt):
         return None
 
 
-def show_publish_mapping_dialog(param_names, xaml_dir):
+def show_publish_mapping_dialog(param_names, xaml_dir, preselect=None):
     if not xaml_dir:
         return None
 
@@ -433,21 +436,34 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         except Exception:
             pass
 
-        building_combo = window.FindName("BuildingParamCombo")
         count_combo = window.FindName("CountParamCombo")
         area_combo = window.FindName("AreaParamCombo")
         highest_level_combo = window.FindName("HighestLevelParamCombo")
         ok_button = window.FindName("OkButton")
         cancel_button = window.FindName("CancelButton")
 
-        building_combo.ItemsSource = options
         count_combo.ItemsSource = options
         area_combo.ItemsSource = options
         highest_level_combo.ItemsSource = options
-        building_combo.SelectedIndex = 0
         count_combo.SelectedIndex = 0
         area_combo.SelectedIndex = 0
         highest_level_combo.SelectedIndex = 0
+
+        def set_combo_to(combo, value):
+            if combo is None or not value:
+                return
+            try:
+                for index in range(combo.Items.Count):
+                    if str(combo.Items[index]) == str(value):
+                        combo.SelectedIndex = index
+                        return
+            except Exception:
+                pass
+
+        if preselect:
+            set_combo_to(area_combo, preselect.get("area_param"))
+            set_combo_to(count_combo, preselect.get("count_param"))
+            set_combo_to(highest_level_combo, preselect.get("highest_level_param"))
 
         def ok_clicked(_sender, _args):
             window.DialogResult = True
@@ -463,12 +479,10 @@ def show_publish_mapping_dialog(param_names, xaml_dir):
         if not window.ShowDialog():
             return CANCELLED
 
-        building_param = str(building_combo.SelectedItem) if building_combo.SelectedItem is not None else SKIP_LABEL
         count_param = str(count_combo.SelectedItem) if count_combo.SelectedItem is not None else SKIP_LABEL
         area_param = str(area_combo.SelectedItem) if area_combo.SelectedItem is not None else SKIP_LABEL
         highest_level_param = str(highest_level_combo.SelectedItem) if highest_level_combo.SelectedItem is not None else SKIP_LABEL
         return {
-            "building_param": None if building_param == SKIP_LABEL else building_param,
             "count_param": None if count_param == SKIP_LABEL else count_param,
             "area_param": None if area_param == SKIP_LABEL else area_param,
             "highest_level_param": None if highest_level_param == SKIP_LABEL else highest_level_param,
@@ -493,7 +507,12 @@ def choose_destination_parameter(param_names, metric_name, title):
 
 
 def choose_publish_mapping(param_names, xaml_dir=None):
-    result = show_publish_mapping_dialog(param_names, xaml_dir)
+    preselect = {
+        "area_param": DEFAULT_AREA_PARAM,
+        "count_param": DEFAULT_COUNT_PARAM,
+        "highest_level_param": DEFAULT_HIGHEST_LEVEL_PARAM,
+    }
+    result = show_publish_mapping_dialog(param_names, xaml_dir, preselect=preselect)
     if result is CANCELLED or result == CANCELLED:
         return CANCELLED
     if isinstance(result, dict):
@@ -619,52 +638,70 @@ def set_area_param(doc, param, area_internal):
     return False
 
 
-def get_highest_level_number(floors, doc):
-    """Return the highest floor level number adjusted for regional and mezzanine conventions.
+def build_project_level_index(doc):
+    level_rows = []
+    try:
+        levels = FilteredElementCollector(doc).OfClass(Level).ToElements()
+    except Exception:
+        levels = []
 
-    Adjustments applied to the raw number extracted from the highest level's name:
-      +1  if UK numbering is detected (ground floor is numbered 0, e.g. "Level 00")
-      +N  where N is the number of mezzanine levels present (level name contains "mez")
-
-    Examples:
-      NA, no mez  – Level 13            → 13
-      UK, no mez  – Level 12 (00=GF)   → 13  (+1 for 00-based ground)
-      NA, 1 mez   – Level 13 + Mez     → 14  (+1 for mez)
-      UK, 1 mez   – Level 12 + Mez     → 14  (+1 UK +1 mez)
-    """
-    level_info = []
-    for floor in floors:
+    for level in levels:
         try:
-            level_id = floor.LevelId
-            if level_id is None:
-                continue
-            level = doc.GetElement(level_id)
-            if level is None:
-                continue
-            name = (level.Name or "").strip()
-            elev = level.Elevation
-            is_mez = bool(re.search(r'mez', name, re.IGNORECASE))
-            match = re.search(r'\d+', name)
-            num = int(match.group(0)) if match else None
-            level_info.append({"elev": elev, "num": num, "name": name, "is_mez": is_mez})
+            elevation = float(level.Elevation)
+        except Exception:
+            continue
+        if elevation < 0.0:
+            continue
+        key = elem_id_int(level.Id)
+        if key is None:
+            continue
+        name = ""
+        try:
+            name = level.Name or ""
         except Exception:
             pass
+        level_rows.append((elevation, name.lower(), key))
 
-    if not level_info:
+    level_rows.sort(key=lambda row: (row[0], row[1], row[2]))
+    level_index = {}
+    for index, row in enumerate(level_rows):
+        level_index[row[2]] = index + 1
+    return level_index
+
+
+def get_highest_level_index(floors, doc, level_index):
+    highest_floor = None
+    highest_elevation = None
+
+    for floor in floors:
+        try:
+            level = doc.GetElement(floor.LevelId)
+        except Exception:
+            level = None
+        if level is None:
+            continue
+
+        level_key = elem_id_int(level.Id)
+        if level_key not in level_index:
+            continue
+
+        try:
+            elevation = float(level.Elevation)
+        except Exception:
+            continue
+
+        if highest_elevation is None or elevation > highest_elevation:
+            highest_floor = floor
+            highest_elevation = elevation
+
+    if highest_floor is None:
         return None
 
-    # UK convention: ground floor is numbered 0 (e.g. "Level 00")
-    non_mez_nums = [li["num"] for li in level_info if not li["is_mez"] and li["num"] is not None]
-    is_uk = bool(non_mez_nums) and min(non_mez_nums) == 0
-
-    mez_count = sum(1 for li in level_info if li["is_mez"])
-
-    highest = max(level_info, key=lambda li: li["elev"])
-    raw_num = highest["num"]
-    if raw_num is None:
+    try:
+        level = doc.GetElement(highest_floor.LevelId)
+        return level_index.get(elem_id_int(level.Id))
+    except Exception:
         return None
-
-    return raw_num + (1 if is_uk else 0) + mez_count
 
 
 def set_highest_level_param(param, level_num):
@@ -733,7 +770,6 @@ def publish_mass_level_metrics(xaml_dir=None):
     mapping = choose_publish_mapping(param_names, xaml_dir=xaml_dir)
     if mapping is CANCELLED or mapping == CANCELLED:
         return
-    building_param_name = mapping.get("building_param")
     count_param_name = mapping.get("count_param")
     area_param_name = mapping.get("area_param")
     highest_level_param_name = mapping.get("highest_level_param")
@@ -747,36 +783,18 @@ def publish_mass_level_metrics(xaml_dir=None):
         alert("Each metric must map to a different destination parameter.", title="Publish Mass Level Counts")
         return
 
-    # Pre-compute highest level per building (or per mass when no building param is chosen).
-    # Done outside the transaction since it only reads data.
+    level_index = build_project_level_index(doc)
+    if highest_level_param_name and not level_index:
+        alert("No project Levels at or above 0.0 elevation were found.", title="Publish Mass Level Counts")
+        return
+
+    # Pre-compute highest project level index per mass outside the transaction.
     mass_highest_level = {}  # {elem_id_int: level_num}
     if highest_level_param_name:
-        if building_param_name:
-            # Collect active floors per building value
-            building_active_floors = {}
-            for mass in masses:
-                val = get_param_value(get_param_by_name(mass, building_param_name))
-                bval = str(val).strip() if val is not None else ""
-                key = elem_id_int(mass.Id)
-                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
-                if bval not in building_active_floors:
-                    building_active_floors[bval] = []
-                building_active_floors[bval].extend(active)
-            # Resolve per-building highest level and map back to each mass
-            building_highest = {
-                bval: get_highest_level_number(bfloors, doc) if bfloors else None
-                for bval, bfloors in building_active_floors.items()
-            }
-            for mass in masses:
-                val = get_param_value(get_param_by_name(mass, building_param_name))
-                bval = str(val).strip() if val is not None else ""
-                mass_highest_level[elem_id_int(mass.Id)] = building_highest.get(bval)
-        else:
-            # Fall back to per-mass highest level
-            for mass in masses:
-                key = elem_id_int(mass.Id)
-                active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
-                mass_highest_level[key] = get_highest_level_number(active, doc) if active else None
+        for mass in masses:
+            key = elem_id_int(mass.Id)
+            active = [f for f in groups.get(key, []) if get_floor_area_internal(f) > 0]
+            mass_highest_level[key] = get_highest_level_index(active, doc, level_index) if active else None
 
     updated_masses = 0
     count_written = 0
@@ -853,16 +871,15 @@ def publish_mass_level_metrics(xaml_dir=None):
 
     report = [
         "Masses updated: {}".format(updated_masses),
-        "Mass Floor counts written: {}".format(count_written),
+        "Mass Included Levels written: {}".format(count_written),
         "Typical floor areas written: {}".format(area_written),
         "Highest floor level numbers written: {}".format(highest_level_written),
         "Skipped (no associated Mass Floors): {}".format(no_floors),
         "Skipped (no Floor Area values): {}".format(no_area),
         "Failures: {}".format(failures),
         "",
-        "Building grouping parameter: {}".format(building_param_name or SKIP_LABEL),
-        "Count parameter: {}".format(count_param_name or SKIP_LABEL),
-        "Typical floor area parameter: {}".format(area_param_name or SKIP_LABEL),
-        "Highest floor level parameter: {}".format(highest_level_param_name or SKIP_LABEL),
+        "Mass Included Levels parameter: {}".format(count_param_name or SKIP_LABEL),
+        "Mass Typical Floor Area parameter: {}".format(area_param_name or SKIP_LABEL),
+        "Mass Highest Level parameter: {}".format(highest_level_param_name or SKIP_LABEL),
     ]
     alert("\n".join(report), title="Publish Mass Level Counts")
