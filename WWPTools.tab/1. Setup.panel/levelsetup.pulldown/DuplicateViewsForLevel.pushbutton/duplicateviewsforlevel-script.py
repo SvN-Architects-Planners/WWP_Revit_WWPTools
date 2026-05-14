@@ -12,6 +12,80 @@ from Autodesk.Revit import DB
 import WWP_uiUtils as ui
 
 
+def _show_level_picker(level_names, title="Duplicate Views For Level"):
+    """Single form with source (single-select) and target (multi-select) level lists."""
+    import clr
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.Windows import Application, ShutdownMode
+    from System.Windows.Markup import XamlReader
+    from System.Windows.Interop import WindowInteropHelper
+    from System import IntPtr
+    from System.Diagnostics import Process
+
+    if Application.Current is None:
+        app = Application()
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown
+
+    xaml = (
+        '<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"'
+        ' Title="" Width="400" Height="540" WindowStartupLocation="CenterScreen" ResizeMode="CanResize">'
+        '<Grid Margin="16,14,16,14">'
+        '<Grid.RowDefinitions>'
+        '<RowDefinition Height="Auto"/>'
+        '<RowDefinition Height="*"/>'
+        '<RowDefinition Height="12"/>'
+        '<RowDefinition Height="Auto"/>'
+        '<RowDefinition Height="Auto"/>'
+        '<RowDefinition Height="*"/>'
+        '<RowDefinition Height="12"/>'
+        '<RowDefinition Height="Auto"/>'
+        '</Grid.RowDefinitions>'
+        '<TextBlock Grid.Row="0" Text="Get level style from:" FontWeight="SemiBold" Margin="0,0,0,4"/>'
+        '<ListBox Grid.Row="1" Name="SourceList" SelectionMode="Single"/>'
+        '<TextBlock Grid.Row="3" Text="Target new level:" FontWeight="SemiBold" Margin="0,0,0,2"/>'
+        '<TextBlock Grid.Row="4" Text="(Hold Ctrl or Shift to select multiple)" Foreground="Gray" FontSize="11" Margin="0,0,0,4"/>'
+        '<ListBox Grid.Row="5" Name="TargetList" SelectionMode="Extended"/>'
+        '<StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">'
+        '<Button Name="OkButton" Content="OK" Width="80" Margin="0,0,8,0" IsDefault="True" IsEnabled="False"/>'
+        '<Button Name="CancelButton" Content="Cancel" Width="80" IsCancel="True"/>'
+        '</StackPanel>'
+        '</Grid>'
+        '</Window>'
+    )
+
+    window = XamlReader.Parse(xaml)
+    window.Title = title
+    source_list = window.FindName("SourceList")
+    target_list = window.FindName("TargetList")
+    ok_btn = window.FindName("OkButton")
+
+    for name in level_names:
+        source_list.Items.Add(name)
+        target_list.Items.Add(name)
+
+    try:
+        owner = Process.GetCurrentProcess().MainWindowHandle
+        if owner != IntPtr.Zero:
+            WindowInteropHelper(window).Owner = owner
+    except Exception:
+        pass
+
+    def _update_ok(s, e):
+        ok_btn.IsEnabled = (source_list.SelectedIndex >= 0 and target_list.SelectedItems.Count > 0)
+
+    source_list.SelectionChanged += _update_ok
+    target_list.SelectionChanged += _update_ok
+
+    if window.ShowDialog() != True:
+        return None, None
+
+    src_idx = source_list.SelectedIndex
+    tgt_indices = [target_list.Items.IndexOf(item) for item in target_list.SelectedItems]
+    return src_idx, tgt_indices
+
+
 def _collect_levels(doc):
     levels = list(DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements())
     levels.sort(key=lambda l: l.Elevation)
@@ -107,18 +181,15 @@ def main():
 
     level_names = [lvl.Name for lvl in levels]
 
-    # --- Pick source level ---
-    src_idx = ui.uiUtils_select_indices(
-        level_names,
-        title="Source Level",
-        prompt="Select the level whose views you want to duplicate:",
-        multiselect=False,
-        width=520,
-        height=520,
-    )
-    if not src_idx:
+    # --- Single form: pick source and target levels ---
+    src_idx, tgt_indices = _show_level_picker(level_names)
+    if src_idx is None:
         return
-    source_level = levels[src_idx[0]]
+    source_level = levels[src_idx]
+    target_levels = [levels[i] for i in (tgt_indices or []) if levels[i].Id != source_level.Id]
+    if not target_levels:
+        ui.uiUtils_alert("No valid target levels selected.", title="Duplicate Views For Level")
+        return
 
     source_views = _views_for_level(doc, source_level)
     if not source_views:
@@ -127,25 +198,6 @@ def main():
             title="Duplicate Views For Level",
         )
         return
-
-    # --- Pick target level(s) ---
-    other_levels = [l for l in levels if l.Id != source_level.Id]
-    other_names = [l.Name for l in other_levels]
-    if not other_names:
-        ui.uiUtils_alert("No other levels available as targets.", title="Duplicate Views For Level")
-        return
-
-    tgt_idx = ui.uiUtils_select_indices(
-        other_names,
-        title="Target Level(s)",
-        prompt="Select target level(s) to create matching views on:",
-        multiselect=True,
-        width=520,
-        height=520,
-    )
-    if not tgt_idx:
-        return
-    target_levels = [other_levels[i] for i in tgt_idx]
 
     # --- Create views ---
     created = []
