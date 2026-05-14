@@ -117,20 +117,7 @@ def get_highest_level_number(floors, doc, project_index=None):
         return elev_to_index[nearest]
     except Exception:
         return None
-            return True
-        if stype == StorageType.ElementId:
-            if isinstance(value, ElementId):
-                param.Set(value)
-                return True
-            try:
-                param.Set(ElementId(Int64(value)))
-                return True
-            except Exception:
-                return False
-    except Exception:
-        return False
-
-    return False
+    
 
 
 def build_param_map(element):
