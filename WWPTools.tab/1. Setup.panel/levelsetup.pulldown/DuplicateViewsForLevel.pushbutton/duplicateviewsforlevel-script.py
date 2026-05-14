@@ -78,6 +78,12 @@ def _show_level_picker(level_names, title="Duplicate Views For Level"):
     source_list.SelectionChanged += _update_ok
     target_list.SelectionChanged += _update_ok
 
+    def _accept(s, e):
+        if ok_btn.IsEnabled:
+            window.DialogResult = True
+
+    ok_btn.Click += _accept
+
     if window.ShowDialog() != True:
         return None, None
 
@@ -127,7 +133,7 @@ def _copy_writable_params(src, dst):
     for param in src.Parameters:
         if param.IsReadOnly:
             continue
-        if param.StorageType == DB.StorageType.None:
+        if param.StorageType == getattr(DB.StorageType, "None"):
             continue
 
         defn = param.Definition
