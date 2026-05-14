@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 from System import Int64
+# Local constants used by the publish tool
+TITLE = "Publish Mass Level Counts"
+SKIP_LABEL = "(skip)"
+# Sentinel value returned by dialog helpers when the user cancels
+CANCELLED = object()
 def get_project_level_index(doc, baseline=0.0, tol=1e-6):
     """Build project-level elevation index mapping starting from `baseline`.
 
