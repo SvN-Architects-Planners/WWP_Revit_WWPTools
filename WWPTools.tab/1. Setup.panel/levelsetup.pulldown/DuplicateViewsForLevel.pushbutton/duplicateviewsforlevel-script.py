@@ -163,34 +163,44 @@ def main():
             src_num = _src_nums[-1] if _src_nums else None
             tgt_num = _tgt_nums[-1] if _tgt_nums else None
 
-            # Build a set of (ViewType, key) signatures already on this target level
-            # so we never create a view that already exists there.
-            existing_sigs = set()
-            for ev in _views_for_level(doc, target_level):
-                if ev.ViewType == DB.ViewType.AreaPlan:
-                    scheme = ev.AreaScheme
-                    sig_key = scheme.Id.IntegerValue if scheme else -1
-                else:
-                    sig_key = ev.GetTypeId().IntegerValue
-                existing_sigs.add((ev.ViewType, sig_key))
+            # Skip check is by derived name, not by (ViewType, TypeId), so that
+            # multiple views of the same family type can coexist on a level (e.g.
+            # DD_LEVEL 00 and SD_LEVEL 00 are both FloorPlans of the same type).
+            existing_names = {ev.Name for ev in _views_for_level(doc, target_level)}
+            # AreaPlans are still unique per scheme per level (Revit limitation).
+            existing_area_schemes = {
+                ev.AreaScheme.Id.IntegerValue
+                for ev in _views_for_level(doc, target_level)
+                if ev.ViewType == DB.ViewType.AreaPlan and ev.AreaScheme is not None
+            }
 
             for src_view in source_views:
                 vtype = src_view.ViewType
 
-                # Build the signature for this source view
+                # Compute derived name up-front so the skip message shows the target name.
+                if src_num and tgt_num:
+                    derived = re.sub(
+                        r'(?<!\d)' + re.escape(src_num) + r'(?!\d)',
+                        tgt_num,
+                        src_view.Name,
+                    )
+                else:
+                    derived = src_view.Name
+
+                # Skip if a view with that derived name already exists on the target.
                 if vtype == DB.ViewType.AreaPlan:
                     src_scheme = src_view.AreaScheme
-                    sig = (vtype, src_scheme.Id.IntegerValue if src_scheme else -1)
+                    scheme_id = src_scheme.Id.IntegerValue if src_scheme else -1
+                    if scheme_id in existing_area_schemes:
+                        skipped.append("'{}' already exists on '{}'".format(derived, target_level.Name))
+                        continue
                 else:
-                    sig = (vtype, src_view.GetTypeId().IntegerValue)
-
-                if sig in existing_sigs:
-                    skipped.append("'{}' already exists on '{}'".format(src_view.Name, target_level.Name))
-                    continue
+                    if derived in existing_names:
+                        skipped.append("'{}' already exists on '{}'".format(derived, target_level.Name))
+                        continue
 
                 try:
                     if vtype in (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan):
-                        # Preserve the exact ViewFamilyType from the source view
                         new_view = DB.ViewPlan.Create(doc, src_view.GetTypeId(), target_level.Id)
 
                     elif vtype == DB.ViewType.AreaPlan:
@@ -203,25 +213,20 @@ def main():
                         skipped.append("'{}' — unsupported type ({})".format(src_view.Name, vtype))
                         continue
 
-                    # Track the new signature so subsequent source views in the same
-                    # loop don't accidentally create a second view of the same type
-                    existing_sigs.add(sig)
+                    # Track so subsequent iterations in the same run don't re-create.
+                    existing_names.add(derived)
+                    if vtype == DB.ViewType.AreaPlan:
+                        existing_area_schemes.add(scheme_id)
 
-                    # Rename inline: substitute the level number in the source view name
-                    if src_num and tgt_num:
-                        derived = re.sub(
-                            r'(?<!\d)' + re.escape(src_num) + r'(?!\d)',
-                            tgt_num,
-                            src_view.Name,
-                        )
-                        if derived != src_view.Name:
-                            try:
-                                new_view.Name = derived
-                            except Exception:
-                                pass
+                    # Apply derived name.
+                    if derived != src_view.Name:
+                        try:
+                            new_view.Name = derived
+                        except Exception:
+                            pass
                     final_name = new_view.Name
 
-                    # Apply view template
+                    # Apply view template.
                     tmpl_id = src_view.ViewTemplateId
                     if tmpl_id and tmpl_id != DB.ElementId.InvalidElementId:
                         try:
@@ -229,7 +234,7 @@ def main():
                         except Exception:
                             pass
 
-                    # Copy all writable instance parameters
+                    # Copy all writable instance parameters.
                     _copy_writable_params(src_view, new_view)
 
                     created.append("{} → {}".format(src_view.Name, final_name))
