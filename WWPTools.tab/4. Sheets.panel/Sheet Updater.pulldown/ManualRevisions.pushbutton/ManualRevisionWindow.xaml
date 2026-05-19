@@ -11,14 +11,41 @@
         <ResourceDictionary>
             <Style TargetType="Label">
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
 
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="#E5EAF0" />
                 <Setter Property="BorderBrush" Value="#CBD5E1" />
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Height" Value="26.5" />
+                <Setter Property="Padding" Value="18,0" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="ButtonBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ButtonBorder" Property="Background" Value="#D6DEE8" />
+                                    <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#B8C6D6" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
         </ResourceDictionary>
     </Window.Resources>
@@ -37,7 +64,7 @@
                        FontWeight="Bold" />
             <TextBlock x:Name="SheetLabel"
                        Margin="0,4,0,0"
-                       Foreground="{StaticResource MutedBrush}"
+                       Foreground="{DynamicResource MutedBrush}"
                        FontSize="12"
                        Text="Select sheets to update. The current sheet is shown first." />
         </StackPanel>
@@ -61,8 +88,8 @@
 
                 <Border Grid.Row="0"
                         Padding="16"
-                        Background="{StaticResource PanelBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
+                        Background="{DynamicResource PanelBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="6">
                     <Grid>
@@ -126,7 +153,7 @@
                                    Grid.ColumnSpan="2"
                                    TextWrapping="Wrap"
                                    FontSize="11"
-                                   Foreground="{StaticResource MutedBrush}"
+                                   Foreground="{DynamicResource MutedBrush}"
                                    Text="Selected sheets always use the fake revision parameters on the target titleblock. Each selected sheet keeps its current titleblock as the source." />
                         <Label Grid.Row="2" Grid.Column="0" Content="Target titleblock" />
                         <ComboBox x:Name="CmbTargetTitleblock" Grid.Row="2" Grid.Column="1" Margin="10,0,0,8" />
@@ -143,7 +170,7 @@
                                    Grid.ColumnSpan="2"
                                    TextWrapping="Wrap"
                                    FontSize="11"
-                                   Foreground="{StaticResource MutedBrush}"
+                                   Foreground="{DynamicResource MutedBrush}"
                                    Text="Select one or more sheets to update." />
                     </Grid>
                 </Border>
@@ -151,7 +178,7 @@
                 <TextBlock x:Name="TxtHint"
                            Grid.Row="4"
                            TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedBrush}"
+                           Foreground="{DynamicResource MutedBrush}"
                            FontSize="11"
                            Text="Descriptions wrap at about 25 characters without breaking words, with up to 10 lines on the left before overflowing to the right. Optionally ignore sheets whose real revision table still fits in one column." />
             </Grid>
