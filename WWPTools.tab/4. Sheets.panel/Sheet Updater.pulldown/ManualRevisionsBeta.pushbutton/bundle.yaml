@@ -1,0 +1,6 @@
+title: "Manual Rev\nbeta"
+tooltip: |
+  Beta formatter for manual revision titleblocks using per-set width inputs.
+  Automatically switches selected sheets to the chosen target titleblock only when the override is needed.
+  Version: 0.1.0
+author: "Jason Tian"
