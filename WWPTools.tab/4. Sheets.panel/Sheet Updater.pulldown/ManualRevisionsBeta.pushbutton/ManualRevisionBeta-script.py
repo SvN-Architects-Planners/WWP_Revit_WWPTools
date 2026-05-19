@@ -427,29 +427,51 @@ def _normalize_multiline_text(value):
 
 
 def _wrap_text_to_width(text, width_value):
-    width_value = max(1, int(width_value))
+    width_value = max(1.0, float(width_value))
     normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
     wrapped_lines = []
     for raw_line in normalized.split("\n"):
         if raw_line == "":
             wrapped_lines.append("")
             continue
-        lines = textwrap.wrap(
-            raw_line,
-            width=width_value,
-            break_long_words=True,
-            break_on_hyphens=False,
-        )
-        wrapped_lines.extend(lines or [""])
+        words = raw_line.split()
+        if not words:
+            wrapped_lines.append("")
+            continue
+        current_line = words[0]
+        current_width = _estimate_text_width(current_line)
+        for word in words[1:]:
+            candidate = current_line + " " + word
+            candidate_width = _estimate_text_width(candidate)
+            if candidate_width <= width_value:
+                current_line = candidate
+                current_width = candidate_width
+            else:
+                wrapped_lines.append(current_line)
+                if _estimate_text_width(word) <= width_value:
+                    current_line = word
+                    current_width = _estimate_text_width(word)
+                else:
+                    overflow_lines = _break_word_to_width(word, width_value)
+                    wrapped_lines.extend(overflow_lines[:-1])
+                    current_line = overflow_lines[-1]
+                    current_width = _estimate_text_width(current_line)
+        wrapped_lines.append(current_line)
     return wrapped_lines or [""]
 
 
 def _fit_single_line_text(text, width_value):
-    width_value = max(1, int(width_value))
+    width_value = max(1.0, float(width_value))
     value = str(text or "").replace("\r\n", " ").replace("\r", " ").replace("\n", " ").strip()
-    if len(value) <= width_value:
+    if _estimate_text_width(value) <= width_value:
         return value
-    return value[:width_value]
+    fitted = ""
+    for char in value:
+        candidate = fitted + char
+        if _estimate_text_width(candidate) > width_value:
+            break
+        fitted = candidate
+    return fitted
 
 
 def _mm_to_char_width(width_mm, mm_per_char):
@@ -457,7 +479,42 @@ def _mm_to_char_width(width_mm, mm_per_char):
         width_mm = float(width_mm)
     except Exception:
         width_mm = float(DEFAULT_DATE_WIDTH)
-    return max(1, int(round(width_mm / mm_per_char)))
+    return max(1.0, float(width_mm) / float(mm_per_char))
+
+
+def _char_width_factor(char):
+    if char == " ":
+        return 0.45
+    if char in ".,:;|!iIl1'`":
+        return 0.5
+    if char in "-_/()[]{}":
+        return 0.65
+    if char in "MW@#%&QGOCD":
+        return 1.3
+    if char.isupper():
+        return 1.08
+    if char.isdigit():
+        return 0.95
+    return 0.9
+
+
+def _estimate_text_width(text):
+    return sum([_char_width_factor(char) for char in str(text or "")])
+
+
+def _break_word_to_width(word, max_width):
+    parts = []
+    current = ""
+    for char in str(word or ""):
+        candidate = current + char
+        if current and _estimate_text_width(candidate) > max_width:
+            parts.append(current)
+            current = char
+        else:
+            current = candidate
+    if current or not parts:
+        parts.append(current)
+    return parts
 
 
 def _revision_date_text(revision):
