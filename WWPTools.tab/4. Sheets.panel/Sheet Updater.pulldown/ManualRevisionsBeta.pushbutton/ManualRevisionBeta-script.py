@@ -270,6 +270,18 @@ def get_titleblock_instances(sheet):
         return []
 
 
+def get_all_titleblock_instances():
+    try:
+        collector = (
+            FilteredElementCollector(doc)
+            .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+            .WhereElementIsNotElementType()
+        )
+        return list(collector.ToElements())
+    except Exception:
+        return []
+
+
 def get_sheet_titleblock_type_id(sheet):
     for titleblock in get_titleblock_instances(sheet):
         try:
@@ -333,15 +345,15 @@ def get_parameter_options(sheets, preferred_token=None):
         except Exception:
             pass
 
-        for titleblock in get_titleblock_instances(sheet):
-            try:
-                for param in titleblock.Parameters:
-                    if _is_text_parameter(param):
-                        name = getattr(param.Definition, "Name", None)
-                        if name:
-                            text_options.add(make_param_token(SCOPE_TITLEBLOCK, name))
-            except Exception:
-                pass
+    for titleblock in get_all_titleblock_instances():
+        try:
+            for param in titleblock.Parameters:
+                if _is_text_parameter(param):
+                    name = getattr(param.Definition, "Name", None)
+                    if name:
+                        text_options.add(make_param_token(SCOPE_TITLEBLOCK, name))
+        except Exception:
+            pass
 
     preferred_token = normalize_param_token(preferred_token or "")
     if preferred_token:
@@ -574,6 +586,11 @@ def build_missing_sheet_message(missing_by_sheet):
     for sheet_label in missing_by_sheet:
         lines.append(sheet_label)
     return "\n".join(lines)
+
+
+def _requires_existing_param_before_swap(token):
+    scope, _param_name = parse_param_token(token)
+    return scope != SCOPE_TITLEBLOCK
 
 
 def _set_owner(window):
@@ -869,7 +886,7 @@ def main():
 
     missing_by_sheet = []
     for sheet in sheets:
-        if get_param_from_scope(sheet, param_token) is None:
+        if _requires_existing_param_before_swap(param_token) and get_param_from_scope(sheet, param_token) is None:
             missing_by_sheet.append("{} - {}".format(sheet.SheetNumber, sheet.Name))
     if missing_by_sheet:
         ui.uiUtils_alert(build_missing_sheet_message(missing_by_sheet), title=WINDOW_TITLE)
@@ -883,6 +900,7 @@ def main():
     processed_sheets = []
     skipped_sheets = []
     swapped_sheet_count = 0
+    write_failures = []
 
     with revit.Transaction("WWP: Manual Revisions Beta"):
         for sheet in sheets:
@@ -896,12 +914,21 @@ def main():
 
             param = get_param_from_scope(sheet, param_token)
             if param is None or param.IsReadOnly:
+                write_failures.append("{} - {}".format(sheet.SheetNumber, sheet.Name))
                 continue
             try:
                 param.Set(block_text)
                 processed_sheets.append(sheet)
             except Exception:
+                write_failures.append("{} - {}".format(sheet.SheetNumber, sheet.Name))
                 continue
+
+    if write_failures:
+        ui.uiUtils_alert(
+            "The formatted block parameter could not be written on these sheets:\n\n" + "\n".join(write_failures),
+            title=WINDOW_TITLE,
+        )
+        return
 
     if not processed_sheets:
         ui.uiUtils_alert(
