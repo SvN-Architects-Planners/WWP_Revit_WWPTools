@@ -341,7 +341,7 @@ def save_target_titleblock_selection(target_type):
     setattr(
         config,
         CONFIG_FIELDS["target_titleblock"],
-        _elem_id_int(str(target_type.Id)) if target_type is not None else "",
+        _elem_id_text(getattr(target_type, "Id", None)) if target_type is not None else "",
     )
     save_config()
 
@@ -601,12 +601,12 @@ def _type_id_integer_value(type_id):
 
 
 def find_titleblock_type_by_id(titleblock_types, type_id_value):
-    type_id_text = str(type_id_value or "").strip()
+    type_id_text = _elem_id_text(type_id_value)
     if not type_id_text:
         return None
     for titleblock_type in list(titleblock_types or []):
         try:
-            if _elem_id_int(str(titleblock_type.Id)) == type_id_text:
+            if _elem_id_text(titleblock_type.Id) == type_id_text:
                 return titleblock_type
         except Exception:
             continue
@@ -616,12 +616,12 @@ def find_titleblock_type_by_id(titleblock_types, type_id_value):
 def choose_target_titleblock_id(titleblock_types, current_type_id, saved_target_type_id):
     saved_target = find_titleblock_type_by_id(titleblock_types, saved_target_type_id)
     if saved_target is not None:
-        return _elem_id_int(str(saved_target.Id))
+        return _elem_id_text(saved_target.Id)
 
-    current_id_text = str(current_type_id or "").strip()
+    current_id_text = _elem_id_text(current_type_id)
     for titleblock_type in list(titleblock_types or []):
         try:
-            current_id = _elem_id_int(str(titleblock_type.Id))
+            current_id = _elem_id_text(titleblock_type.Id)
         except Exception:
             continue
         if current_id != current_id_text:
@@ -670,6 +670,11 @@ def _elem_id_int(eid):
         return int(str(eid))
     except Exception:
         return None
+
+
+def _elem_id_text(eid):
+    value = _elem_id_int(eid)
+    return "" if value is None else str(value)
 
 
 class ManualRevisionDialog(object):
@@ -782,7 +787,7 @@ class ManualRevisionDialog(object):
     @staticmethod
     def _type_id_string(titleblock_type):
         try:
-            return str(_elem_id_int(titleblock_type.Id) or "")
+            return _elem_id_text(titleblock_type.Id)
         except Exception:
             return ""
 
@@ -954,7 +959,7 @@ class ManualRevisionDialog(object):
         self.result = {
             "param_map": param_map,
             "selected_indices": selected_indices,
-            "target_type_id": _elem_id_int(str(target_type.Id)),
+            "target_type_id": _elem_id_text(target_type.Id),
             "ignore_single_column": self._ignore_single_column(),
         }
         self.window.DialogResult = True
@@ -990,7 +995,7 @@ def main():
     current_type_id = ""
     reference_titleblock_type_id = get_sheet_titleblock_type_id(reference_sheet)
     if reference_titleblock_type_id is not None:
-        current_type_id = str(_elem_id_int(reference_titleblock_type_id))
+        current_type_id = _elem_id_text(reference_titleblock_type_id)
     saved_target_type_id = get_saved_target_titleblock_id()
     target_type_id = choose_target_titleblock_id(titleblock_types, current_type_id, saved_target_type_id)
 
