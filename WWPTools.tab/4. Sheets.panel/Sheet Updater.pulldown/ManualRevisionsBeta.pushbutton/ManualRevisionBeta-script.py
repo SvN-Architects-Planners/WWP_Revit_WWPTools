@@ -517,6 +517,14 @@ def _break_word_to_width(word, max_width):
     return parts
 
 
+def _pad_right(text, width, fill_text):
+    value = str(text or "")
+    pad_count = max(0, int(width) - len(value))
+    if pad_count <= 0:
+        return value
+    return value + (fill_text * pad_count)
+
+
 def _revision_date_text(revision):
     try:
         return str(getattr(revision, "RevisionDate", "") or "").strip()
@@ -540,8 +548,8 @@ def _format_row_lines(date_text, desc_text, date_width, desc_width):
 
     row_lines = []
     for index in range(line_cost):
-        date_part = date_lines[index].ljust(date_width, NBSP)
-        desc_part = desc_lines[index].ljust(desc_width, NBSP)
+        date_part = _pad_right(date_lines[index], date_width, NBSP)
+        desc_part = _pad_right(desc_lines[index], desc_width, NBSP)
         row_lines.append("{}{}{}".format(date_part, NBSP, desc_part))
     return row_lines, line_cost
 
@@ -591,7 +599,7 @@ def build_revision_block_text(sheet, layout_settings):
         for col_index in range(active_column_count):
             segment = normalized_columns[col_index][line_index] if col_index < len(normalized_columns) else ""
             segment_width = date_width + 1 + desc_width
-            line_segments.append(segment.ljust(segment_width, NBSP))
+            line_segments.append(_pad_right(segment, segment_width, NBSP))
         combined_lines.append("".join(line_segments))
 
     while combined_lines and not combined_lines[-1].replace(NBSP, "").strip():
