@@ -54,9 +54,10 @@ DEFAULT_DATE_WIDTH = 23
 DEFAULT_DESC_WIDTH = 57
 DEFAULT_COLUMN_COUNT = 2
 LINE_LIMIT_PER_SET = 10
-SET_GAP = 1
+SET_GAP = 4
 DATE_MM_PER_CHAR = 2.3
 DESC_MM_PER_CHAR = 57.0 / 34.0
+NBSP = u"\u00A0"
 
 SCOPE_SHEET = "sheet"
 SCOPE_TITLEBLOCK = "titleblock"
@@ -475,9 +476,9 @@ def _format_row_lines(date_text, desc_text, date_width, desc_width):
 
     row_lines = []
     for index in range(line_cost):
-        date_part = date_lines[index].ljust(date_width)
-        desc_part = desc_lines[index].ljust(desc_width)
-        row_lines.append("{} {}{}".format(date_part, desc_part, "" if desc_width <= 0 else ""))
+        date_part = date_lines[index].ljust(date_width, NBSP)
+        desc_part = desc_lines[index].ljust(desc_width, NBSP)
+        row_lines.append("{}{}{}".format(date_part, NBSP * 2, desc_part))
     return row_lines, line_cost
 
 
@@ -525,12 +526,11 @@ def build_revision_block_text(sheet, layout_settings):
         line_segments = []
         for col_index in range(active_column_count):
             segment = normalized_columns[col_index][line_index] if col_index < len(normalized_columns) else ""
-            if segment:
-                segment = segment.rstrip()
-            line_segments.append(segment.ljust(date_width + 1 + desc_width))
-        combined_lines.append((" " * SET_GAP).join(line_segments).rstrip())
+            segment_width = date_width + 2 + desc_width
+            line_segments.append(segment.ljust(segment_width, NBSP))
+        combined_lines.append((NBSP * SET_GAP).join(line_segments))
 
-    while combined_lines and not combined_lines[-1].strip():
+    while combined_lines and not combined_lines[-1].replace(NBSP, "").strip():
         combined_lines.pop()
     return _normalize_multiline_text("\n".join(combined_lines)), used_columns
 
