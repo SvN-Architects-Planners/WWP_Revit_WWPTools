@@ -173,6 +173,11 @@ def get_param(element, param_name):
 def _is_text_parameter(param):
     if not param or not getattr(param, "Definition", None):
         return False
+    try:
+        if hasattr(param, "StorageType") and param.StorageType == DB.StorageType.String:
+            return True
+    except Exception:
+        pass
     definition = param.Definition
     try:
         if hasattr(definition, "GetDataType") and hasattr(DB, "SpecTypeId"):
