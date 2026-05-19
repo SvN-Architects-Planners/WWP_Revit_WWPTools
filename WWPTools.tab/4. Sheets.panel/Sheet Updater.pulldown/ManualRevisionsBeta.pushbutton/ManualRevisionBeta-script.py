@@ -54,7 +54,6 @@ DEFAULT_DATE_WIDTH = 23
 DEFAULT_DESC_WIDTH = 57
 DEFAULT_COLUMN_COUNT = 2
 LINE_LIMIT_PER_SET = 10
-SET_GAP = 4
 DATE_MM_PER_CHAR = 2.3
 DESC_MM_PER_CHAR = 57.0 / 34.0
 NBSP = u"\u00A0"
@@ -445,6 +444,14 @@ def _wrap_text_to_width(text, width_value):
     return wrapped_lines or [""]
 
 
+def _fit_single_line_text(text, width_value):
+    width_value = max(1, int(width_value))
+    value = str(text or "").replace("\r\n", " ").replace("\r", " ").replace("\n", " ").strip()
+    if len(value) <= width_value:
+        return value
+    return value[:width_value]
+
+
 def _mm_to_char_width(width_mm, mm_per_char):
     try:
         width_mm = float(width_mm)
@@ -468,7 +475,7 @@ def _revision_desc_text(revision):
 
 
 def _format_row_lines(date_text, desc_text, date_width, desc_width):
-    date_lines = _wrap_text_to_width(date_text, date_width)
+    date_lines = [_fit_single_line_text(date_text, date_width)]
     desc_lines = _wrap_text_to_width(desc_text, desc_width)
     line_cost = max(len(date_lines), len(desc_lines))
     date_lines += [""] * max(0, line_cost - len(date_lines))
@@ -478,7 +485,7 @@ def _format_row_lines(date_text, desc_text, date_width, desc_width):
     for index in range(line_cost):
         date_part = date_lines[index].ljust(date_width, NBSP)
         desc_part = desc_lines[index].ljust(desc_width, NBSP)
-        row_lines.append("{}{}{}".format(date_part, NBSP * 2, desc_part))
+        row_lines.append("{}{}{}".format(date_part, NBSP, desc_part))
     return row_lines, line_cost
 
 
@@ -526,9 +533,9 @@ def build_revision_block_text(sheet, layout_settings):
         line_segments = []
         for col_index in range(active_column_count):
             segment = normalized_columns[col_index][line_index] if col_index < len(normalized_columns) else ""
-            segment_width = date_width + 2 + desc_width
+            segment_width = date_width + 1 + desc_width
             line_segments.append(segment.ljust(segment_width, NBSP))
-        combined_lines.append((NBSP * SET_GAP).join(line_segments))
+        combined_lines.append("".join(line_segments))
 
     while combined_lines and not combined_lines[-1].replace(NBSP, "").strip():
         combined_lines.pop()
