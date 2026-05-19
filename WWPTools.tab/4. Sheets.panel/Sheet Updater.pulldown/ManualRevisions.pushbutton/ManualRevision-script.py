@@ -655,6 +655,23 @@ def _set_owner(window):
         pass
 
 
+def _elem_id_int(eid):
+    if eid is None:
+        return None
+    try:
+        return int(eid.Value)  # Revit 2024+
+    except Exception:
+        pass
+    try:
+        return int(eid.IntegerValue)  # Revit 2023-
+    except Exception:
+        pass
+    try:
+        return int(str(eid))
+    except Exception:
+        return None
+
+
 class ManualRevisionDialog(object):
     def __init__(self, sheet_list, preselected_indices, param_options, selected_map, titleblock_types, target_type_id):
         self.sheet_list = list(sheet_list or [])
@@ -757,14 +774,6 @@ class ManualRevisionDialog(object):
     @staticmethod
     def _make_list_item(label, index):
         from System.Windows.Controls import ListBoxItem
-
-
-def _elem_id_int(eid):
-    try:
-        return int(eid.Value)      # Revit 2024+
-    except AttributeError:
-        return int(eid.Value)  # Revit 2023-
-
         item = ListBoxItem()
         item.Content = label
         item.Tag = index
@@ -773,7 +782,7 @@ def _elem_id_int(eid):
     @staticmethod
     def _type_id_string(titleblock_type):
         try:
-            return _elem_id_int(str(titleblock_type.Id))
+            return str(_elem_id_int(titleblock_type.Id) or "")
         except Exception:
             return ""
 
