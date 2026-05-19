@@ -9,10 +9,6 @@
         ResizeMode="CanResize">
     <Window.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/WWPTools.WpfUI;component/Themes/FlatTheme.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-
             <Style TargetType="Label">
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource TextBrush}" />

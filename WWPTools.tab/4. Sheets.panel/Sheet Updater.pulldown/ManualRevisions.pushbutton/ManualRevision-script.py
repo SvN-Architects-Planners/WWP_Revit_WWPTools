@@ -117,6 +117,13 @@ def ensure_wpfui_theme():
         return
 
     try:
+        ui._ensure_theme()
+        _WPFUI_THEME_READY = True
+        return
+    except Exception:
+        pass
+
+    try:
         revit_version = int(str(__revit__.Application.VersionNumber))
     except Exception:
         revit_version = None
