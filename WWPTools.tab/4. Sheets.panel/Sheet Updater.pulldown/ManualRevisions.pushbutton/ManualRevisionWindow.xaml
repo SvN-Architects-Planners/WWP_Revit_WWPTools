@@ -99,6 +99,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="124" />
@@ -111,17 +113,23 @@
                                    FontWeight="Bold"
                                    Text="Parameter Mapping" />
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Left dates" />
+                        <Label Grid.Row="1" Grid.Column="0" Content="Set 1 dates" />
                         <ComboBox x:Name="CmbLeftDatesParam" Grid.Row="1" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="2" Grid.Column="0" Content="Left descriptions" />
+                        <Label Grid.Row="2" Grid.Column="0" Content="Set 1 descriptions" />
                         <ComboBox x:Name="CmbLeftDescsParam" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="3" Grid.Column="0" Content="Right dates" />
+                        <Label Grid.Row="3" Grid.Column="0" Content="Set 2 dates" />
                         <ComboBox x:Name="CmbRightDatesParam" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="4" Grid.Column="0" Content="Right descriptions" />
-                        <ComboBox x:Name="CmbRightDescsParam" Grid.Row="4" Grid.Column="1" Margin="8,0,0,0" />
+                        <Label Grid.Row="4" Grid.Column="0" Content="Set 2 descriptions" />
+                        <ComboBox x:Name="CmbRightDescsParam" Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" />
+
+                        <Label Grid.Row="5" Grid.Column="0" Content="Set 3 dates" />
+                        <ComboBox x:Name="CmbSet3DatesParam" Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" />
+
+                        <Label Grid.Row="6" Grid.Column="0" Content="Set 3 descriptions" />
+                        <ComboBox x:Name="CmbSet3DescsParam" Grid.Row="6" Grid.Column="1" Margin="8,0,0,0" />
                     </Grid>
                 </Border>
 
@@ -180,7 +188,7 @@
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource MutedBrush}"
                            FontSize="11"
-                           Text="Descriptions wrap at about 25 characters without breaking words, with up to 10 lines on the left before overflowing to the right. Optionally ignore sheets whose real revision table still fits in one column." />
+                           Text="Descriptions now wrap at about 34 characters without breaking words. Set 1 and Set 2 are required; Set 3 is optional for an extra revision column when needed." />
             </Grid>
 
             <GridSplitter Grid.Column="1"

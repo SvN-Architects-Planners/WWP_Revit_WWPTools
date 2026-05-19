@@ -40,6 +40,8 @@ FIELD_LEFT_DATES = "left_dates"
 FIELD_LEFT_DESCS = "left_descs"
 FIELD_RIGHT_DATES = "right_dates"
 FIELD_RIGHT_DESCS = "right_descs"
+FIELD_SET3_DATES = "set3_dates"
+FIELD_SET3_DESCS = "set3_descs"
 
 SCOPE_SHEET = "sheet"
 SCOPE_TITLEBLOCK = "titleblock"
@@ -49,13 +51,17 @@ FIELD_ORDER = [
     FIELD_LEFT_DESCS,
     FIELD_RIGHT_DATES,
     FIELD_RIGHT_DESCS,
+    FIELD_SET3_DATES,
+    FIELD_SET3_DESCS,
 ]
 
 FIELD_LABELS = {
-    FIELD_LEFT_DATES: "Left dates",
-    FIELD_LEFT_DESCS: "Left descriptions",
-    FIELD_RIGHT_DATES: "Right dates",
-    FIELD_RIGHT_DESCS: "Right descriptions",
+    FIELD_LEFT_DATES: "Set 1 dates",
+    FIELD_LEFT_DESCS: "Set 1 descriptions",
+    FIELD_RIGHT_DATES: "Set 2 dates",
+    FIELD_RIGHT_DESCS: "Set 2 descriptions",
+    FIELD_SET3_DATES: "Set 3 dates",
+    FIELD_SET3_DESCS: "Set 3 descriptions",
 }
 
 DEFAULT_PARAM_NAMES = {
@@ -63,6 +69,8 @@ DEFAULT_PARAM_NAMES = {
     FIELD_LEFT_DESCS: "! S_TB_RevisonDetail_Left",
     FIELD_RIGHT_DATES: "! S_TB_RevisonDate_Right",
     FIELD_RIGHT_DESCS: "! S_TB_RevisonDetail_Right",
+    FIELD_SET3_DATES: "",
+    FIELD_SET3_DESCS: "",
 }
 
 CONFIG_FIELDS = {
@@ -70,8 +78,16 @@ CONFIG_FIELDS = {
     FIELD_LEFT_DESCS: "param_left_descs",
     FIELD_RIGHT_DATES: "param_right_dates",
     FIELD_RIGHT_DESCS: "param_right_descs",
+    FIELD_SET3_DATES: "param_set3_dates",
+    FIELD_SET3_DESCS: "param_set3_descs",
     "target_titleblock": "target_titleblock_id",
 }
+
+COLUMN_FIELD_SETS = [
+    ("Set 1", FIELD_LEFT_DATES, FIELD_LEFT_DESCS, True),
+    ("Set 2", FIELD_RIGHT_DATES, FIELD_RIGHT_DESCS, True),
+    ("Set 3", FIELD_SET3_DATES, FIELD_SET3_DESCS, False),
+]
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -108,7 +124,7 @@ def _read_bundle_title():
 BUNDLE_TITLE = _read_bundle_title()
 WINDOW_TITLE = " ".join(BUNDLE_TITLE.splitlines()).strip() or "Manual Revisions"
 SCHEDULE_LINE_LIMIT = 10
-DOUBLE_LINE_DESCRIPTION_LENGTH = 25
+DOUBLE_LINE_DESCRIPTION_LENGTH = 34
 
 
 def ensure_wpfui_theme():
@@ -174,11 +190,44 @@ def normalize_param_token(field_name, token):
     return make_param_token(scope, param_name)
 
 
+def get_active_field_names(param_map):
+    active_fields = []
+    for _set_name, date_field, desc_field, _required in COLUMN_FIELD_SETS:
+        if param_map.get(date_field) and param_map.get(desc_field):
+            active_fields.extend([date_field, desc_field])
+    return active_fields
+
+
+def validate_param_map(param_map):
+    missing_required_labels = []
+    incomplete_optional_sets = []
+    for set_name, date_field, desc_field, required in COLUMN_FIELD_SETS:
+        has_date = bool(param_map.get(date_field))
+        has_desc = bool(param_map.get(desc_field))
+        if required:
+            if not has_date:
+                missing_required_labels.append(FIELD_LABELS[date_field])
+            if not has_desc:
+                missing_required_labels.append(FIELD_LABELS[desc_field])
+        elif has_date != has_desc:
+            incomplete_optional_sets.append(set_name)
+    return missing_required_labels, incomplete_optional_sets
+
+
+def is_required_field(field_name):
+    for _set_name, date_field, desc_field, required in COLUMN_FIELD_SETS:
+        if field_name == date_field or field_name == desc_field:
+            return required
+    return True
+
+
 DEFAULT_PARAM_MAP = {
     FIELD_LEFT_DATES: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_LEFT_DATES]),
     FIELD_LEFT_DESCS: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_LEFT_DESCS]),
     FIELD_RIGHT_DATES: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_RIGHT_DATES]),
     FIELD_RIGHT_DESCS: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_RIGHT_DESCS]),
+    FIELD_SET3_DATES: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_SET3_DATES]),
+    FIELD_SET3_DESCS: make_param_token(SCOPE_SHEET, DEFAULT_PARAM_NAMES[FIELD_SET3_DESCS]),
 }
 
 
@@ -416,7 +465,7 @@ def save_param_map(param_map):
 
 def get_missing_selected_params(sheet, param_map, include_titleblock=True):
     missing = []
-    for field_name in FIELD_ORDER:
+    for field_name in get_active_field_names(param_map):
         token = normalize_param_token(field_name, param_map.get(field_name, "") or "")
         if not token:
             missing.append(field_name)
@@ -551,27 +600,38 @@ def _build_desc_column(rows):
     return _normalize_multiline_text("\n".join(lines))
 
 
-def build_revision_preview_values(sheet):
+def build_revision_preview_values(sheet, param_map):
     revisions = get_sheet_revisions(sheet)
-    left_rows = []
-    right_rows = []
-    left_line_count = 0
+    active_sets = [
+        (date_field, desc_field)
+        for _set_name, date_field, desc_field, _required in COLUMN_FIELD_SETS
+        if param_map.get(date_field) and param_map.get(desc_field)
+    ]
+    if not active_sets:
+        active_sets = [(FIELD_LEFT_DATES, FIELD_LEFT_DESCS), (FIELD_RIGHT_DATES, FIELD_RIGHT_DESCS)]
+
+    rows_by_set = [[] for _ in active_sets]
+    line_counts = [0 for _ in active_sets]
 
     for revision in revisions:
         line_cost = _revision_line_cost(revision)
         row = (_revision_date_text(revision), _revision_description_text(revision), line_cost)
-        if left_line_count + line_cost <= SCHEDULE_LINE_LIMIT:
-            left_rows.append(row)
-            left_line_count += line_cost
-        else:
-            right_rows.append(row)
+        placed = False
+        for index in range(len(rows_by_set)):
+            if line_counts[index] + line_cost <= SCHEDULE_LINE_LIMIT:
+                rows_by_set[index].append(row)
+                line_counts[index] += line_cost
+                placed = True
+                break
+        if not placed:
+            rows_by_set[-1].append(row)
 
-    return {
-        FIELD_LEFT_DATES: _build_date_column(left_rows),
-        FIELD_LEFT_DESCS: _build_desc_column(left_rows),
-        FIELD_RIGHT_DATES: _build_date_column(right_rows),
-        FIELD_RIGHT_DESCS: _build_desc_column(right_rows),
-    }
+    values = dict((field_name, "") for field_name in FIELD_ORDER)
+    for index, (date_field, desc_field) in enumerate(active_sets):
+        rows = rows_by_set[index]
+        values[date_field] = _build_date_column(rows)
+        values[desc_field] = _build_desc_column(rows)
+    return values
 
 
 def write_sheet_values(sheet, param_map, values):
@@ -704,6 +764,8 @@ class ManualRevisionDialog(object):
         self._cmb_left_descs = self.window.FindName("CmbLeftDescsParam")
         self._cmb_right_dates = self.window.FindName("CmbRightDatesParam")
         self._cmb_right_descs = self.window.FindName("CmbRightDescsParam")
+        self._cmb_set3_dates = self.window.FindName("CmbSet3DatesParam")
+        self._cmb_set3_descs = self.window.FindName("CmbSet3DescsParam")
         self._cmb_target_titleblock = self.window.FindName("CmbTargetTitleblock")
         self._chk_ignore_single_column = self.window.FindName("ChkIgnoreSingleColumn")
         self._txt_mapping_info = self.window.FindName("TxtMappingInfo")
@@ -723,6 +785,8 @@ class ManualRevisionDialog(object):
         self._populate_combo(self._cmb_left_descs, param_options.get(FIELD_LEFT_DESCS, []), selected_map.get(FIELD_LEFT_DESCS, ""))
         self._populate_combo(self._cmb_right_dates, param_options.get(FIELD_RIGHT_DATES, []), selected_map.get(FIELD_RIGHT_DATES, ""))
         self._populate_combo(self._cmb_right_descs, param_options.get(FIELD_RIGHT_DESCS, []), selected_map.get(FIELD_RIGHT_DESCS, ""))
+        self._populate_combo(self._cmb_set3_dates, param_options.get(FIELD_SET3_DATES, []), selected_map.get(FIELD_SET3_DATES, ""))
+        self._populate_combo(self._cmb_set3_descs, param_options.get(FIELD_SET3_DESCS, []), selected_map.get(FIELD_SET3_DESCS, ""))
         self._populate_titleblock_combo(self._cmb_target_titleblock, target_type_id)
 
         for combo_box in [
@@ -730,6 +794,8 @@ class ManualRevisionDialog(object):
             self._cmb_left_descs,
             self._cmb_right_dates,
             self._cmb_right_descs,
+            self._cmb_set3_dates,
+            self._cmb_set3_descs,
         ]:
             combo_box.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
 
@@ -821,14 +887,20 @@ class ManualRevisionDialog(object):
 
     def _populate_combo(self, combo_box, options, selected_value):
         combo_box.Items.Clear()
+        field_name = self._field_name_for_combo(combo_box)
         token_lookup = {}
+        if not is_required_field(field_name):
+            combo_box.Items.Add("(Not used)")
+            token_lookup["(Not used)"] = ""
         for option in options:
-            label = format_param_option(self._field_name_for_combo(combo_box), option)
+            label = format_param_option(field_name, option)
             combo_box.Items.Add(label)
             token_lookup[label] = option
         self._combo_tokens[combo_box.Name] = token_lookup
 
-        selected_label = format_param_option(self._field_name_for_combo(combo_box), selected_value)
+        selected_label = format_param_option(field_name, selected_value)
+        if not selected_label and not is_required_field(field_name):
+            selected_label = "(Not used)"
         if selected_label and selected_label in list(token_lookup.keys()):
             combo_box.SelectedItem = selected_label
         elif combo_box.Items.Count > 0:
@@ -840,6 +912,8 @@ class ManualRevisionDialog(object):
             FIELD_LEFT_DESCS: self._combo_value(self._cmb_left_descs),
             FIELD_RIGHT_DATES: self._combo_value(self._cmb_right_dates),
             FIELD_RIGHT_DESCS: self._combo_value(self._cmb_right_descs),
+            FIELD_SET3_DATES: self._combo_value(self._cmb_set3_dates),
+            FIELD_SET3_DESCS: self._combo_value(self._cmb_set3_descs),
         }
 
     def _ignore_single_column(self):
@@ -872,6 +946,8 @@ class ManualRevisionDialog(object):
             "CmbLeftDescsParam": FIELD_LEFT_DESCS,
             "CmbRightDatesParam": FIELD_RIGHT_DATES,
             "CmbRightDescsParam": FIELD_RIGHT_DESCS,
+            "CmbSet3DatesParam": FIELD_SET3_DATES,
+            "CmbSet3DescsParam": FIELD_SET3_DESCS,
         }
         return mapping.get(combo_box.Name, FIELD_LEFT_DATES)
 
@@ -880,9 +956,12 @@ class ManualRevisionDialog(object):
             return
 
         param_map = self._get_param_map()
-        missing = [FIELD_LABELS[field_name] for field_name in FIELD_ORDER if not param_map.get(field_name)]
-        if missing:
-            self._txt_mapping_info.Text = "Select all four parameters before applying."
+        missing_required, incomplete_optional_sets = validate_param_map(param_map)
+        if missing_required:
+            self._txt_mapping_info.Text = "Complete Set 1 and Set 2 before applying."
+            return
+        if incomplete_optional_sets:
+            self._txt_mapping_info.Text = "{} must have both dates and descriptions selected.".format(", ".join(incomplete_optional_sets))
             return
         selected_indices = self._get_selected_sheet_indices()
         if not selected_indices:
@@ -892,24 +971,29 @@ class ManualRevisionDialog(object):
         selected_sheets = [self.sheet_list[index] for index in selected_indices if 0 <= index < len(self.sheet_list)]
         target_type = self._selected_titleblock_type(self._cmb_target_titleblock)
         target_name = titleblock_display_name(target_type) or "target titleblock"
+        active_set_count = max(1, len(get_active_field_names(param_map)) // 2)
         ignored_count = len([sheet for sheet in selected_sheets if not needs_two_column_manual_layout(sheet)]) if self._ignore_single_column() else 0
         processed_count = max(0, len(selected_sheets) - ignored_count)
         if self._ignore_single_column():
             self._txt_mapping_info.Text = (
-                "{} sheet{} selected. {} will be swapped to {}. {} will be ignored because the revision table does not need two columns."
+                "{} sheet{} selected. {} active set{}. {} will be swapped to {}. {} will be ignored because the revision table does not need two columns."
             ).format(
                 len(selected_sheets),
                 "" if len(selected_sheets) == 1 else "s",
+                active_set_count,
+                "" if active_set_count == 1 else "s",
                 processed_count,
                 target_name,
                 ignored_count,
             )
         else:
             self._txt_mapping_info.Text = (
-                "{} sheet{} selected. All selected sheets will be swapped to {} and will use the fake revision parameters."
+                "{} sheet{} selected. {} active set{}. All selected sheets will be swapped to {} and will use the fake revision parameters."
             ).format(
                 len(selected_sheets),
                 "" if len(selected_sheets) == 1 else "s",
+                active_set_count,
+                "" if active_set_count == 1 else "s",
                 target_name,
             )
 
@@ -929,10 +1013,17 @@ class ManualRevisionDialog(object):
 
     def _on_apply(self, sender, args):
         param_map = self._get_param_map()
-        missing_labels = [FIELD_LABELS[field_name] for field_name in FIELD_ORDER if not param_map.get(field_name)]
+        missing_labels, incomplete_optional_sets = validate_param_map(param_map)
         if missing_labels:
             MessageBox.Show(
-                "Select all four parameters before applying:\n\n" + "\n".join(missing_labels),
+                "Complete Set 1 and Set 2 before applying:\n\n" + "\n".join(missing_labels),
+                WINDOW_TITLE,
+                MessageBoxButton.OK,
+            )
+            return
+        if incomplete_optional_sets:
+            MessageBox.Show(
+                "{} must have both dates and descriptions selected.".format(", ".join(incomplete_optional_sets)),
                 WINDOW_TITLE,
                 MessageBoxButton.OK,
             )
@@ -1077,7 +1168,7 @@ def main():
         for sheet in sheets_to_process:
             if swap_sheet_titleblock_type(sheet, target_type) > 0:
                 swapped_sheet_count += 1
-            sheet_values = build_revision_preview_values(sheet)
+            sheet_values = build_revision_preview_values(sheet, param_map)
             write_sheet_values(sheet, param_map, sheet_values)
             missing_fields = get_missing_selected_params(sheet, param_map)
             if missing_fields:
