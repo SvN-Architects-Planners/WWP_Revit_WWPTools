@@ -202,6 +202,16 @@ def _revit_version():
         return ""
 
 
+def _revit_username():
+    try:
+        name = str(__revit__.Application.Username or "").strip()
+        if name:
+            return name
+    except Exception:
+        pass
+    return os.environ.get("USERNAME") or ""
+
+
 def _build_event(event_type, extra_data=None):
     identity = _load_identity()
     payload = {
@@ -210,6 +220,7 @@ def _build_event(event_type, extra_data=None):
         "timestamp_utc": _utc_now(),
         "install_id": identity.get("install_id") or "",
         "user_id": identity.get("user_id") or "",
+        "user_name": _revit_username(),
         "machine_id": identity.get("machine_id") or "",
         "extension_version": get_installed_version("dev"),
         "revit_version": _revit_version(),
