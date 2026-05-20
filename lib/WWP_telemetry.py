@@ -12,12 +12,13 @@ except Exception:
     except Exception:
         _urlrequest = None
 
-try:
-    from urllib.parse import urlencode as _urlencode
-except Exception:
-    _urlencode = None
-
-_SP_TOKEN_CACHE = {"token": "", "expires_at": 0.0}
+# TODO: Re-enable when Azure AD app registration is available
+# try:
+#     from urllib.parse import urlencode as _urlencode
+# except Exception:
+#     _urlencode = None
+#
+# _SP_TOKEN_CACHE = {"token": "", "expires_at": 0.0}
 
 try:
     from pyrevit import EXEC_PARAMS
@@ -247,87 +248,88 @@ def _queue_event(payload):
         _append_jsonl(_pending_path(), payload)
 
 
-def _load_sp_config():
-    raw = _read_json_file(_config_path(), default={})
-    sp = raw.get("sharepoint") if isinstance(raw, dict) else None
-    if not isinstance(sp, dict) or not sp.get("enabled"):
-        return None
-    required = ("tenant_id", "client_id", "client_secret", "drive_id", "item_id")
-    if not all(str(sp.get(k) or "").strip() for k in required):
-        return None
-    return sp
-
-
-def _sp_get_token(sp):
-    global _SP_TOKEN_CACHE
-    now = time.time()
-    if _SP_TOKEN_CACHE["token"] and now < _SP_TOKEN_CACHE["expires_at"] - 60:
-        return _SP_TOKEN_CACHE["token"]
-    if _urlrequest is None or _urlencode is None:
-        return ""
-    url = "https://login.microsoftonline.com/{}/oauth2/v2.0/token".format(sp["tenant_id"])
-    body = _urlencode({
-        "grant_type": "client_credentials",
-        "client_id": sp["client_id"],
-        "client_secret": sp["client_secret"],
-        "scope": "https://graph.microsoft.com/.default",
-    }).encode("utf-8")
-    try:
-        req = _urlrequest.Request(
-            url, data=body,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        resp = _urlrequest.urlopen(req, timeout=10)
-        data = json.loads(resp.read().decode("utf-8"))
-        token = str(data.get("access_token") or "")
-        expires_in = int(data.get("expires_in") or 3600)
-        _SP_TOKEN_CACHE["token"] = token
-        _SP_TOKEN_CACHE["expires_at"] = now + expires_in
-        return token
-    except Exception:
-        return ""
-
-
-def _sp_append_rows(rows, sp):
-    if not rows or _urlrequest is None:
-        return False
-    token = _sp_get_token(sp)
-    if not token:
-        return False
-    table_name = str(sp.get("table_name") or "UsageData")
-    url = (
-        "https://graph.microsoft.com/v1.0"
-        "/drives/{}/items/{}/workbook/tables/{}/rows/add".format(
-            sp["drive_id"], sp["item_id"], table_name
-        )
-    )
-    payload = json.dumps({"values": rows}).encode("utf-8")
-    try:
-        req = _urlrequest.Request(
-            url, data=payload,
-            headers={
-                "Authorization": "Bearer " + token,
-                "Content-Type": "application/json",
-            },
-        )
-        resp = _urlrequest.urlopen(req, timeout=float(sp.get("timeout_sec") or 5))
-        status = getattr(resp, "status", None) or getattr(resp, "code", None) or 200
-        return int(status) < 300
-    except Exception:
-        return False
-
-
-def _event_to_sp_row(event):
-    return [
-        str(event.get("timestamp_utc") or ""),
-        str(event.get("user_name") or ""),
-        str(event.get("install_id") or ""),
-        str(event.get("extension_version") or ""),
-        str(event.get("revit_version") or ""),
-        str(event.get("event_type") or ""),
-        str(event.get("command_name") or event.get("tool_key") or ""),
-        str(event.get("tool_key") or ""),
-    ]
+# TODO: Re-enable when Azure AD app registration is available
+# def _load_sp_config():
+#     raw = _read_json_file(_config_path(), default={})
+#     sp = raw.get("sharepoint") if isinstance(raw, dict) else None
+#     if not isinstance(sp, dict) or not sp.get("enabled"):
+#         return None
+#     required = ("tenant_id", "client_id", "client_secret", "drive_id", "item_id")
+#     if not all(str(sp.get(k) or "").strip() for k in required):
+#         return None
+#     return sp
+#
+#
+# def _sp_get_token(sp):
+#     global _SP_TOKEN_CACHE
+#     now = time.time()
+#     if _SP_TOKEN_CACHE["token"] and now < _SP_TOKEN_CACHE["expires_at"] - 60:
+#         return _SP_TOKEN_CACHE["token"]
+#     if _urlrequest is None or _urlencode is None:
+#         return ""
+#     url = "https://login.microsoftonline.com/{}/oauth2/v2.0/token".format(sp["tenant_id"])
+#     body = _urlencode({
+#         "grant_type": "client_credentials",
+#         "client_id": sp["client_id"],
+#         "client_secret": sp["client_secret"],
+#         "scope": "https://graph.microsoft.com/.default",
+#     }).encode("utf-8")
+#     try:
+#         req = _urlrequest.Request(
+#             url, data=body,
+#             headers={"Content-Type": "application/x-www-form-urlencoded"},
+#         )
+#         resp = _urlrequest.urlopen(req, timeout=10)
+#         data = json.loads(resp.read().decode("utf-8"))
+#         token = str(data.get("access_token") or "")
+#         expires_in = int(data.get("expires_in") or 3600)
+#         _SP_TOKEN_CACHE["token"] = token
+#         _SP_TOKEN_CACHE["expires_at"] = now + expires_in
+#         return token
+#     except Exception:
+#         return ""
+#
+#
+# def _sp_append_rows(rows, sp):
+#     if not rows or _urlrequest is None:
+#         return False
+#     token = _sp_get_token(sp)
+#     if not token:
+#         return False
+#     table_name = str(sp.get("table_name") or "UsageData")
+#     url = (
+#         "https://graph.microsoft.com/v1.0"
+#         "/drives/{}/items/{}/workbook/tables/{}/rows/add".format(
+#             sp["drive_id"], sp["item_id"], table_name
+#         )
+#     )
+#     payload = json.dumps({"values": rows}).encode("utf-8")
+#     try:
+#         req = _urlrequest.Request(
+#             url, data=payload,
+#             headers={
+#                 "Authorization": "Bearer " + token,
+#                 "Content-Type": "application/json",
+#             },
+#         )
+#         resp = _urlrequest.urlopen(req, timeout=float(sp.get("timeout_sec") or 5))
+#         status = getattr(resp, "status", None) or getattr(resp, "code", None) or 200
+#         return int(status) < 300
+#     except Exception:
+#         return False
+#
+#
+# def _event_to_sp_row(event):
+#     return [
+#         str(event.get("timestamp_utc") or ""),
+#         str(event.get("user_name") or ""),
+#         str(event.get("install_id") or ""),
+#         str(event.get("extension_version") or ""),
+#         str(event.get("revit_version") or ""),
+#         str(event.get("event_type") or ""),
+#         str(event.get("command_name") or event.get("tool_key") or ""),
+#         str(event.get("tool_key") or ""),
+#     ]
 
 
 def flush_pending_events():
@@ -336,9 +338,8 @@ def flush_pending_events():
         return 0
 
     endpoint_url = config.get("endpoint_url") or ""
-    sp_config = _load_sp_config()
 
-    if not endpoint_url and not sp_config:
+    if not endpoint_url:
         return 0
 
     pending_path = _pending_path()
@@ -387,11 +388,11 @@ def flush_pending_events():
         except Exception:
             pass
 
-    # SharePoint Excel
-    if sp_config:
-        rows = [_event_to_sp_row(e) for e in events]
-        if _sp_append_rows(rows, sp_config):
-            any_sent = True
+    # TODO: Re-enable when Azure AD app registration is available
+    # if sp_config:
+    #     rows = [_event_to_sp_row(e) for e in events]
+    #     if _sp_append_rows(rows, sp_config):
+    #         any_sent = True
 
     if not any_sent:
         return 0
