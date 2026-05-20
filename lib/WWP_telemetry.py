@@ -12,7 +12,7 @@ except Exception:
     except Exception:
         _urlrequest = None
 
-# TODO: Re-enable when Azure AD app registration is available
+# TODO: Re-enable when Microsoft Entra ID app registration is available
 # try:
 #     from urllib.parse import urlencode as _urlencode
 # except Exception:
@@ -248,7 +248,7 @@ def _queue_event(payload):
         _append_jsonl(_pending_path(), payload)
 
 
-# TODO: Re-enable when Azure AD app registration is available
+# TODO: Re-enable when Microsoft Entra ID app registration is available
 # def _load_sp_config():
 #     raw = _read_json_file(_config_path(), default={})
 #     sp = raw.get("sharepoint") if isinstance(raw, dict) else None
@@ -388,7 +388,7 @@ def flush_pending_events():
         except Exception:
             pass
 
-    # TODO: Re-enable when Azure AD app registration is available
+    # TODO: Re-enable when Microsoft Entra ID app registration is available
     # if sp_config:
     #     rows = [_event_to_sp_row(e) for e in events]
     #     if _sp_append_rows(rows, sp_config):
