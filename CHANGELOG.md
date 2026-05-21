@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `command-executed` pyRevit hook: automatically logs every WWPTools button click without modifying individual scripts.
 - Npgsql 8.0.5 NuGet package added to `WWPTools.WpfUI`.
 
+### Fixed
+- True North Updater: angle was written as the clockwise value (e.g. 342.8°) instead of the correct counter-clockwise value (e.g. 17.2°). Fixed sign convention in `_get_true_north_angle_for_view`.
+
 ### Changed
 - `DeleteSheetSet`: fixed parameter list showing unrelated view parameters.
 - Sheets-Views Manager pulldown: reordered by function group.

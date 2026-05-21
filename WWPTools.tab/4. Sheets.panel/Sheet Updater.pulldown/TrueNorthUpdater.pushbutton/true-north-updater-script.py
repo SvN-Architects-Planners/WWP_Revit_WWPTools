@@ -156,7 +156,7 @@ def _resolve_target_parameter(sheet, titleblock_instance, target_param_name, tar
 def _get_true_north_angle_for_view(doc, view):
     """
     Returns the True North angle (degrees) as seen in the given view.
-    Angle is measured clockwise from the view's up direction to True North.
+    Angle is measured counter-clockwise from the view's up direction to True North.
     """
     try:
         proj_pos = doc.ActiveProjectLocation.GetProjectPosition(DB.XYZ.Zero)
@@ -172,7 +172,8 @@ def _get_true_north_angle_for_view(doc, view):
         right = view.RightDirection
         north_up = tn.DotProduct(up)
         north_right = tn.DotProduct(right)
-        angle_deg = math.degrees(math.atan2(north_right, north_up))
+        # Negate north_right to get CCW angle from view up (matches Revit's convention)
+        angle_deg = math.degrees(math.atan2(-north_right, north_up))
         return round(angle_deg % 360.0, 4)
     except Exception:
         return round(math.degrees(angle_rad) % 360.0, 4)
