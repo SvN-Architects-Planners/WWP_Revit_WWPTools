@@ -89,22 +89,65 @@ def _param_value(element, name):
     return EMPTY_VALUE
 
 
-def collect_sheets(document):
-    """Return list of dicts with sheet metadata."""
-    sheets = (DB.FilteredElementCollector(document)
-              .OfClass(DB.ViewSheet)
-              .ToElements())
+_BUILTIN_SHEET_PARAM_NAMES = [
+    "Sheet Number",
+    "Sheet Name",
+    "Is Placeholder",
+    "Drawn By",
+    "Checked By",
+    "Designed By",
+    "Approved By",
+    "Sheet Issue Date",
+    "Scheduled Date",
+    "Current Revision",
+    "Revision Date",
+    "Revision Description",
+    "Issued By",
+    "Issued To",
+]
 
-    # Build parameter name set
-    param_names = {"Sheet Number", "Sheet Name", "Is Placeholder"}
-    for sheet in sheets:
-        for p in sheet.Parameters:
+
+def _get_project_sheet_param_names(document):
+    """Return names of project/shared parameters explicitly bound to the Sheets category."""
+    names = set()
+    try:
+        sheet_cat = DB.Category.GetCategory(document, DB.BuiltInCategory.OST_Sheets)
+        if sheet_cat is None:
+            return names
+        binding_map = document.ParameterBindings
+        iterator = binding_map.ForwardIterator()
+        while iterator.MoveNext():
             try:
-                n = p.Definition.Name
-                if n:
-                    param_names.add(n)
+                binding = iterator.Current
+                defn = iterator.Key
+                if hasattr(binding, "Categories"):
+                    for cat in binding.Categories:
+                        try:
+                            if cat.Id.IntegerValue == sheet_cat.Id.IntegerValue:
+                                if defn.Name:
+                                    names.add(defn.Name)
+                                break
+                        except Exception:
+                            pass
             except Exception:
                 pass
+    except Exception:
+        pass
+    return names
+
+
+def collect_sheets(document):
+    """Return list of dicts with sheet metadata."""
+    sheets = list(
+        DB.FilteredElementCollector(document)
+        .OfClass(DB.ViewSheet)
+        .ToElements()
+    )
+
+    # Built-in sheet params + project/shared params bound to Sheets category only.
+    # Avoids polluting the list with unrelated view-level parameters.
+    param_names = set(_BUILTIN_SHEET_PARAM_NAMES)
+    param_names.update(_get_project_sheet_param_names(document))
     param_names = sorted(param_names)
 
     result = []
