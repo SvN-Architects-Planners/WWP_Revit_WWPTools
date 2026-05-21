@@ -37,7 +37,7 @@ CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
 CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
 LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
-PARAM_SAVED_SETS = "! P_STATS_Export"
+PARAM_SAVED_SETS = "! P_STATS_Export_Text"
 SAVED_SET_NAMESPACE = "export2ex"
 
 
