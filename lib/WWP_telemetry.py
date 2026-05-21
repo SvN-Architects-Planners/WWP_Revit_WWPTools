@@ -29,7 +29,7 @@ _APP_NAME = "WWPTools"
 
 _PENDING_PATH = os.path.join(
     os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
-    "WWP", "pending_script_logs.jsonl",
+    "pyRevit", "WWPTools", "pending_script_logs.jsonl",
 )
 
 _CONFIG_PATH = os.path.join(
