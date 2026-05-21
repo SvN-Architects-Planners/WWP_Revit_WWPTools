@@ -123,6 +123,42 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Saved set:"
+                                   Foreground="#374151"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Margin="0,0,8,0"/>
+                        <ComboBox Name="SavedSetBox"
+                                  Grid.Column="1"
+                                  IsEditable="True"
+                                  Margin="0,0,8,0"/>
+                        <Button Name="LoadSetButton"
+                                Grid.Column="2"
+                                Content="Load"
+                                Width="64"
+                                Margin="0,0,6,0"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Name="SaveSetButton"
+                                Grid.Column="3"
+                                Content="Save"
+                                Width="64"
+                                Margin="0,0,6,0"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Name="DeleteSetButton"
+                                Grid.Column="4"
+                                Content="Delete"
+                                Width="64"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                    </Grid>
                     <TextBlock Text="Search schedules"
                                Margin="0,0,0,6"
                                Foreground="#6B7280"

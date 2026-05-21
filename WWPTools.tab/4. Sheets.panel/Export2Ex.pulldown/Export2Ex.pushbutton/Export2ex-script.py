@@ -37,6 +37,8 @@ CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
 CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
 LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
+PARAM_SAVED_SETS = "! P_STATS_Export"
+SAVED_SET_NAMESPACE = "export2ex"
 
 
 
@@ -117,6 +119,71 @@ def get_active_doc():
     except Exception:
         pass
     return None
+
+
+def read_saved_sets(doc):
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return {}
+        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None:
+            return {}
+        raw = (param.AsString() or "").strip()
+        if not raw:
+            return {}
+        data = json.loads(raw)
+        if isinstance(data, dict) and isinstance(data.get(SAVED_SET_NAMESPACE), dict):
+            return data.get(SAVED_SET_NAMESPACE) or {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _looks_like_legacy_saved_sets(data):
+    if not isinstance(data, dict) or not data:
+        return False
+    if "mass_stats" in data or SAVED_SET_NAMESPACE in data:
+        return False
+    return all(isinstance(v, dict) for v in data.values())
+
+
+def write_saved_sets(doc, sets_dict):
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return False
+        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None or param.IsReadOnly:
+            return False
+        raw = (param.AsString() or "").strip()
+        try:
+            payload = json.loads(raw) if raw else {}
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        if _looks_like_legacy_saved_sets(payload):
+            payload = {SAVED_SET_NAMESPACE: payload}
+        payload[SAVED_SET_NAMESPACE] = sets_dict
+        t = DB.Transaction(doc, "Save Export2Ex Settings")
+        t.Start()
+        param.Set(json.dumps(payload, ensure_ascii=False, indent=2))
+        t.Commit()
+        return True
+    except Exception as exc:
+        log_exception("write_saved_sets", exc)
+        return False
+
+
+def _normalize_namespace_data(data):
+    if not isinstance(data, dict):
+        return {}
+    if "settings" in data or "sets" in data:
+        return data
+    if _looks_like_legacy_saved_sets(data):
+        return {"sets": data}
+    return {}
 
 
 class _LocalConfig(object):
@@ -400,6 +467,7 @@ def load_uiutils():
 def _show_export_form(
     ui,
     items,
+    schedule_names,
     prechecked_indices,
     init_excel_path,
     init_csv_dir,
@@ -411,6 +479,8 @@ def _show_export_form(
     last_group_headers,
     last_grouped_column_headers,
     last_text_qualifier,
+    saved_sets,
+    doc,
 ):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -452,6 +522,10 @@ def _show_export_form(
     export_column_headers = window.FindName("ExportColumnHeaders")
     export_group_headers = window.FindName("ExportGroupHeaders")
     export_grouped_column_headers = window.FindName("ExportGroupedColumnHeaders")
+    saved_set_box = window.FindName("SavedSetBox")
+    load_set_button = window.FindName("LoadSetButton")
+    save_set_button = window.FindName("SaveSetButton")
+    delete_set_button = window.FindName("DeleteSetButton")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
@@ -553,6 +627,107 @@ def _show_export_form(
         for item in schedule_list.SelectedItems:
             selected_names.add(str(item))
 
+    def _refresh_saved_set_dropdown():
+        if saved_set_box is None:
+            return
+        current_text = saved_set_box.Text or ""
+        saved_set_box.Items.Clear()
+        for name in sorted(saved_sets.keys()):
+            saved_set_box.Items.Add(name)
+        saved_set_box.Text = current_text
+
+    def _get_current_set_data():
+        selected_indices = [idx for idx, item in enumerate(items) if item in selected_names]
+        return {
+            "schedule_names": [schedule_names[idx] for idx in selected_indices if idx < len(schedule_names)],
+            "export_mode": 0 if excel_mode.IsChecked else 1,
+            "csv_mode": 1 if bool(quote_all.IsChecked) else 0,
+            "csv_delim": delimiter_values.get(str(csv_delim.SelectedItem), ","),
+            "csv_text_qualifier": "\"" if str(text_qualifier.SelectedItem).startswith("Double") else ("'" if str(text_qualifier.SelectedItem).startswith("Single") else ""),
+            "export_title": bool(export_title.IsChecked),
+            "export_column_headers": bool(export_column_headers.IsChecked),
+            "export_group_headers": bool(export_group_headers.IsChecked),
+            "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
+        }
+
+    def _save_sets_to_project():
+        proj_data = _normalize_namespace_data(read_saved_sets(doc))
+        proj_data["settings"] = proj_data.get("settings", {})
+        proj_data["sets"] = saved_sets
+        write_saved_sets(doc, proj_data)
+
+    def _apply_saved_set(set_data):
+        try:
+            selected_set = set(set_data.get("schedule_names") or [])
+            selected_names.clear()
+            for idx, schedule_name in enumerate(schedule_names):
+                if schedule_name in selected_set and idx < len(items):
+                    selected_names.add(items[idx])
+            _apply_selection()
+
+            mode_value = int(set_data.get("export_mode", 0))
+            if mode_value == 1:
+                csv_mode.IsChecked = True
+            else:
+                excel_mode.IsChecked = True
+            _update_enabled_state()
+
+            quote_all.IsChecked = bool(int(set_data.get("csv_mode", 0)) == 1)
+            saved_delim = set_data.get("csv_delim", ",")
+            delim_label = default_delim_label
+            for label, value in delimiter_values.items():
+                if value == saved_delim:
+                    delim_label = label
+                    break
+            csv_delim.SelectedItem = delim_label
+
+            saved_qualifier = set_data.get("csv_text_qualifier", "")
+            if saved_qualifier == "\"":
+                text_qualifier.SelectedItem = 'Double Quote (")'
+            elif saved_qualifier == "'":
+                text_qualifier.SelectedItem = "Single Quote (')"
+            else:
+                text_qualifier.SelectedItem = "(none)"
+
+            export_title.IsChecked = bool(set_data.get("export_title", False))
+            export_column_headers.IsChecked = bool(set_data.get("export_column_headers", True))
+            export_group_headers.IsChecked = bool(set_data.get("export_group_headers", False))
+            export_grouped_column_headers.IsChecked = bool(set_data.get("export_grouped_column_headers", False))
+        except Exception:
+            pass
+
+    def _load_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name:
+            return
+        set_data = saved_sets.get(name)
+        if not isinstance(set_data, dict):
+            return
+        _apply_saved_set(set_data)
+
+    def _save_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name:
+            return
+        saved_sets[name] = _get_current_set_data()
+        _save_sets_to_project()
+        _refresh_saved_set_dropdown()
+
+    def _delete_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name or name not in saved_sets:
+            return
+        del saved_sets[name]
+        _save_sets_to_project()
+        saved_set_box.Text = ""
+        _refresh_saved_set_dropdown()
+
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
         file_name = os.path.basename(current) if current else "Schedules.xlsx"
@@ -613,7 +788,14 @@ def _show_export_form(
     browse_csv.Click += _browse_csv
     ok_button.Click += _ok
     cancel_button.Click += _cancel
+    if load_set_button is not None:
+        load_set_button.Click += _load_set
+    if save_set_button is not None:
+        save_set_button.Click += _save_set
+    if delete_set_button is not None:
+        delete_set_button.Click += _delete_set
 
+    _refresh_saved_set_dropdown()
     _update_enabled_state()
 
     if not window.ShowDialog():
@@ -1246,6 +1428,10 @@ def main():
         return
     config, save_config = get_config_and_saver()
     ui = load_uiutils()
+    proj_data = _normalize_namespace_data(read_saved_sets(doc))
+    project_settings = proj_data.get("settings", {}) if isinstance(proj_data, dict) else {}
+    if not isinstance(project_settings, dict):
+        project_settings = {}
 
     schedules = collect_schedules(doc)
     if not schedules:
@@ -1254,7 +1440,7 @@ def main():
 
     items = [ScheduleItem(v) for v in schedules]
     log_message("main schedules loaded count={}".format(len(items)))
-    last_ids = config_get(config, CONFIG_LAST_SCHEDULE_IDS, [])
+    last_ids = project_settings.get(CONFIG_LAST_SCHEDULE_IDS, config_get(config, CONFIG_LAST_SCHEDULE_IDS, []))
     try:
         prechecked_ids = set(int(x) for x in last_ids)
     except Exception:
@@ -1266,20 +1452,24 @@ def main():
     default_dir = get_default_dir(doc)
     last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
     last_csv_dir = config_get(config, CONFIG_LAST_CSV_DIR, "")
-    last_csv_mode = config_get(config, CONFIG_LAST_CSV_MODE, 0)
-    last_csv_delim = config_get(config, CONFIG_LAST_CSV_DELIM, ",")
-    last_export_mode = config_get(config, CONFIG_LAST_EXPORT_MODE, 0)
-    last_export_title = config_get(config, CONFIG_LAST_CSV_EXPORT_TITLE, False)
-    last_column_headers = config_get(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True)
-    last_group_headers = config_get(config, CONFIG_LAST_CSV_GROUP_HEADERS, False)
-    last_grouped_column_headers = config_get(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False)
-    last_text_qualifier = config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, "")
+    last_csv_mode = project_settings.get(CONFIG_LAST_CSV_MODE, config_get(config, CONFIG_LAST_CSV_MODE, 0))
+    last_csv_delim = project_settings.get(CONFIG_LAST_CSV_DELIM, config_get(config, CONFIG_LAST_CSV_DELIM, ","))
+    last_export_mode = project_settings.get(CONFIG_LAST_EXPORT_MODE, config_get(config, CONFIG_LAST_EXPORT_MODE, 0))
+    last_export_title = project_settings.get(CONFIG_LAST_CSV_EXPORT_TITLE, config_get(config, CONFIG_LAST_CSV_EXPORT_TITLE, False))
+    last_column_headers = project_settings.get(CONFIG_LAST_CSV_COLUMN_HEADERS, config_get(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True))
+    last_group_headers = project_settings.get(CONFIG_LAST_CSV_GROUP_HEADERS, config_get(config, CONFIG_LAST_CSV_GROUP_HEADERS, False))
+    last_grouped_column_headers = project_settings.get(CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, config_get(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False))
+    last_text_qualifier = project_settings.get(CONFIG_LAST_CSV_TEXT_QUALIFIER, config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, ""))
+    saved_sets = proj_data.get("sets", {})
+    if not isinstance(saved_sets, dict):
+        saved_sets = {}
 
     init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
     init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
     inputs = _show_export_form(
         ui,
         [item.display_name for item in items],
+        [item.view.Name for item in items],
         prechecked_indices,
         init_excel_path,
         init_csv_dir,
@@ -1291,6 +1481,8 @@ def main():
         last_group_headers,
         last_grouped_column_headers,
         last_text_qualifier,
+        saved_sets,
+        doc,
     )
     if inputs is not False:
         if not inputs:
@@ -1362,6 +1554,20 @@ def main():
         config.last_csv_column_headers = export_column_headers
         config.last_csv_group_headers = export_group_headers
         config.last_csv_grouped_column_headers = export_grouped_column_headers
+        proj_data = _normalize_namespace_data(read_saved_sets(doc))
+        proj_data["settings"] = {
+            CONFIG_LAST_SCHEDULE_IDS: [element_id_value(v.Id) for v in selected_views],
+            CONFIG_LAST_EXPORT_MODE: mode,
+            CONFIG_LAST_CSV_MODE: 1 if quote_all else 0,
+            CONFIG_LAST_CSV_DELIM: csv_delim,
+            CONFIG_LAST_CSV_EXPORT_TITLE: export_title,
+            CONFIG_LAST_CSV_COLUMN_HEADERS: export_column_headers,
+            CONFIG_LAST_CSV_GROUP_HEADERS: export_group_headers,
+            CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS: export_grouped_column_headers,
+            CONFIG_LAST_CSV_TEXT_QUALIFIER: csv_text_qualifier,
+        }
+        proj_data["sets"] = proj_data.get("sets", {})
+        write_saved_sets(doc, proj_data)
         log_message("main saving config after modern dialog")
         save_config()
         ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
@@ -1456,6 +1662,20 @@ def main():
         config.last_csv_delim = csv_delim
 
     log_message("main saving config after legacy dialog")
+    proj_data = _normalize_namespace_data(read_saved_sets(doc))
+    proj_data["settings"] = {
+        CONFIG_LAST_SCHEDULE_IDS: [element_id_value(v.Id) for v in selected_views],
+        CONFIG_LAST_EXPORT_MODE: mode,
+        CONFIG_LAST_CSV_MODE: config_get(config, CONFIG_LAST_CSV_MODE, 0),
+        CONFIG_LAST_CSV_DELIM: config_get(config, CONFIG_LAST_CSV_DELIM, ","),
+        CONFIG_LAST_CSV_EXPORT_TITLE: config_get(config, CONFIG_LAST_CSV_EXPORT_TITLE, False),
+        CONFIG_LAST_CSV_COLUMN_HEADERS: config_get(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True),
+        CONFIG_LAST_CSV_GROUP_HEADERS: config_get(config, CONFIG_LAST_CSV_GROUP_HEADERS, False),
+        CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS: config_get(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False),
+        CONFIG_LAST_CSV_TEXT_QUALIFIER: config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, ""),
+    }
+    proj_data["sets"] = proj_data.get("sets", {})
+    write_saved_sets(doc, proj_data)
     save_config()
     ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
 
