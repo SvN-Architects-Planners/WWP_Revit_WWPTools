@@ -55,7 +55,7 @@ try:
 		_pyrvit_tel.set_telemetry_state(True)
 		_pyrvit_tel.set_telemetry_file_dir(_wwp_dir)
 		_pyrvit_tel.set_telemetry_file_path(_tel_filepath)
-	except Exception:
+	except BaseException:
 		pass
 
 	# Process completed session telemetry files (skip the current one)
@@ -98,9 +98,9 @@ try:
 				_t.daemon = True
 				_t.start()
 			shutil.move(_tel_file, os.path.join(_done_dir, os.path.basename(_tel_file)))
-		except Exception:
+		except BaseException:
 			pass
-except Exception:
+except BaseException:
 	pass
 
 # check if notifications are disabled
