@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Distribution repo now receives a matching `V{version}` git tag on every publish, so pyRevit's extension manager displays the correct version instead of the previous tag.
 
 ### Changed
+- Update WWPTools: button now available without an open Revit document (`zero-doc` context).
 - `DeleteSheetSet`: fixed parameter list showing unrelated view parameters.
 - Sheets-Views Manager pulldown: reordered by function group.
 - Export2Ex and Beta: renamed Project Info parameter to `! P_STATS_Export_Text`.

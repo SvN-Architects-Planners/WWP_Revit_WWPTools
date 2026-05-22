@@ -1,3 +1,5 @@
+__context__ = "zero-doc"
+
 import os
 import subprocess
 import sys
