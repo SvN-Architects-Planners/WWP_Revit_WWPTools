@@ -11,7 +11,7 @@ clr.AddReference("WindowsBase")
 
 from System.IO import File
 from System.Windows import MessageBox, MessageBoxButton, MessageBoxImage, Visibility
-from System.Windows.Controls import CheckBox, ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
+from System.Windows.Controls import CheckBox, ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -211,8 +211,8 @@ class DeleteSheetSetDialog(object):
         self._btn_refresh.Click += self._on_refresh
         self._btn_delete.Click += self._on_delete
         self._btn_close.Click += self._on_close
-        self._cmb_param.SelectionChanged += SelectionChangedEventHandler(self._on_param_changed)
-        self._txt_search.TextChanged += TextChangedEventHandler(self._on_search_changed)
+        self._cmb_param.SelectionChanged += self._on_param_changed
+        self._txt_search.TextChanged += self._on_search_changed
 
     # ------------------------------------------------------------------
     # Load / refresh

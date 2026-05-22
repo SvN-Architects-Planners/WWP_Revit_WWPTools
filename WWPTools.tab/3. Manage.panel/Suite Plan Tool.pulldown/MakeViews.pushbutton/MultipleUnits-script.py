@@ -16,7 +16,7 @@ from Autodesk.Revit.UI import Selection as UISelection
 from System.Collections.Generic import List
 from System.IO import File
 from System.Windows import Visibility
-from System.Windows.Controls import SelectionChangedEventHandler
+
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 

@@ -20,7 +20,7 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import revit, DB
 from System.IO import File
-from System.Windows.Controls import SelectionChangedEventHandler, TextChangedEventHandler
+
 from System.Windows import MessageBox, MessageBoxButton
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -724,14 +724,14 @@ class ManualRevisionBetaDialog(object):
         self._txt_column_count.Text = str(layout_settings["column_count"])
         self._chk_only_override_needed.IsChecked = bool(only_override_needed)
 
-        self._cmb_block_param.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
-        self._cmb_target_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
+        self._cmb_block_param.SelectionChanged += self._on_mapping_changed
+        self._cmb_target_titleblock.SelectionChanged += self._on_mapping_changed
         self._chk_only_override_needed.Checked += self._on_mapping_changed
         self._chk_only_override_needed.Unchecked += self._on_mapping_changed
-        self._txt_date_width.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
-        self._txt_desc_width.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
-        self._txt_column_count.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
-        self._sheets_list.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
+        self._txt_date_width.TextChanged += self._on_mapping_changed
+        self._txt_desc_width.TextChanged += self._on_mapping_changed
+        self._txt_column_count.TextChanged += self._on_mapping_changed
+        self._sheets_list.SelectionChanged += self._on_mapping_changed
         self._btn_select_all.Click += self._on_select_all
         self._btn_clear_selection.Click += self._on_clear_selection
         self._btn_apply.Click += self._on_apply

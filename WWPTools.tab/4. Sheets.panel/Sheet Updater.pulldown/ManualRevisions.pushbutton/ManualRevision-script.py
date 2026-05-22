@@ -20,7 +20,7 @@ from pyrevit import revit, DB
 
 
 from System.IO import File
-from System.Windows.Controls import SelectionChangedEventHandler
+
 from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -797,12 +797,12 @@ class ManualRevisionDialog(object):
             self._cmb_set3_dates,
             self._cmb_set3_descs,
         ]:
-            combo_box.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
+            combo_box.SelectionChanged += self._on_mapping_changed
 
-        self._cmb_target_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
+        self._cmb_target_titleblock.SelectionChanged += self._on_mapping_changed
         self._chk_ignore_single_column.Checked += self._on_mapping_changed
         self._chk_ignore_single_column.Unchecked += self._on_mapping_changed
-        self._sheets_list.SelectionChanged += SelectionChangedEventHandler(self._on_selection_changed)
+        self._sheets_list.SelectionChanged += self._on_selection_changed
         self._btn_select_all.Click += self._on_select_all
         self._btn_clear_selection.Click += self._on_clear_selection
         self._btn_apply.Click += self._on_apply

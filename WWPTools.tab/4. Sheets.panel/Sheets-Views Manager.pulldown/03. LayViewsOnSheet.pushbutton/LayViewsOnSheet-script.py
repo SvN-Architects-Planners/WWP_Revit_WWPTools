@@ -14,8 +14,8 @@ from pyrevit import revit, DB
 
 from System.IO import File
 from System.Windows import CornerRadius, TextAlignment, TextWrapping, Thickness, VerticalAlignment
-from System.Windows.Controls import Border, CheckBox, ListBoxItem, SelectionChangedEventHandler, TextBlock, TextChangedEventHandler
-from System.Windows.Input import Cursors, MouseButtonEventHandler, MouseButtonState, MouseEventHandler
+from System.Windows.Controls import Border, CheckBox, ListBoxItem, TextBlock
+from System.Windows.Input import Cursors, MouseButtonState
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import Brushes
@@ -468,13 +468,13 @@ class LayoutPreviewWindow(object):
         self._build_view_records(preselected_view_ids)
         self._rebuild_views_list()
 
-        self._cmb_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_titleblock_changed)
+        self._cmb_titleblock.SelectionChanged += self._on_titleblock_changed
         self._btn_auto_layout.Click += self._on_auto_layout
         self._btn_select_visible.Click += self._on_select_visible
         self._btn_clear_visible.Click += self._on_clear_visible
         self._btn_create.Click += self._on_create
         self._btn_cancel.Click += self._on_cancel
-        self._txt_view_search.TextChanged += TextChangedEventHandler(self._on_search_changed)
+        self._txt_view_search.TextChanged += self._on_search_changed
         self._preview_host.SizeChanged += self._on_preview_size_changed
 
         self._refresh_measurement(reset_layout=True)
@@ -723,9 +723,9 @@ class LayoutPreviewWindow(object):
         label.Margin = Thickness(8)
         label.Foreground = Brushes.Black
         border.Child = label
-        border.MouseLeftButtonDown += MouseButtonEventHandler(self._on_box_mouse_down)
-        border.MouseMove += MouseEventHandler(self._on_box_mouse_move)
-        border.MouseLeftButtonUp += MouseButtonEventHandler(self._on_box_mouse_up)
+        border.MouseLeftButtonDown += self._on_box_mouse_down
+        border.MouseMove += self._on_box_mouse_move
+        border.MouseLeftButtonUp += self._on_box_mouse_up
         return border
 
     def _update_preview_box(self, item):

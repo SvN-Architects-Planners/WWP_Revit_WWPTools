@@ -15,7 +15,7 @@ from Autodesk.Revit import DB
 
 from System.IO import File
 from System.Windows import Visibility
-from System.Windows.Controls import ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
+from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -113,8 +113,8 @@ class CopyFiltersToCurrentViewDialog(object):
         return self.window.ShowDialog()
 
     def _bind_events(self):
-        self._source_combo.SelectionChanged += SelectionChangedEventHandler(self._on_source_changed)
-        self._filter_search.TextChanged += TextChangedEventHandler(self._on_filter_search_changed)
+        self._source_combo.SelectionChanged += self._on_source_changed
+        self._filter_search.TextChanged += self._on_filter_search_changed
         self._btn_select_visible_filters.Click += self._on_select_visible_filters
         self._btn_clear_filters.Click += self._on_clear_filters
         self._btn_cancel.Click += self._on_cancel

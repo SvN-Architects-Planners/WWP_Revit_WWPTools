@@ -15,7 +15,7 @@ from pyrevit import DB, revit
 
 from System.IO import File
 from System.Windows import CornerRadius, FontWeights, TextAlignment, TextWrapping, Thickness
-from System.Windows.Controls import Border, SelectionChangedEventHandler, StackPanel, TextBlock, TextBox, TextChangedEventHandler
+from System.Windows.Controls import Border, StackPanel, TextBlock, TextBox
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import Brushes
@@ -407,8 +407,8 @@ class SheetDuplicatorDialog(object):
         self._populate_source_sheets()
         self._populate_duplicate_options()
 
-        self._cmb_source_sheet.SelectionChanged += SelectionChangedEventHandler(self._on_source_sheet_changed)
-        self._cmb_duplicate_option.SelectionChanged += SelectionChangedEventHandler(self._on_duplicate_option_changed)
+        self._cmb_source_sheet.SelectionChanged += self._on_source_sheet_changed
+        self._cmb_duplicate_option.SelectionChanged += self._on_duplicate_option_changed
         self._btn_reset_names.Click += self._on_reset_names
         self._btn_cancel.Click += self._on_cancel
         self._btn_create.Click += self._on_create
@@ -539,7 +539,7 @@ class SheetDuplicatorDialog(object):
             target_box.Tag = slot
             target_box.Text = slot["target_name"]
             target_box.IsEnabled = bool(slot["can_duplicate"])
-            target_box.TextChanged += TextChangedEventHandler(self._on_target_name_changed)
+            target_box.TextChanged += self._on_target_name_changed
             panel.Children.Add(target_box)
             slot["text_box"] = target_box
 

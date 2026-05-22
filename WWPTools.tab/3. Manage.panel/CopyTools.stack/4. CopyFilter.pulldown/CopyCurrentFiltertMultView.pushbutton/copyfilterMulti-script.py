@@ -14,7 +14,7 @@ clr.AddReference("WindowsBase")
 
 from System.IO import File
 from System.Windows import Visibility
-from System.Windows.Controls import ListBoxItem, TextChangedEventHandler
+from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -108,8 +108,8 @@ class CopyCurrentFiltersDialog(object):
         return self.window.ShowDialog()
 
     def _bind_events(self):
-        self._target_search.TextChanged += TextChangedEventHandler(self._on_target_search_changed)
-        self._filter_search.TextChanged += TextChangedEventHandler(self._on_filter_search_changed)
+        self._target_search.TextChanged += self._on_target_search_changed
+        self._filter_search.TextChanged += self._on_filter_search_changed
         self._btn_select_visible_targets.Click += self._on_select_visible_targets
         self._btn_clear_targets.Click += self._on_clear_targets
         self._btn_select_visible_filters.Click += self._on_select_visible_filters

@@ -23,7 +23,7 @@ from Autodesk.Revit import DB
 from System.Drawing.Printing import PrinterSettings
 from System.IO import File
 
-from System.Windows.Controls import ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
+from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -777,8 +777,8 @@ class CombinedPrintSetDialog(object):
     def _bind_events(self):
         self._btn_add_files.Click += self._on_add_files
         self._btn_remove_source.Click += self._on_remove_source
-        self._sources_list.SelectionChanged += SelectionChangedEventHandler(self._on_source_changed)
-        self._txt_sheet_filter.TextChanged += TextChangedEventHandler(self._on_filter_changed)
+        self._sources_list.SelectionChanged += self._on_source_changed
+        self._txt_sheet_filter.TextChanged += self._on_filter_changed
         self._btn_add_selected.Click += self._on_add_selected
         self._btn_add_all.Click += self._on_add_all
         self._btn_move_top.Click += self._on_move_top
