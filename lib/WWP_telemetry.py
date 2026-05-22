@@ -129,6 +129,14 @@ def _revit_username():
     return os.environ.get("USERNAME") or os.environ.get("USER")
 
 
+# def _pyrevit_version():
+#     try:
+#         from pyrevit import version as pv
+#         return str(pv)
+#     except Exception:
+#         return None
+
+
 def _get_hostname():
     try:
         return socket.gethostname()
@@ -194,6 +202,12 @@ def _fire(script_name, script_type="python", success=True,
         "duration_ms":    int(duration_ms or 0),
         "success":        bool(success),
         "error_msg":      error_msg,
+        # Future fields (enable after Terry adds DB columns):
+        # "session_id":      None,
+        # "event_type":      script_type or "tool_use",
+        # "pyrevit_version": None,
+        # "wwptools_version": None,
+        # "document_name":   None,
     }
     t = threading.Thread(target=_worker, args=(entry,))
     t.daemon = True
