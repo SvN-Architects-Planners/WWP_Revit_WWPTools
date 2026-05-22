@@ -14,35 +14,6 @@ try:
 except Exception:
 	pass
 
-# Register runtime hooks manually — pyRevit's new_loader (C# path) skips
-# hooks.register_hooks(), so command-exec.py never fires without this.
-try:
-	from pyrevit.loader import hooks as _hooks
-	from pyrevit import framework, HOST_APP
-	import traceback as _tb
-	_debug_log = os.path.join(os.environ.get("APPDATA", ""), "pyRevit", "WWPTools", "hook_debug.txt")
-	try:
-		_handler = _hooks.get_hooks_handler()
-		_hooks_dir = os.path.dirname(__file__)
-		_lib_dir = os.path.normpath(os.path.join(_hooks_dir, "..", "lib"))
-		_hook_path = os.path.join(_hooks_dir, "command-exec.py")
-		_handler.RegisterHook(
-			uniqueId="wwp_revit_wwptools.command-exec.py",
-			eventName="command-exec",
-			eventTarget="",
-			scriptPath=_hook_path,
-			searchPaths=framework.Array[str]([_lib_dir]),
-			extensionName="WWP_Revit_WWPTools",
-		)
-		_hooks.activate()
-		with open(_debug_log, "w") as _f:
-			_f.write("OK: handler={} hook_path={}\n".format(_handler, _hook_path))
-	except Exception as _e:
-		with open(_debug_log, "w") as _f:
-			_f.write("ERROR: {}\n{}\n".format(_e, _tb.format_exc()))
-except Exception:
-	pass
-
 # check if notifications are disabled
 if msgUtils_muted():
 	script.exit()
