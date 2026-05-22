@@ -895,5 +895,5 @@ def publish_mass_level_metrics(xaml_dir=None):
         "Mass Included Levels parameter: {}".format(count_param_name or SKIP_LABEL),
         "Mass Typical Floor Area parameter: {}".format(area_param_name or SKIP_LABEL),
         "Mass Highest Level parameter: {}".format(highest_level_param_name or SKIP_LABEL),
-            ]
+    ]
     alert("\n".join(report), title="Publish Mass Level Counts")

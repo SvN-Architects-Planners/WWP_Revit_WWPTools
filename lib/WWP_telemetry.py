@@ -73,14 +73,12 @@ def _extension_root():
 
 
 def _is_wwptools_command(command_path, command_extension):
-    ext_lower = str(command_extension or "").strip().lower()
-    if ext_lower in ("wwptools", "wwptools.extension", "wwp_revit_wwptools"):
+    if str(command_extension or "").strip().lower() in ("wwptools", "wwptools.extension"):
         return True
     path = os.path.normpath(str(command_path or "").strip())
     if not path:
         return False
-    root = _extension_root().lower()
-    return path.lower().startswith(root)
+    return path.lower().startswith(_extension_root().lower())
 
 
 def _revit_version():
