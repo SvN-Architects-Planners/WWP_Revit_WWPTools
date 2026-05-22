@@ -14,6 +14,7 @@ if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 
 from WWP_versioning import get_installed_version
+import WWP_telemetry
 
 
 WEBSITE_URL = "https://wwparchitects.com"
@@ -69,6 +70,8 @@ class AboutWindow(forms.WPFWindow):
         self.GithubButton.Click += self._open_github
         self.ReleaseButton.Click += self._open_release
 
+        self.TelemetryCheckBox.IsChecked = WWP_telemetry.is_telemetry_enabled()
+
     def make_bitmap_image(self, image_path):
         bitmap = BitmapImage()
         bitmap.BeginInit()
@@ -88,6 +91,9 @@ class AboutWindow(forms.WPFWindow):
 
     def _open_release(self, sender, args):
         script.open_url(RELEASE_URL)
+
+    def on_telemetry_changed(self, sender, args):
+        WWP_telemetry.set_telemetry_enabled(self.TelemetryCheckBox.IsChecked == True)
 
     def handleclick(self, sender, args):
         self.Close()

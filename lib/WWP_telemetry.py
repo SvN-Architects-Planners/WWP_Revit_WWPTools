@@ -26,21 +26,56 @@ from WWP_versioning import get_installed_version
 
 
 _APP_NAME = "WWPTools"
+_APPDATA = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
 
-_PENDING_PATH = os.path.join(
-    os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
-    "pyRevit", "WWPTools", "pending_script_logs.jsonl",
-)
+_PENDING_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
 
-_CONFIG_PATH = os.path.join(
-    os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
-    "pyRevit", _APP_NAME, "telemetry", "telemetry.config.json",
-)
+_CONFIG_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "telemetry", "telemetry.config.json")
+
+_PREFS_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
 
 _endpoint = None
 _enabled = True
 _config_loaded = False
 _config_lock = threading.Lock()
+
+_user_pref_enabled = None  # None = not yet read from disk
+_prefs_lock = threading.Lock()
+
+
+def is_telemetry_enabled():
+    """Returns the user's opt-in preference (default True). Cached after first read."""
+    global _user_pref_enabled
+    with _prefs_lock:
+        if _user_pref_enabled is None:
+            try:
+                with open(_PREFS_PATH, "r") as f:
+                    _user_pref_enabled = bool(json.load(f).get("telemetry_enabled", True))
+            except Exception:
+                _user_pref_enabled = True
+        return _user_pref_enabled
+
+
+def set_telemetry_enabled(value):
+    """Persist the user's opt-in preference and update the in-memory cache."""
+    global _user_pref_enabled
+    try:
+        folder = os.path.dirname(_PREFS_PATH)
+        if folder and not os.path.isdir(folder):
+            os.makedirs(folder)
+        prefs = {}
+        try:
+            with open(_PREFS_PATH, "r") as f:
+                prefs = json.load(f)
+        except Exception:
+            pass
+        prefs["telemetry_enabled"] = bool(value)
+        with open(_PREFS_PATH, "w") as f:
+            json.dump(prefs, f)
+    except Exception:
+        pass
+    with _prefs_lock:
+        _user_pref_enabled = bool(value)
 
 
 def _load_config():
@@ -146,7 +181,7 @@ def _worker(entry):
 def _fire(script_name, script_type="python", success=True,
           duration_ms=0, error_msg=None, project_number=None):
     _load_config()
-    if not _enabled or not _endpoint:
+    if not _enabled or not _endpoint or not is_telemetry_enabled():
         return
     entry = {
         "user_name":      _revit_username(),

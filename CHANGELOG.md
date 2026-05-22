@@ -5,14 +5,15 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-05-21
+## [2.0.0] - 2026-05-22
 
 ### Added
 - Auto-update on Revit close: `startup.py` registers a `UIApplication.ApplicationClosing` event at pyRevit startup. Silently checks for updates in a background thread; if updates are available when the user closes Revit, a TaskDialog prompts to install. A detached batch watcher waits for Revit to fully exit, waits 15 seconds, then runs `git fetch / reset --hard / clean` and sends a toast notification on completion.
 - Script usage logging (Python): rewrote `WWP_telemetry.py` to POST log entries to a Neon Postgres database via a Vercel API endpoint. Uses `urllib` only (no pip dependencies). Adds `track_use()` function; preserves `track_current_command()` and `track_app_init()`. Falls back to a local JSONL queue at `%APPDATA%\pyRevit\WWPTools\pending_script_logs.jsonl` when offline; queue flushes automatically on next successful connection.
-- Script usage logging (C#): added `ScriptLogger.cs` to `WWPTools.WpfUI` (`WWP.Revit.Logging` namespace). Fetches Neon connection string from Vercel config endpoint on first call; writes directly via Npgsql. Uses same offline queue path as Python side.
+- Script usage logging (C#): added `ScriptLogger.cs` to `WWPTools.WpfUI` (`WWP.Revit.Logging` namespace). Fetches Neon connection string from live Vercel config endpoint (`wwp-revit-wwp-tools-logger.vercel.app`) on first call; writes directly via Npgsql. Uses same offline queue path as Python side.
 - `command-executed` pyRevit hook: automatically logs every WWPTools button click without modifying individual scripts.
 - Npgsql 8.0.5 NuGet package added to `WWPTools.WpfUI`.
+- About dialog: telemetry opt-out toggle — checked by default; unchecking stops all usage reports. Preference saved to `%APPDATA%\pyRevit\WWPTools\user_prefs.json`.
 
 ### Fixed
 - True North Updater: angle was written as the clockwise value (e.g. 342.8°) instead of the correct counter-clockwise value (e.g. 17.2°). Fixed sign convention in `_get_true_north_angle_for_view`.

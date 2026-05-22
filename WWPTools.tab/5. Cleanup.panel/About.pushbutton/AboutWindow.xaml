@@ -1,7 +1,7 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="About WWPTools"
-        Height="360"
+        Height="395"
         Width="720"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -111,6 +111,15 @@
                            FontSize="12"
                            Foreground="#6A7E90"
                            Text="Click anywhere outside the panel or press Esc to close." />
+
+                <CheckBox x:Name="TelemetryCheckBox"
+                          Margin="0,10,0,0"
+                          FontSize="12"
+                          Foreground="#6A7E90"
+                          IsChecked="True"
+                          Checked="on_telemetry_changed"
+                          Unchecked="on_telemetry_changed"
+                          Content="Send anonymous usage reports to help improve WWPTools" />
             </StackPanel>
         </Grid>
     </Border>
