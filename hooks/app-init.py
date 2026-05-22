@@ -76,7 +76,8 @@ try:
 			continue
 		try:
 			with open(_tel_file, "r") as _fh:
-				_records = json.load(_fh) or []
+				_data = json.load(_fh)
+			_records = _data.get("value", []) if isinstance(_data, dict) else (_data or [])
 			for _rec in _records:
 				# Filter to WWPTools commands only
 				if str(_rec.get("commandextension", "") or "").lower() != "wwp_revit_wwptools":
