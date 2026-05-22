@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - True North Updater: angle was written as the clockwise value (e.g. 342.8°) instead of the correct counter-clockwise value (e.g. 17.2°). Fixed sign convention in `_get_true_north_angle_for_view`.
-- Script usage logging: `command-exec.py` hook was never firing because pyRevit's `new_loader = true` (C# session loader) skips Python hook registration (pyRevit bug — fixed in pyRevit 6.2.0 via PR #3090). Workaround: set `new_loader = false` in `pyRevit_config.ini`.
+- Script usage logging: `command-exec.py` hook cannot intercept pyRevit `IExternalCommand` button clicks — only `AddInCommandBinding` (Revit built-ins) fire that event. Replaced with pyRevit's built-in Script Telemetry: `app-init.py` enables it on first run, writes per-session JSON to `%APPDATA%\pyRevit\WWPTools\`, and on each subsequent startup filters WWPTools entries into `script_log.jsonl` and forwards to Neon.
+- Script usage logging: `new_loader = true` (C# session loader) was also skipping Python hook registration entirely (pyRevit bug fixed in 6.2.0 via PR #3090). Workaround applied: set `new_loader = false` in `pyRevit_config.ini`.
 - Distribution repo now receives a matching `V{version}` git tag on every publish, so pyRevit's extension manager displays the correct version instead of the previous tag.
 
 ### Changed
