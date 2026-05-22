@@ -18,6 +18,10 @@ _APPDATA = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "A
 
 _PENDING_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
 
+_LOCAL_LOG_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "script_log.jsonl")
+
+_LOCAL_LOG_MAX_LINES = 2000
+
 _PREFS_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
 
 _user_pref_enabled = None  # None = not yet read from disk
@@ -143,6 +147,27 @@ def _log_via_clr(entry):
         pass
 
 
+def _write_local_log(entry):
+    try:
+        folder = os.path.dirname(_LOCAL_LOG_PATH)
+        if folder and not os.path.isdir(folder):
+            os.makedirs(folder)
+        line = json.dumps(entry) + "\n"
+        with open(_LOCAL_LOG_PATH, "a") as f:
+            f.write(line)
+        # Trim to last _LOCAL_LOG_MAX_LINES lines to prevent unbounded growth
+        try:
+            with open(_LOCAL_LOG_PATH, "r") as f:
+                lines = f.readlines()
+            if len(lines) > _LOCAL_LOG_MAX_LINES:
+                with open(_LOCAL_LOG_PATH, "w") as f:
+                    f.writelines(lines[-_LOCAL_LOG_MAX_LINES:])
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def _queue(entry):
     try:
         folder = os.path.dirname(_PENDING_PATH)
@@ -190,6 +215,7 @@ def _fire(script_name, script_type="python", success=True,
         # "wwptools_version": None,
         # "document_name":   None,
     }
+    _write_local_log(entry)
     t = threading.Thread(target=_log_via_clr, args=(entry,))
     t.daemon = True
     t.start()
