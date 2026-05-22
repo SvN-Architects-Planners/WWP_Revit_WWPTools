@@ -81,19 +81,34 @@ try:
 				# Filter to WWPTools commands only
 				if str(_rec.get("commandextension", "") or "").lower() != "wwp_revit_wwptools":
 					continue
-				_trace   = _rec.get("trace") or {}
-				_success = int(_rec.get("resultcode") or 0) == 0
-				_err     = str(_trace.get("message", "") or "").strip() or None
+				_trace        = _rec.get("trace") or {}
+				_success      = int(_rec.get("resultcode") or 0) == 0
+				_err          = str(_trace.get("message", "") or "").strip() or None
+				_script_name  = str(_rec.get("commandname", ""))
+				_user_name    = str(_rec.get("username", ""))
+				_machine_name = socket.gethostname()
+				_revit_ver    = str(_rec.get("revit", ""))
+				_doc_name     = str(_rec.get("docname", "") or "")
+				_evt_type     = "error" if not _success else "tool_use"
+				_details      = _wwp_tel._format_details_md(
+					_script_name, _evt_type, _success, _user_name, _machine_name,
+					_revit_ver, None, None, _doc_name, 0, _err,
+				)
 				_entry = {
-					"logged_at":     str(_rec.get("exec_timestamp", "") or _rec.get("timestamp", "")),
-					"user_name":     str(_rec.get("username", "")),
-					"machine_name":  socket.gethostname(),
-					"script_name":   str(_rec.get("commandname", "")),
-					"script_type":   "python",
-					"revit_version": str(_rec.get("revit", "")),
-					"success":       _success,
-					"error_msg":     _err,
-					"doc_name":      str(_rec.get("docname", "") or ""),
+					"logged_at":        str(_rec.get("exec_timestamp", "") or _rec.get("timestamp", "")),
+					"user_name":        _user_name,
+					"machine_name":     _machine_name,
+					"script_name":      _script_name,
+					"script_type":      "python",
+					"revit_version":    _revit_ver,
+					"success":          _success,
+					"error_msg":        _err,
+					"document_name":    _doc_name,
+					"session_id":       str(_rec.get("sessionid", "") or ""),
+					"event_type":       _evt_type,
+					"pyrevit_version":  str(_rec.get("pyrevit", "") or ""),
+					"wwptools_version": None,
+					"details":          _details,
 				}
 				with open(_log_path, "a") as _lf:
 					_lf.write(json.dumps(_entry) + "\n")

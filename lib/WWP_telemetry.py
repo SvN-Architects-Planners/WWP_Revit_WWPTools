@@ -100,12 +100,55 @@ def _revit_username():
     return os.environ.get("USERNAME") or os.environ.get("USER")
 
 
-# def _pyrevit_version():
-#     try:
-#         from pyrevit import version as pv
-#         return str(pv)
-#     except Exception:
-#         return None
+def _pyrevit_version():
+    try:
+        from pyrevit import version as pv
+        return str(pv)
+    except Exception:
+        return None
+
+
+def _session_id():
+    try:
+        from pyrevit.loader import sessioninfo
+        return str(sessioninfo.get_session_uuid())
+    except Exception:
+        return None
+
+
+def _revit_document_name():
+    try:
+        doc = __revit__.ActiveUIDocument.Document  # type: ignore
+        return str(doc.Title or "").strip() or None
+    except Exception:
+        return None
+
+
+def _wwptools_version():
+    try:
+        v = get_installed_version()
+        return "{}.{}.{}".format(*v) if v else None
+    except Exception:
+        return None
+
+
+def _format_details_md(script_name, event_type, success, user_name, machine_name,
+                        revit_ver, pyrevit_ver, wwptools_ver, document_name,
+                        duration_ms, error_msg):
+    status = u"✅ Success" if success else u"❌ Failed"
+    lines = [
+        u"**Script:** {}".format(script_name or ""),
+        u"**Event:** {}".format(event_type or "tool_use"),
+        u"**Status:** {}".format(status),
+        u"**User:** {} @ {}".format(user_name or "", machine_name or ""),
+        u"**Revit:** {} · **pyRevit:** {} · **WWPTools:** {}".format(
+            revit_ver or "", pyrevit_ver or "", wwptools_ver or ""),
+        u"**Document:** {}".format(document_name or ""),
+        u"**Duration:** {} ms".format(int(duration_ms or 0)),
+    ]
+    if error_msg:
+        lines.append(u"**Error:**\n```\n{}\n```".format(str(error_msg)[:500]))
+    return u"  \n".join(lines)
 
 
 def _get_hostname():
@@ -175,26 +218,36 @@ def _worker(entry):
         _queue(entry)
 
 
-def _fire(script_name, script_type="python", success=True,
+def _fire(script_name, script_type="python", event_type="tool_use", success=True,
           duration_ms=0, error_msg=None, project_number=None):
     if not is_telemetry_enabled():
         return
+    user_name     = _revit_username()
+    machine_name  = _get_hostname()
+    revit_ver     = _revit_version()
+    pyrevit_ver   = _pyrevit_version()
+    wwptools_ver  = _wwptools_version()
+    document_name = _revit_document_name()
     entry = {
-        "user_name":      _revit_username(),
-        "machine_name":   _get_hostname(),
-        "script_name":    script_name,
-        "script_type":    script_type,
-        "revit_version":  _revit_version(),
-        "project_number": project_number,
-        "duration_ms":    int(duration_ms or 0),
-        "success":        bool(success),
-        "error_msg":      error_msg,
-        # Future fields (enable after Terry adds DB columns):
-        # "session_id":      None,
-        # "event_type":      script_type or "tool_use",
-        # "pyrevit_version": None,
-        # "wwptools_version": None,
-        # "document_name":   None,
+        "user_name":       user_name,
+        "machine_name":    machine_name,
+        "script_name":     script_name,
+        "script_type":     script_type,
+        "revit_version":   revit_ver,
+        "project_number":  project_number,
+        "duration_ms":     int(duration_ms or 0),
+        "success":         bool(success),
+        "error_msg":       error_msg,
+        "session_id":      _session_id(),
+        "event_type":      event_type,
+        "pyrevit_version": pyrevit_ver,
+        "wwptools_version": wwptools_ver,
+        "document_name":   document_name,
+        "details":         _format_details_md(
+            script_name, event_type, success, user_name, machine_name,
+            revit_ver, pyrevit_ver, wwptools_ver, document_name,
+            duration_ms, error_msg,
+        ),
     }
     _write_local_log(entry)
     t = threading.Thread(target=_worker, args=(entry,))
@@ -209,7 +262,7 @@ def _fire(script_name, script_type="python", success=True,
 def track_use(script_name, success=True, duration_ms=0, error_msg=None, project_number=None):
     """Log a single script execution. Call at the end of every script."""
     try:
-        _fire(script_name, script_type="python",
+        _fire(script_name, script_type="python", event_type="tool_use",
               success=success, duration_ms=duration_ms,
               error_msg=error_msg, project_number=project_number)
     except Exception:
@@ -235,7 +288,8 @@ def track_current_command():
 def track_failed_command(script_name, error_msg):
     """Log an unhandled command exception captured by the command-failed hook."""
     try:
-        _fire(script_name, success=False, error_msg=error_msg[:1000] if error_msg else None)
+        _fire(script_name, event_type="error", success=False,
+              error_msg=error_msg[:1000] if error_msg else None)
     except Exception:
         pass
 
@@ -243,6 +297,6 @@ def track_failed_command(script_name, error_msg):
 def track_app_init():
     """Log a session-start entry."""
     try:
-        _fire("app-init", script_type="python")
+        _fire("app-init", script_type="python", event_type="app_init")
     except Exception:
         pass

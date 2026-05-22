@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export2Ex and Beta: renamed Project Info parameter to `! P_STATS_Export_Text`.
 - Export2Ex: added Project Info settings sync and named save sets.
 - Script usage logging (Python): rewired to call C# ScriptLogger directly via CLR -- no separate Vercel POST endpoint required.
+- Script usage logging (Python): telemetry payload now populates all Neon columns — `session_id`, `event_type`, `pyrevit_version`, `wwptools_version`, `document_name`, and `details`; `details` is a markdown-formatted human-readable report of each script run.
 
 ## [1.5.0] - 2026-05-04
 
