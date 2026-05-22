@@ -19,22 +19,27 @@ except Exception:
 try:
 	from pyrevit.loader import hooks as _hooks
 	from pyrevit import framework, HOST_APP
-	_handler = _hooks.get_hooks_handler()
-	if _handler:
+	import traceback as _tb
+	_debug_log = os.path.join(os.environ.get("APPDATA", ""), "pyRevit", "WWPTools", "hook_debug.txt")
+	try:
+		_handler = _hooks.get_hooks_handler()
 		_hooks_dir = os.path.dirname(__file__)
 		_lib_dir = os.path.normpath(os.path.join(_hooks_dir, "..", "lib"))
-		for _hook_file in ["command-exec.py"]:
-			_hook_path = os.path.join(_hooks_dir, _hook_file)
-			if os.path.isfile(_hook_path):
-				_handler.RegisterHook(
-					uniqueId="wwp_revit_wwptools." + _hook_file,
-					eventName=_hook_file.replace(".py", ""),
-					eventTarget="",
-					scriptPath=_hook_path,
-					searchPaths=framework.Array[str]([_lib_dir]),
-					extensionName="WWP_Revit_WWPTools",
-				)
+		_hook_path = os.path.join(_hooks_dir, "command-exec.py")
+		_handler.RegisterHook(
+			uniqueId="wwp_revit_wwptools.command-exec.py",
+			eventName="command-exec",
+			eventTarget="",
+			scriptPath=_hook_path,
+			searchPaths=framework.Array[str]([_lib_dir]),
+			extensionName="WWP_Revit_WWPTools",
+		)
 		_hooks.activate()
+		with open(_debug_log, "w") as _f:
+			_f.write("OK: handler={} hook_path={}\n".format(_handler, _hook_path))
+	except Exception as _e:
+		with open(_debug_log, "w") as _f:
+			_f.write("ERROR: {}\n{}\n".format(_e, _tb.format_exc()))
 except Exception:
 	pass
 
