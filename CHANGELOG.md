@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - True North Updater: angle was written as the clockwise value (e.g. 342.8°) instead of the correct counter-clockwise value (e.g. 17.2°). Fixed sign convention in `_get_true_north_angle_for_view`.
+- Script usage logging: `command-exec.py` hook was never firing because pyRevit's `new_loader = true` (C# session loader) skips Python hook registration. Fixed by self-registering the hook from `app-init.py` on every session start.
 - Distribution repo now receives a matching `V{version}` git tag on every publish, so pyRevit's extension manager displays the correct version instead of the previous tag.
 
 ### Changed
