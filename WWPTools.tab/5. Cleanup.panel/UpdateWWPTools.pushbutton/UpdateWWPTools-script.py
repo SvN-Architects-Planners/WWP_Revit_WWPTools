@@ -18,8 +18,7 @@ if lib_path not in sys.path:
 
 TITLE = "Update WWPTools"
 RELEASES_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest"
-TARGET_BRANCH = "main"
-TARGET_REMOTE_BRANCH = "origin/main"
+SUPPORTED_UPDATE_BRANCHES = ("main", "pyrevit-6.1", "pyrevit-6.4")
 
 # Windows process-creation flags (safe fallback for IronPython)
 _DETACHED_PROCESS       = getattr(subprocess, "DETACHED_PROCESS",       0x00000008)
@@ -165,26 +164,30 @@ def _latest_tag(repo_root):
         return None
 
 
-def _remote_tag(repo_root):
+def _remote_branch(target_branch):
+    return "origin/{}".format(target_branch)
+
+
+def _remote_tag(repo_root, target_branch):
     if not _git_cli_available():
         return None
     try:
         tag = _git_output(
             repo_root,
-            ["describe", "--tags", "--abbrev=0", "origin/{}".format(TARGET_BRANCH)]
+            ["describe", "--tags", "--abbrev=0", _remote_branch(target_branch)]
         ).strip()
         return tag if tag else None
     except Exception:
         return None
 
 
-def _incoming_log(repo_root, max_lines=10):
+def _incoming_log(repo_root, target_branch, max_lines=10):
     if not _git_cli_available():
         return ""
     try:
         log = _git_output(
             repo_root,
-            ["log", "--oneline", "HEAD..origin/{}".format(TARGET_BRANCH)]
+            ["log", "--oneline", "HEAD..{}".format(_remote_branch(target_branch))]
         ).strip()
         lines = log.splitlines()
         if len(lines) > max_lines:
@@ -194,13 +197,13 @@ def _incoming_log(repo_root, max_lines=10):
         return ""
 
 
-def _incoming_changed_files(repo_root):
+def _incoming_changed_files(repo_root, target_branch):
     if not _git_cli_available():
         return []
     try:
         output = _git_output(
             repo_root,
-            ["diff", "--name-only", "HEAD..origin/{}".format(TARGET_BRANCH)]
+            ["diff", "--name-only", "HEAD..{}".format(_remote_branch(target_branch))]
         ).strip()
         return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
     except Exception:
@@ -276,14 +279,14 @@ def _git_output(repo_root, args):
     return (stdout or b"").decode("utf-8", "ignore")
 
 
-def _sync_to_github(repo_root):
+def _sync_to_github(repo_root, target_branch):
     if not _git_cli_available():
         raise Exception(
             "Git CLI is required to update WWPTools.\n\n"
             "Close Revit, install Git, then run Update WWPTools again."
         )
-    _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
-    _run_git(repo_root, ["reset", "--hard", TARGET_REMOTE_BRANCH])
+    _run_git(repo_root, ["fetch", "origin", target_branch])
+    _run_git(repo_root, ["reset", "--hard", _remote_branch(target_branch)])
     _run_git(repo_root, ["clean", "-ffdx"])
     return pygit.get_repo(repo_root)
 
@@ -308,20 +311,20 @@ def _is_revit_locked_update_error(error):
 
 
 
-def _ensure_target_branch(repo_info, repo_root):
-    if repo_info.branch == TARGET_BRANCH:
+def _ensure_target_branch(repo_info, repo_root, target_branch):
+    if repo_info.branch == target_branch:
         return repo_info
 
     # Don't block on dirty files - we always reset --hard so local changes are discarded anyway.
     repo = repo_info.repo
     try:
-        target_branch = repo.Branches[TARGET_BRANCH]
+        local_branch = repo.Branches[target_branch]
     except Exception:
-        target_branch = None
+        local_branch = None
 
-    if target_branch is not None:
+    if local_branch is not None:
         try:
-            pygit.libgit.Commands.Checkout(repo, target_branch)
+            pygit.libgit.Commands.Checkout(repo, local_branch)
             return pygit.get_repo(repo_root)
         except Exception:
             pass
@@ -331,12 +334,12 @@ def _ensure_target_branch(repo_info, repo_root):
             "Installed repo is on branch '{}', but this updater is configured to use '{}'.\n\n"
             "Git CLI is not available to switch branches automatically.".format(
                 repo_info.branch,
-                TARGET_REMOTE_BRANCH,
+                _remote_branch(target_branch),
             )
         )
 
-    _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
-    _run_git(repo_root, ["checkout", "-B", TARGET_BRANCH, TARGET_REMOTE_BRANCH])
+    _run_git(repo_root, ["fetch", "origin", target_branch])
+    _run_git(repo_root, ["checkout", "-B", target_branch, _remote_branch(target_branch)])
     return pygit.get_repo(repo_root)
 
 
@@ -346,7 +349,7 @@ class _DivergenceResult(object):
         self.AheadBy = ahead
 
 
-def _history_divergence(repo_info, repo_root):
+def _history_divergence(repo_info, repo_root, target_branch):
     try:
         pygit.git_fetch(repo_info)
         return pygit.compare_branch_heads(repo_info)
@@ -355,9 +358,9 @@ def _history_divergence(repo_info, repo_root):
     if not _git_cli_available():
         return None
     try:
-        _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
-        behind = int(_git_output(repo_root, ["rev-list", "--count", "HEAD..origin/{}".format(TARGET_BRANCH)]).strip())
-        ahead  = int(_git_output(repo_root, ["rev-list", "--count", "origin/{}..HEAD".format(TARGET_BRANCH)]).strip())
+        _run_git(repo_root, ["fetch", "origin", target_branch])
+        behind = int(_git_output(repo_root, ["rev-list", "--count", "HEAD..{}".format(_remote_branch(target_branch))]).strip())
+        ahead  = int(_git_output(repo_root, ["rev-list", "--count", "{}..HEAD".format(_remote_branch(target_branch))]).strip())
         return _DivergenceResult(behind, ahead)
     except Exception:
         return None
@@ -407,16 +410,17 @@ def _manual_batch_path(repo_root, pid):
     return os.path.normpath(os.path.join(scripts_dir, "wwptools_manual_update_{}.bat".format(pid)))
 
 
-def _write_manual_update_batch(repo_root, batch_path):
+def _write_manual_update_batch(repo_root, batch_path, target_branch):
     safe_root = os.path.normpath(repo_root)
     lines = [
         "@echo off",
         "echo Manual WWPTools updater",
         "echo Repo: {}".format(safe_root),
+        "echo Branch: {}".format(target_branch),
         "",
-        "git -C \"{}\" fetch origin {} 2>&1".format(safe_root, TARGET_BRANCH),
+        "git -C \"{}\" fetch origin {} 2>&1".format(safe_root, target_branch),
         "if errorlevel 1 (echo Fetch failed & pause & exit /b 1)",
-        "git -C \"{}\" reset --hard origin/{} 2>&1".format(safe_root, TARGET_BRANCH),
+        "git -C \"{}\" reset --hard origin/{} 2>&1".format(safe_root, target_branch),
         "if errorlevel 1 (echo Reset failed & pause & exit /b 1)",
         "git -C \"{}\" clean -ffdx 2>&1".format(safe_root),
         "if errorlevel 1 (echo Clean failed & pause & exit /b 1)",
@@ -430,10 +434,10 @@ def _write_manual_update_batch(repo_root, batch_path):
     except Exception:
         return False
 
-def _schedule_update_on_revit_exit(repo_root, installed_label=None):
+def _schedule_update_on_revit_exit(repo_root, target_branch, installed_label=None):
     """
     Spawn a detached cmd process that waits until Revit fully closes,
-    then resets to origin/main so locked DLLs are no longer an obstacle.
+    then resets to the selected origin branch so locked DLLs are no longer an obstacle.
     Returns True if the watcher was started successfully.
     """
     pid = os.getpid()
@@ -466,9 +470,9 @@ def _schedule_update_on_revit_exit(repo_root, installed_label=None):
         "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
         "echo [%%date%% %%time%%] Revit closed. Starting Git sync... >> \"%%LOG%%\"",
         start_notice,
-        "git -C \"{root}\" fetch origin {branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=TARGET_BRANCH),
+        "git -C \"{root}\" fetch origin {branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=target_branch),
         "if errorlevel 1 goto failed",
-        "git -C \"{root}\" reset --hard origin/{branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=TARGET_BRANCH),
+        "git -C \"{root}\" reset --hard origin/{branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=target_branch),
         "if errorlevel 1 goto failed",
         "git -C \"{root}\" clean -ffdx >> \"%%LOG%%\" 2>&1".format(root=safe_root),
         "if errorlevel 1 goto failed",
@@ -498,7 +502,7 @@ def _schedule_update_on_revit_exit(repo_root, installed_label=None):
         return False
 
 
-def _start_standby_update(repo_root, reason, installed_label=None):
+def _start_standby_update(repo_root, reason, target_branch, installed_label=None):
     if not _git_cli_available():
         _alert(
             "WWPTools can not finish this update while Revit is open.\n\n"
@@ -508,7 +512,7 @@ def _start_standby_update(repo_root, reason, installed_label=None):
             TITLE,
         )
         return
-    if _schedule_update_on_revit_exit(repo_root, installed_label=installed_label):
+    if _schedule_update_on_revit_exit(repo_root, target_branch, installed_label=installed_label):
         notice = (
             "WWPTools is ready to finish updating, but Revit is using one or more files.\n\n"
             "{}\n\n"
@@ -532,7 +536,7 @@ def _start_standby_update(repo_root, reason, installed_label=None):
         if create_manual:
             pid = os.getpid()
             batch_path = _manual_batch_path(repo_root, pid)
-            if _write_manual_update_batch(repo_root, batch_path):
+            if _write_manual_update_batch(repo_root, batch_path, target_branch):
                 try:
                     # Open containing folder and select the batch file
                     subprocess.Popen(["explorer", "/select,{}".format(batch_path)])
@@ -553,11 +557,77 @@ def _start_standby_update(repo_root, reason, installed_label=None):
 # Main update flow
 # ---------------------------------------------------------------------------
 
+def _available_update_branches(repo_root, current_branch):
+    branches = []
+    if current_branch:
+        branches.append(current_branch)
+    for branch in SUPPORTED_UPDATE_BRANCHES:
+        if branch not in branches:
+            branches.append(branch)
+
+    if _git_cli_available():
+        try:
+            _run_git(repo_root, ["fetch", "origin", "--prune"])
+            output = _git_output(
+                repo_root,
+                ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"]
+            )
+            remote_branches = []
+            for line in output.splitlines():
+                value = line.strip()
+                if not value or value == "origin/HEAD" or not value.startswith("origin/"):
+                    continue
+                remote_branches.append(value.split("/", 1)[1])
+            branches = [branch for branch in branches if branch in remote_branches]
+            for branch in remote_branches:
+                if branch in SUPPORTED_UPDATE_BRANCHES and branch not in branches:
+                    branches.append(branch)
+        except Exception:
+            pass
+    return branches or list(SUPPORTED_UPDATE_BRANCHES)
+
+
+def _select_update_branch(repo_info, repo_root):
+    current_branch = str(getattr(repo_info, "branch", "") or "").strip()
+    branches = _available_update_branches(repo_root, current_branch)
+    labels = []
+    label_to_branch = {}
+    for branch in branches:
+        label = branch
+        if branch == current_branch:
+            label += "  (current)"
+        elif branch == "pyrevit-6.1":
+            label += "  (pyRevit 6.1 stable)"
+        elif branch == "pyrevit-6.4":
+            label += "  (pyRevit 6.4+)"
+        labels.append(label)
+        label_to_branch[label] = branch
+
+    try:
+        from pyrevit import forms  # type: ignore
+        selected = forms.SelectFromList.show(
+            labels,
+            title="Select WWPTools Update Branch",
+            button_name="Use Selected Branch",
+            multiselect=False,
+        )
+        if not selected:
+            return None
+        return label_to_branch.get(selected, selected.split()[0])
+    except Exception:
+        if current_branch:
+            return current_branch
+        return branches[0] if branches else "main"
+
+
 def _update_repo(repo_info, repo_root):
-    repo_info = _ensure_target_branch(repo_info, repo_root)
+    target_branch = _select_update_branch(repo_info, repo_root)
+    if not target_branch:
+        return
+    repo_info = _ensure_target_branch(repo_info, repo_root, target_branch)
     if repo_info is None:
         return
-    divergence = _history_divergence(repo_info, repo_root)
+    divergence = _history_divergence(repo_info, repo_root, target_branch)
     behind = int(divergence.BehindBy) if divergence and divergence.BehindBy is not None else 0
     ahead  = int(divergence.AheadBy)  if divergence and divergence.AheadBy  is not None else 0
     dirty = _working_tree_dirty(repo_root)
@@ -573,17 +643,17 @@ def _update_repo(repo_info, repo_root):
         _alert(msg, TITLE)
         return
 
-    remote_tag = _remote_tag(repo_root)
+    remote_tag = _remote_tag(repo_root, target_branch)
     remote_label = "{} ({})".format(remote_tag, "incoming") if remote_tag else "{} commit(s)".format(behind)
-    changelog = _incoming_log(repo_root)
-    changed_files = _incoming_changed_files(repo_root)
+    changelog = _incoming_log(repo_root, target_branch)
+    changed_files = _incoming_changed_files(repo_root, target_branch)
     needs_revit_close = _update_needs_revit_close(changed_files)
 
     confirm_msg = (
         "Updates are available for WWPTools.\n\n"
         "Current version:  {}\n"
         "New version:      {}\n"
-        "Branch:           {}\n\n"
+        "Update branch:    {}\n\n"
         "What's new:\n{}\n\n"
         "Update behavior:\n"
         "Local WWPTools files will be overwritten with GitHub files.\n"
@@ -593,7 +663,7 @@ def _update_repo(repo_info, repo_root):
     ).format(
         current_label,
         remote_label,
-        repo_info.branch,
+        target_branch,
         changelog if changelog else "  (commit log unavailable)",
     )
     if needs_revit_close:
@@ -609,13 +679,14 @@ def _update_repo(repo_info, repo_root):
         _start_standby_update(
             repo_root,
             "This update includes DLL files that Revit can not replace while it is running.",
+            target_branch,
             installed_label=remote_tag,
         )
         return
 
     dll_locked = False
     try:
-        updated_repo = _sync_to_github(repo_root)
+        updated_repo = _sync_to_github(repo_root, target_branch)
     except Exception as sync_err:
         if _is_revit_locked_update_error(sync_err):
             dll_locked = True
@@ -626,6 +697,7 @@ def _update_repo(repo_info, repo_root):
         _start_standby_update(
             repo_root,
             "A WWPTools DLL is locked by Revit, so Git can not replace it yet.",
+            target_branch,
             installed_label=remote_tag,
         )
         return
