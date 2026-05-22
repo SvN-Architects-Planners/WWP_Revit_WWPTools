@@ -1,3 +1,4 @@
+#! python3
 """Purge unused DirectShape type definitions left by Data Exchange or other connectors."""
 
 from System.Collections.Generic import List
