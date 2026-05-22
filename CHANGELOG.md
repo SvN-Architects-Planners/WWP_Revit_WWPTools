@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Update WWPTools: button now available without an open Revit document (`zero-doc` context).
+- Update WWPTools: removed standby updater (detached batch watcher that ran after Revit exited). If an update includes locked DLLs, the tool now simply prompts to close Revit and try again.
 - `DeleteSheetSet`: fixed parameter list showing unrelated view parameters.
 - Sheets-Views Manager pulldown: reordered by function group.
 - Export2Ex and Beta: renamed Project Info parameter to `! P_STATS_Export_Text`.

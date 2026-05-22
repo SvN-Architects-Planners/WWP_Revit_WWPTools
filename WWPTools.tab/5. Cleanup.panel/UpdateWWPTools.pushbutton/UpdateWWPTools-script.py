@@ -3,7 +3,6 @@ __context__ = "zero-doc"
 import os
 import subprocess
 import sys
-import tempfile
 import traceback
 
 from pyrevit import script  # type: ignore
@@ -310,7 +309,6 @@ def _is_revit_locked_update_error(error):
     return False
 
 
-
 def _ensure_target_branch(repo_info, repo_root, target_branch):
     if repo_info.branch == target_branch:
         return repo_info
@@ -380,177 +378,6 @@ def _show_not_repo_message():
     )
     if open_release:
         _open_latest_release()
-
-
-# ---------------------------------------------------------------------------
-# Background updater - runs after Revit exits
-# ---------------------------------------------------------------------------
-
-def _standby_log_path(repo_root, pid):
-    base_dir = os.environ.get("LOCALAPPDATA")
-    if not base_dir:
-        base_dir = tempfile.gettempdir()
-    log_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "UpdateLogs"))
-    try:
-        if not os.path.isdir(log_dir):
-            os.makedirs(log_dir)
-    except Exception:
-        log_dir = tempfile.gettempdir()
-    return os.path.normpath(os.path.join(log_dir, "wwptools_update_{}.log".format(pid)))
-
-
-def _manual_batch_path(repo_root, pid):
-    base_dir = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
-    scripts_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "UpdateScripts"))
-    try:
-        if not os.path.isdir(scripts_dir):
-            os.makedirs(scripts_dir)
-    except Exception:
-        scripts_dir = tempfile.gettempdir()
-    return os.path.normpath(os.path.join(scripts_dir, "wwptools_manual_update_{}.bat".format(pid)))
-
-
-def _write_manual_update_batch(repo_root, batch_path, target_branch):
-    safe_root = os.path.normpath(repo_root)
-    lines = [
-        "@echo off",
-        "echo Manual WWPTools updater",
-        "echo Repo: {}".format(safe_root),
-        "echo Branch: {}".format(target_branch),
-        "",
-        "git -C \"{}\" fetch origin {} 2>&1".format(safe_root, target_branch),
-        "if errorlevel 1 (echo Fetch failed & pause & exit /b 1)",
-        "git -C \"{}\" reset --hard origin/{} 2>&1".format(safe_root, target_branch),
-        "if errorlevel 1 (echo Reset failed & pause & exit /b 1)",
-        "git -C \"{}\" clean -ffdx 2>&1".format(safe_root),
-        "if errorlevel 1 (echo Clean failed & pause & exit /b 1)",
-        "echo Update completed successfully.",
-        "pause",
-    ]
-    try:
-        with open(batch_path, "w") as f:
-            f.write("\r\n".join(lines) + "\r\n")
-        return True
-    except Exception:
-        return False
-
-def _schedule_update_on_revit_exit(repo_root, target_branch, installed_label=None):
-    """
-    Spawn a detached cmd process that waits until Revit fully closes,
-    then resets to the selected origin branch so locked DLLs are no longer an obstacle.
-    Returns True if the watcher was started successfully.
-    """
-    pid = os.getpid()
-    safe_root = os.path.normpath(repo_root)
-    log_path = _standby_log_path(repo_root, pid)
-
-    start_notice = _powershell_toast_command(
-        TITLE,
-        "Revit has closed. WWPTools update is now running in the background. You will get a completion message when it finishes.",
-    )
-    installed_text = installed_label or "the latest available version"
-    success_notice = _powershell_toast_command(
-        TITLE,
-        "WWPTools update finished successfully to {}. Update finished after Revit closed.\n\nLog file:\n{}".format(installed_text, log_path),
-    )
-    failed_notice = _powershell_toast_command(
-        TITLE,
-        "WWPTools update failed after Revit closed.\n\nCheck the update log for details:\n{}".format(log_path),
-    )
-
-    # Batch script: poll until all Revit processes are gone, then mirror origin/main.
-    batch = "\r\n".join([
-        "@echo off",
-        "setlocal",
-        "set \"LOG={log}\"".format(log=log_path),
-        "echo [%%date%% %%time%%] Standby updater started. > \"%%LOG%%\"",
-        "echo [%%date%% %%time%%] Waiting for Revit.exe to close... >> \"%%LOG%%\"",
-        ":wait",
-        "tasklist /FI \"IMAGENAME eq Revit.exe\" 2>NUL | find /I \"Revit.exe\" >NUL",
-        "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
-        "echo [%%date%% %%time%%] Revit closed. Starting Git sync... >> \"%%LOG%%\"",
-        start_notice,
-        "git -C \"{root}\" fetch origin {branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=target_branch),
-        "if errorlevel 1 goto failed",
-        "git -C \"{root}\" reset --hard origin/{branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=target_branch),
-        "if errorlevel 1 goto failed",
-        "git -C \"{root}\" clean -ffdx >> \"%%LOG%%\" 2>&1".format(root=safe_root),
-        "if errorlevel 1 goto failed",
-        "echo [%%date%% %%time%%] Update completed successfully. >> \"%%LOG%%\"",
-        success_notice,
-        "exit /b 0",
-        ":failed",
-        "echo [%%date%% %%time%%] Update failed. >> \"%%LOG%%\"",
-        failed_notice,
-        "exit /b 1",
-    ]) + "\r\n"
-
-    batch_path = os.path.join(
-        tempfile.gettempdir(),
-        "wwptools_update_{}.bat".format(pid),
-    )
-    try:
-        with open(batch_path, "w") as f:
-            f.write(batch)
-        subprocess.Popen(
-            ["cmd", "/c", batch_path],
-            creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
-            close_fds=True,
-        )
-        return True
-    except Exception:
-        return False
-
-
-def _start_standby_update(repo_root, reason, target_branch, installed_label=None):
-    if not _git_cli_available():
-        _alert(
-            "WWPTools can not finish this update while Revit is open.\n\n"
-            "{}\n\n"
-            "Git CLI is not available to run the standby updater.\n"
-            "Close Revit completely, then run Update WWPTools again.".format(reason),
-            TITLE,
-        )
-        return
-    if _schedule_update_on_revit_exit(repo_root, target_branch, installed_label=installed_label):
-        notice = (
-            "WWPTools is ready to finish updating, but Revit is using one or more files.\n\n"
-            "{}\n\n"
-            "Close all Revit windows. The standby updater will finish automatically after Revit closes.\n"
-            "You can reopen Revit after the update finishes.".format(reason)
-        )
-        # Try to show a non-blocking external message so the dialog doesn't prevent closing Revit
-        launched = _launch_powershell_message(TITLE, notice)
-        if not launched:
-            _alert(notice, TITLE)
-
-        # Offer to create a manual updater batch file the user can run later
-        try:
-            create_manual = _confirm(
-                "Create a manual updater batch file you can run later?",
-                TITLE,
-            )
-        except Exception:
-            create_manual = False
-
-        if create_manual:
-            pid = os.getpid()
-            batch_path = _manual_batch_path(repo_root, pid)
-            if _write_manual_update_batch(repo_root, batch_path, target_branch):
-                try:
-                    # Open containing folder and select the batch file
-                    subprocess.Popen(["explorer", "/select,{}".format(batch_path)])
-                except Exception:
-                    try:
-                        os.startfile(os.path.dirname(batch_path))
-                    except Exception:
-                        _alert("Manual update batch created at: {}".format(batch_path), TITLE)
-    else:
-        _alert(
-            "Could not start the standby updater.\n\n"
-            "Close Revit completely, then run Update WWPTools again.",
-            TITLE,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -669,38 +496,31 @@ def _update_repo(repo_info, repo_root):
     if needs_revit_close:
         confirm_msg = (
             confirm_msg +
-            "\n\nThis update includes DLL files that Revit may have loaded.\n"
-            "WWPTools will start a standby updater and finish after you close all Revit windows."
+            "\n\nThis update includes DLL files that Revit has loaded.\n"
+            "Close Revit first, then run Update WWPTools again to apply the update."
         )
     if not _confirm(confirm_msg, TITLE):
         return
 
     if needs_revit_close:
-        _start_standby_update(
-            repo_root,
-            "This update includes DLL files that Revit can not replace while it is running.",
-            target_branch,
-            installed_label=remote_tag,
+        _alert(
+            "This update includes DLL files that Revit can not replace while it is running.\n\n"
+            "Please close Revit completely, then run Update WWPTools again.",
+            TITLE,
         )
         return
 
-    dll_locked = False
     try:
         updated_repo = _sync_to_github(repo_root, target_branch)
     except Exception as sync_err:
         if _is_revit_locked_update_error(sync_err):
-            dll_locked = True
-        else:
-            raise
-
-    if dll_locked:
-        _start_standby_update(
-            repo_root,
-            "A WWPTools DLL is locked by Revit, so Git can not replace it yet.",
-            target_branch,
-            installed_label=remote_tag,
-        )
-        return
+            _alert(
+                "A WWPTools DLL is locked by Revit.\n\n"
+                "Please close Revit completely, then run Update WWPTools again.",
+                TITLE,
+            )
+            return
+        raise
 
     after_hash = updated_repo.last_commit_hash[:7]
     new_tag = _latest_tag(repo_root)
