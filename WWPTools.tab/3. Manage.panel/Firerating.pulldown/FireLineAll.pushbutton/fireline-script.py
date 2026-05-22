@@ -11,7 +11,7 @@ clr.AddReference("WindowsBase")
 
 
 from System.IO import File
-from System.Windows import RoutedEventHandler
+
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Controls import ComboBoxItem
@@ -77,8 +77,8 @@ class FireLineDialog(object):
         if self._combo.Items.Count > 0:
             self._combo.SelectedIndex = default_idx
 
-        self._btn_run.Click += RoutedEventHandler(self._on_run)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_run.Click += self._on_run
+        self._btn_cancel.Click += self._on_cancel
 
         self.selected_style = None
         self.accepted = False

@@ -13,7 +13,7 @@ clr.AddReference("WindowsBase")
 from pyrevit import revit, DB
 
 from System.IO import File
-from System.Windows import CornerRadius, RoutedEventHandler, TextAlignment, TextWrapping, Thickness, VerticalAlignment
+from System.Windows import CornerRadius, TextAlignment, TextWrapping, Thickness, VerticalAlignment
 from System.Windows.Controls import Border, CheckBox, ListBoxItem, SelectionChangedEventHandler, TextBlock, TextChangedEventHandler
 from System.Windows.Input import Cursors, MouseButtonEventHandler, MouseButtonState, MouseEventHandler
 from System.Windows.Interop import WindowInteropHelper
@@ -469,11 +469,11 @@ class LayoutPreviewWindow(object):
         self._rebuild_views_list()
 
         self._cmb_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_titleblock_changed)
-        self._btn_auto_layout.Click += RoutedEventHandler(self._on_auto_layout)
-        self._btn_select_visible.Click += RoutedEventHandler(self._on_select_visible)
-        self._btn_clear_visible.Click += RoutedEventHandler(self._on_clear_visible)
-        self._btn_create.Click += RoutedEventHandler(self._on_create)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_auto_layout.Click += self._on_auto_layout
+        self._btn_select_visible.Click += self._on_select_visible
+        self._btn_clear_visible.Click += self._on_clear_visible
+        self._btn_create.Click += self._on_create
+        self._btn_cancel.Click += self._on_cancel
         self._txt_view_search.TextChanged += TextChangedEventHandler(self._on_search_changed)
         self._preview_host.SizeChanged += self._on_preview_size_changed
 
@@ -518,8 +518,8 @@ class LayoutPreviewWindow(object):
         checkbox.Content = record["label"]
         checkbox.IsChecked = bool(record.get("selected"))
         checkbox.VerticalAlignment = VerticalAlignment.Center
-        checkbox.Checked += RoutedEventHandler(self._on_view_checked)
-        checkbox.Unchecked += RoutedEventHandler(self._on_view_checked)
+        checkbox.Checked += self._on_view_checked
+        checkbox.Unchecked += self._on_view_checked
         item.Content = checkbox
         item.Tag = record
         return item

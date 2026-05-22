@@ -10,7 +10,7 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import DB
 from System.IO import File
-from System.Windows import RoutedEventHandler
+
 from System.Windows.Controls import ComboBoxItem, SelectionChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -284,8 +284,8 @@ def show_dialog_selection(script_dir, lib_path):
         window.DialogResult = False
         window.Close()
 
-    btn_apply.Click  += RoutedEventHandler(_on_apply)
-    btn_cancel.Click += RoutedEventHandler(_on_cancel)
+    btn_apply.Click  += _on_apply
+    btn_cancel.Click += _on_cancel
 
     if window.ShowDialog() != True:
         return None
@@ -377,8 +377,8 @@ def show_dialog_category(script_dir, lib_path):
         window.Close()
 
     cmb_category.SelectionChanged += SelectionChangedEventHandler(_on_category_changed)
-    btn_apply.Click  += RoutedEventHandler(_on_apply)
-    btn_cancel.Click += RoutedEventHandler(_on_cancel)
+    btn_apply.Click  += _on_apply
+    btn_cancel.Click += _on_cancel
 
     if window.ShowDialog() != True:
         return None

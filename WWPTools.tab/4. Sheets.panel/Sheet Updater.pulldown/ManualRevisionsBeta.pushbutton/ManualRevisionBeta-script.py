@@ -21,7 +21,7 @@ clr.AddReference("WindowsBase")
 from pyrevit import revit, DB
 from System.IO import File
 from System.Windows.Controls import SelectionChangedEventHandler, TextChangedEventHandler
-from System.Windows import MessageBox, MessageBoxButton, RoutedEventHandler
+from System.Windows import MessageBox, MessageBoxButton
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -726,16 +726,16 @@ class ManualRevisionBetaDialog(object):
 
         self._cmb_block_param.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
         self._cmb_target_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
-        self._chk_only_override_needed.Checked += RoutedEventHandler(self._on_mapping_changed)
-        self._chk_only_override_needed.Unchecked += RoutedEventHandler(self._on_mapping_changed)
+        self._chk_only_override_needed.Checked += self._on_mapping_changed
+        self._chk_only_override_needed.Unchecked += self._on_mapping_changed
         self._txt_date_width.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
         self._txt_desc_width.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
         self._txt_column_count.TextChanged += TextChangedEventHandler(self._on_mapping_changed)
         self._sheets_list.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
-        self._btn_select_all.Click += RoutedEventHandler(self._on_select_all)
-        self._btn_clear_selection.Click += RoutedEventHandler(self._on_clear_selection)
-        self._btn_apply.Click += RoutedEventHandler(self._on_apply)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_select_all.Click += self._on_select_all
+        self._btn_clear_selection.Click += self._on_clear_selection
+        self._btn_apply.Click += self._on_apply
+        self._btn_cancel.Click += self._on_cancel
 
         self._loading = False
         self._refresh_summary()

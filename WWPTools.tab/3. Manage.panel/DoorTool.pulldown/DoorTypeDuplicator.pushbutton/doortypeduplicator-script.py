@@ -11,7 +11,7 @@ clr.AddReference("WindowsBase")
 
 
 from System.IO import File
-from System.Windows import RoutedEventHandler, Visibility
+from System.Windows import Visibility
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Controls import ListBoxItem
@@ -77,10 +77,10 @@ class DoorTypeDuplicatorDialog(object):
             item.Tag = elem
             self._lst.Items.Add(item)
 
-        self._chk_custom.Checked += RoutedEventHandler(self._on_custom_toggle)
-        self._chk_custom.Unchecked += RoutedEventHandler(self._on_custom_toggle)
-        self._btn_duplicate.Click += RoutedEventHandler(self._on_duplicate)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._chk_custom.Checked += self._on_custom_toggle
+        self._chk_custom.Unchecked += self._on_custom_toggle
+        self._btn_duplicate.Click += self._on_duplicate
+        self._btn_cancel.Click += self._on_cancel
 
         self._pnl_custom.Visibility = Visibility.Collapsed
         self.result_type = None

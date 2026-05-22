@@ -13,7 +13,7 @@ clr.AddReference("WindowsBase")
 
 
 from System.IO import File
-from System.Windows import RoutedEventHandler, Visibility
+from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -115,10 +115,10 @@ class CopyFiltersToTemplateDialog(object):
         self._source_combo.SelectionChanged += SelectionChangedEventHandler(self._on_source_changed)
         self._target_combo.SelectionChanged += SelectionChangedEventHandler(self._on_target_changed)
         self._filter_search.TextChanged += TextChangedEventHandler(self._on_filter_search_changed)
-        self._btn_select_visible_filters.Click += RoutedEventHandler(self._on_select_visible_filters)
-        self._btn_clear_filters.Click += RoutedEventHandler(self._on_clear_filters)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
-        self._btn_copy.Click += RoutedEventHandler(self._on_copy)
+        self._btn_select_visible_filters.Click += self._on_select_visible_filters
+        self._btn_clear_filters.Click += self._on_clear_filters
+        self._btn_cancel.Click += self._on_cancel
+        self._btn_copy.Click += self._on_copy
 
     def _selected_source_record(self):
         index_value = int(self._source_combo.SelectedIndex)

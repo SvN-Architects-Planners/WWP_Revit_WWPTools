@@ -19,7 +19,7 @@ for assembly_name in (
 
 from System.IO import File, StringReader
 from System import Uri, Int64
-from System.Windows import RoutedEventHandler, Visibility
+from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -223,8 +223,8 @@ def _show_setup_dialog(scheme_names, level_names, defaults=None):
         window.DialogResult = False
         window.Close()
 
-    ok_btn.Click += RoutedEventHandler(_on_ok)
-    cancel_btn.Click += RoutedEventHandler(_on_cancel)
+    ok_btn.Click += _on_ok
+    cancel_btn.Click += _on_cancel
 
     if window.ShowDialog() != True:
         return None

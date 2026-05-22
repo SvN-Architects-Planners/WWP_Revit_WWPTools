@@ -13,7 +13,7 @@ clr.AddReference("WindowsBase")
 
 
 from System.IO import File
-from System.Windows import RoutedEventHandler, Visibility
+from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem, TextChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -110,12 +110,12 @@ class CopyCurrentFiltersDialog(object):
     def _bind_events(self):
         self._target_search.TextChanged += TextChangedEventHandler(self._on_target_search_changed)
         self._filter_search.TextChanged += TextChangedEventHandler(self._on_filter_search_changed)
-        self._btn_select_visible_targets.Click += RoutedEventHandler(self._on_select_visible_targets)
-        self._btn_clear_targets.Click += RoutedEventHandler(self._on_clear_targets)
-        self._btn_select_visible_filters.Click += RoutedEventHandler(self._on_select_visible_filters)
-        self._btn_clear_filters.Click += RoutedEventHandler(self._on_clear_filters)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
-        self._btn_copy.Click += RoutedEventHandler(self._on_copy)
+        self._btn_select_visible_targets.Click += self._on_select_visible_targets
+        self._btn_clear_targets.Click += self._on_clear_targets
+        self._btn_select_visible_filters.Click += self._on_select_visible_filters
+        self._btn_clear_filters.Click += self._on_clear_filters
+        self._btn_cancel.Click += self._on_cancel
+        self._btn_copy.Click += self._on_copy
 
     def _filtered_target_records(self):
         filter_text = cfc.normalize_text(self._target_search.Text).lower()

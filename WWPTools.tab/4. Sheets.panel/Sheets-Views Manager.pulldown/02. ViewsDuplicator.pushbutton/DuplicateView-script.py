@@ -9,7 +9,7 @@ clr.AddReference("WindowsBase")
 
 from Autodesk.Revit import DB
 from System.IO import File
-from System.Windows import RoutedEventHandler
+
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -208,8 +208,8 @@ def show_dialog(view_count):
         window.DialogResult = False
         window.Close()
 
-    btn_duplicate.Click += RoutedEventHandler(_on_duplicate)
-    btn_cancel.Click    += RoutedEventHandler(_on_cancel)
+    btn_duplicate.Click += _on_duplicate
+    btn_cancel.Click    += _on_cancel
 
     if window.ShowDialog() != True:
         return None

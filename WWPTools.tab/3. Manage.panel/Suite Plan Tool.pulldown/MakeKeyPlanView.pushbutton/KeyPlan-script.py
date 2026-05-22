@@ -13,7 +13,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
 from System.Collections.Generic import List
 from System.IO import File
-from System.Windows import RoutedEventHandler, Visibility
+from System.Windows import Visibility
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -200,8 +200,8 @@ class KeyPlanOptionsDialog(object):
 
         self.result = None
 
-        self._btn_ok.Click += RoutedEventHandler(self._on_ok)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_ok.Click += self._on_ok
+        self._btn_cancel.Click += self._on_cancel
 
         self._lbl_area.Text = area_label or "(not selected)"
 

@@ -22,7 +22,7 @@ from Autodesk.Revit import DB
 
 from System.Drawing.Printing import PrinterSettings
 from System.IO import File
-from System.Windows import RoutedEventHandler
+
 from System.Windows.Controls import ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -775,21 +775,21 @@ class CombinedPrintSetDialog(object):
         return self.window.ShowDialog()
 
     def _bind_events(self):
-        self._btn_add_files.Click += RoutedEventHandler(self._on_add_files)
-        self._btn_remove_source.Click += RoutedEventHandler(self._on_remove_source)
+        self._btn_add_files.Click += self._on_add_files
+        self._btn_remove_source.Click += self._on_remove_source
         self._sources_list.SelectionChanged += SelectionChangedEventHandler(self._on_source_changed)
         self._txt_sheet_filter.TextChanged += TextChangedEventHandler(self._on_filter_changed)
-        self._btn_add_selected.Click += RoutedEventHandler(self._on_add_selected)
-        self._btn_add_all.Click += RoutedEventHandler(self._on_add_all)
-        self._btn_move_top.Click += RoutedEventHandler(self._on_move_top)
-        self._btn_move_up.Click += RoutedEventHandler(self._on_move_up)
-        self._btn_move_down.Click += RoutedEventHandler(self._on_move_down)
-        self._btn_move_bottom.Click += RoutedEventHandler(self._on_move_bottom)
-        self._btn_remove_selected.Click += RoutedEventHandler(self._on_remove_selected)
-        self._btn_clear_set.Click += RoutedEventHandler(self._on_clear_set)
-        self._btn_browse_output.Click += RoutedEventHandler(self._on_browse_output)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
-        self._btn_print.Click += RoutedEventHandler(self._on_print)
+        self._btn_add_selected.Click += self._on_add_selected
+        self._btn_add_all.Click += self._on_add_all
+        self._btn_move_top.Click += self._on_move_top
+        self._btn_move_up.Click += self._on_move_up
+        self._btn_move_down.Click += self._on_move_down
+        self._btn_move_bottom.Click += self._on_move_bottom
+        self._btn_remove_selected.Click += self._on_remove_selected
+        self._btn_clear_set.Click += self._on_clear_set
+        self._btn_browse_output.Click += self._on_browse_output
+        self._btn_cancel.Click += self._on_cancel
+        self._btn_print.Click += self._on_print
 
     def _load_sources(self, records):
         self._source_lookup = {}

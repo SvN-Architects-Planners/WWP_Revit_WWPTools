@@ -11,7 +11,7 @@ clr.AddReference("WindowsBase")
 
 
 from System.IO import File
-from System.Windows import RoutedEventHandler
+
 from System.Windows.Controls import ListBoxItem, SelectionChangedEventHandler
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
@@ -76,8 +76,8 @@ class DeleteSheetDialog(object):
             self._lst_ps.Items.Add(item)
 
         self._lst_ps.SelectionChanged += SelectionChangedEventHandler(self._on_ps_selected)
-        self._btn_delete.Click += RoutedEventHandler(self._on_delete)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_delete.Click += self._on_delete
+        self._btn_cancel.Click += self._on_cancel
 
         self.selected_ps = None
         self.accepted = False

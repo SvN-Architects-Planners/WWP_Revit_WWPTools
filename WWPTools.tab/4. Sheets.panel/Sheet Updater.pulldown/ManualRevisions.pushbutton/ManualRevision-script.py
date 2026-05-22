@@ -21,7 +21,7 @@ from pyrevit import revit, DB
 
 from System.IO import File
 from System.Windows.Controls import SelectionChangedEventHandler
-from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult, RoutedEventHandler
+from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -800,13 +800,13 @@ class ManualRevisionDialog(object):
             combo_box.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
 
         self._cmb_target_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
-        self._chk_ignore_single_column.Checked += RoutedEventHandler(self._on_mapping_changed)
-        self._chk_ignore_single_column.Unchecked += RoutedEventHandler(self._on_mapping_changed)
+        self._chk_ignore_single_column.Checked += self._on_mapping_changed
+        self._chk_ignore_single_column.Unchecked += self._on_mapping_changed
         self._sheets_list.SelectionChanged += SelectionChangedEventHandler(self._on_selection_changed)
-        self._btn_select_all.Click += RoutedEventHandler(self._on_select_all)
-        self._btn_clear_selection.Click += RoutedEventHandler(self._on_clear_selection)
-        self._btn_apply.Click += RoutedEventHandler(self._on_apply)
-        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_select_all.Click += self._on_select_all
+        self._btn_clear_selection.Click += self._on_clear_selection
+        self._btn_apply.Click += self._on_apply
+        self._btn_cancel.Click += self._on_cancel
 
         self._loading = False
         self._refresh_values_from_mapping()

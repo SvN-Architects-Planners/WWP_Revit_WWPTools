@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #! python3
 """Mass Stats By Filters - live back-of-house calculations from Revit mass elements."""
 
@@ -20,7 +19,7 @@ def _load_dll():
         if os.path.isfile(path):
             clr.AddReference(path)
             return path
-    raise FileNotFoundError(
+    raise IOError(
         "WWPTools.WpfUI DLL not found in {}. "
         "Build the solution first (Build → Build Solution).".format(lib_path)
     )
@@ -28,7 +27,7 @@ def _load_dll():
 def main():
     try:
         _load_dll()
-    except FileNotFoundError as e:
+    except IOError as e:
         from pyrevit import forms
         forms.alert(str(e), title="Mass Stats By Filters")
         return

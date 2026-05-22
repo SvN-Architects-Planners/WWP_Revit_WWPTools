@@ -10,7 +10,7 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from System.IO import File
-from System.Windows import MessageBox, MessageBoxButton, MessageBoxImage, RoutedEventHandler, Visibility
+from System.Windows import MessageBox, MessageBoxButton, MessageBoxImage, Visibility
 from System.Windows.Controls import CheckBox, ListBoxItem, SelectionChangedEventHandler, TextChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -203,14 +203,14 @@ class DeleteSheetSetDialog(object):
         self._loading = False
 
         # Wire up events
-        self._btn_apply.Click += RoutedEventHandler(self._on_apply)
-        self._btn_clear.Click += RoutedEventHandler(self._on_clear)
-        self._btn_select_all.Click += RoutedEventHandler(self._on_select_all)
-        self._btn_none.Click += RoutedEventHandler(self._on_none)
-        self._btn_invert.Click += RoutedEventHandler(self._on_invert)
-        self._btn_refresh.Click += RoutedEventHandler(self._on_refresh)
-        self._btn_delete.Click += RoutedEventHandler(self._on_delete)
-        self._btn_close.Click += RoutedEventHandler(self._on_close)
+        self._btn_apply.Click += self._on_apply
+        self._btn_clear.Click += self._on_clear
+        self._btn_select_all.Click += self._on_select_all
+        self._btn_none.Click += self._on_none
+        self._btn_invert.Click += self._on_invert
+        self._btn_refresh.Click += self._on_refresh
+        self._btn_delete.Click += self._on_delete
+        self._btn_close.Click += self._on_close
         self._cmb_param.SelectionChanged += SelectionChangedEventHandler(self._on_param_changed)
         self._txt_search.TextChanged += TextChangedEventHandler(self._on_search_changed)
 
@@ -272,8 +272,8 @@ class DeleteSheetSetDialog(object):
             chk.Content = item["label"]
             chk.IsChecked = bool(item["selected"])
             chk.Tag = item
-            chk.Checked += RoutedEventHandler(self._on_item_checked)
-            chk.Unchecked += RoutedEventHandler(self._on_item_checked)
+            chk.Checked += self._on_item_checked
+            chk.Unchecked += self._on_item_checked
             lbi = ListBoxItem()
             lbi.Content = chk
             self._lst_available.Items.Add(lbi)
