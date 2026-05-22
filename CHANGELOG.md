@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Script usage logging (Python): rewrote `WWP_telemetry.py` to POST log entries to a Neon Postgres database via a Vercel API endpoint. Uses `urllib` only (no pip dependencies). Adds `track_use()` function; preserves `track_current_command()` and `track_app_init()`. Falls back to a local JSONL queue at `%APPDATA%\pyRevit\WWPTools\pending_script_logs.jsonl` when offline; queue flushes automatically on next successful connection.
 - Script usage logging (C#): added `ScriptLogger.cs` to `WWPTools.WpfUI` (`WWP.Revit.Logging` namespace). Fetches Neon connection string from live Vercel config endpoint (`wwp-revit-wwp-tools-logger.vercel.app`) on first call; writes directly via Npgsql. Uses same offline queue path as Python side.
 - `command-executed` pyRevit hook: automatically logs every WWPTools button click without modifying individual scripts.
+- Error telemetry: tool crashes are automatically logged to Neon with the exception message and traceback (truncated to 1 000 chars) via a new command-failed pyRevit hook.
 - Npgsql 8.0.5 NuGet package added to `WWPTools.WpfUI`.
 - About dialog: telemetry opt-out toggle — checked by default; unchecking stops all usage reports. Preference saved to `%APPDATA%\pyRevit\WWPTools\user_prefs.json`.
 

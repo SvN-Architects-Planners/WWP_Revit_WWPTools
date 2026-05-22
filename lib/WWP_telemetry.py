@@ -229,6 +229,14 @@ def track_current_command():
         return False
 
 
+def track_failed_command(script_name, error_msg):
+    """Log an unhandled command exception captured by the command-failed hook."""
+    try:
+        _fire(script_name, success=False, error_msg=error_msg[:1000] if error_msg else None)
+    except Exception:
+        pass
+
+
 def track_app_init():
     """Log a session-start entry."""
     try:
