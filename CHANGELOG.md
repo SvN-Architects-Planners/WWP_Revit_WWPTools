@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - About dialog: telemetry opt-out toggle — checked by default; unchecking stops all usage reports. Preference saved to `%APPDATA%\pyRevit\WWPTools\user_prefs.json`.
 
 ### Fixed
-- pyRevit 6.4 compatibility: removed `RoutedEventHandler(func)` wrappers from all WPF event bindings across 23 files — pythonnet 3.x (shipped with pyRevit 6.4) fails to initialise the `Delegates` type when this wrapper is used; direct assignment (`event += func`) works on IronPython, pythonnet 2.x, and pythonnet 3.x. Also fixed `FileNotFoundError` → `IOError` in Mass Stats scripts for IronPython compatibility, and moved `#! python3` engine header to line 1 so pyRevit 6.4 correctly routes those scripts to CPython.
+- pyRevit 6.4 compatibility: removed `RoutedEventHandler(func)` and `SelectionChangedEventHandler(func)` wrappers from all WPF event bindings across 25 files — pythonnet 3.x (shipped with pyRevit 6.4) fails to initialise the `Delegates` type when this wrapper is used; direct assignment (`event += func`) works on IronPython, pythonnet 2.x, and pythonnet 3.x. Also fixed `FileNotFoundError` → `IOError` in Mass Stats scripts for IronPython compatibility, and moved `#! python3` engine header to line 1 so pyRevit 6.4 correctly routes those scripts to CPython.
 - True North Updater: angle was written as the clockwise value (e.g. 342.8°) instead of the correct counter-clockwise value (e.g. 17.2°). Fixed sign convention in `_get_true_north_angle_for_view`.
 - Distribution repo now receives a matching `V{version}` git tag on every publish, so pyRevit's extension manager displays the correct version instead of the previous tag.
 

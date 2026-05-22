@@ -11,7 +11,7 @@ clr.AddReference("WindowsBase")
 from pyrevit import DB
 from System.IO import File
 from System.Windows import Visibility
-from System.Windows.Controls import ComboBoxItem, SelectionChangedEventHandler
+from System.Windows.Controls import ComboBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -782,8 +782,8 @@ def show_dialog(script_dir, lib_path, mode):
         window.DialogResult = False
         window.Close()
 
-    cmb_target.SelectionChanged += SelectionChangedEventHandler(_on_target_changed)
-    cmb_category.SelectionChanged += SelectionChangedEventHandler(_on_selector_changed)
+    cmb_target.SelectionChanged += _on_target_changed
+    cmb_category.SelectionChanged += _on_selector_changed
     chk_ignore_groups.Checked += _on_ignore_groups_changed
     chk_ignore_groups.Unchecked += _on_ignore_groups_changed
     btn_apply.Click += _on_apply
