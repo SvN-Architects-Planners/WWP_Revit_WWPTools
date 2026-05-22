@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-WWP_telemetry.py — Per-script usage logging to Neon Postgres via Vercel endpoint.
+WWP_telemetry.py - Per-script usage logging to Neon Postgres via Vercel endpoint.
 Fire-and-forget. Never raises. Queues locally if offline, flushes on next success.
 
 Config (pick one):
@@ -167,7 +168,7 @@ def _flush_pending():
                 _post(json.loads(line))
         os.remove(_PENDING_PATH)
     except Exception:
-        pass  # leave file intact — retry on next execution
+        pass  # leave file intact - retry on next execution
 
 
 def _worker(entry):
