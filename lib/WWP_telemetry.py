@@ -1,22 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
-WWP_telemetry.py - Per-script usage logging to Neon Postgres via Vercel endpoint.
-Fire-and-forget. Never raises. Queues locally if offline, flushes on next success.
-
-Config (pick one):
-  Env var  : WWPTOOLS_TELEMETRY_URL=https://your-project.vercel.app/api/...
-  JSON file: %APPDATA%\pyRevit\WWPTools\telemetry\telemetry.config.json
-             {"endpoint_url": "https://...", "enabled": true}
-"""
+"""WWP_telemetry.py - Per-script usage logging via C# ScriptLogger."""
 import json
 import os
 import socket
 import threading
-
-try:
-    from urllib.request import urlopen, Request
-except ImportError:
-    from urllib2 import urlopen, Request  # type: ignore
 
 try:
     from pyrevit import EXEC_PARAMS
@@ -31,14 +18,7 @@ _APPDATA = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "A
 
 _PENDING_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
 
-_CONFIG_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "telemetry", "telemetry.config.json")
-
 _PREFS_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
-
-_endpoint = None
-_enabled = True
-_config_loaded = False
-_config_lock = threading.Lock()
 
 _user_pref_enabled = None  # None = not yet read from disk
 _prefs_lock = threading.Lock()
@@ -77,26 +57,6 @@ def set_telemetry_enabled(value):
         pass
     with _prefs_lock:
         _user_pref_enabled = bool(value)
-
-
-def _load_config():
-    global _endpoint, _enabled, _config_loaded
-    with _config_lock:
-        if _config_loaded:
-            return
-        _config_loaded = True
-        url = (os.environ.get("WWPTOOLS_TELEMETRY_URL") or "").strip()
-        enabled = True
-        if not url:
-            try:
-                with open(_CONFIG_PATH, "r") as f:
-                    cfg = json.load(f)
-                url = str(cfg.get("endpoint_url") or "").strip()
-                enabled = bool(cfg.get("enabled", True))
-            except Exception:
-                pass
-        _endpoint = url or None
-        _enabled = enabled
 
 
 def _extension_root():
@@ -144,13 +104,43 @@ def _get_hostname():
         return None
 
 
-def _post(entry):
-    if not _endpoint:
-        raise Exception("no endpoint configured")
-    data = json.dumps(entry).encode("utf-8")
-    req = Request(_endpoint, data=data, headers={"Content-Type": "application/json"})
-    req.get_method = lambda: "POST"
-    urlopen(req, timeout=5)
+def _dll_path():
+    try:
+        version = int(str(__revit__.Application.VersionNumber))  # type: ignore
+    except Exception:
+        version = None
+    dll_name = "WWPTools.WpfUI.net8.0-windows.dll" if version and version >= 2025 else "WWPTools.WpfUI.net48.dll"
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), dll_name)
+
+
+def _add_wpfui_reference(dll_path):
+    try:
+        import clr
+        if hasattr(clr, "AddReferenceToFileAndPath"):
+            clr.AddReferenceToFileAndPath(dll_path)
+        else:
+            clr.AddReference(dll_path)
+    except Exception:
+        pass
+
+
+def _log_via_clr(entry):
+    try:
+        dll_path = _dll_path()
+        if not os.path.isfile(dll_path):
+            return
+        _add_wpfui_reference(dll_path)
+        from WWP.Revit.Logging import ScriptLogger  # type: ignore
+        ScriptLogger.Log(
+            entry.get("script_name"),
+            bool(entry.get("success", True)),
+            int(entry.get("duration_ms") or 0),
+            entry.get("error_msg"),
+            entry.get("project_number"),
+            entry.get("revit_version"),
+        )
+    except Exception:
+        pass
 
 
 def _queue(entry):
@@ -173,24 +163,15 @@ def _flush_pending():
         for line in lines:
             line = line.strip()
             if line:
-                _post(json.loads(line))
+                _log_via_clr(json.loads(line))
         os.remove(_PENDING_PATH)
     except Exception:
         pass  # leave file intact - retry on next execution
 
 
-def _worker(entry):
-    try:
-        _post(entry)
-        _flush_pending()
-    except Exception:
-        _queue(entry)
-
-
 def _fire(script_name, script_type="python", success=True,
           duration_ms=0, error_msg=None, project_number=None):
-    _load_config()
-    if not _enabled or not _endpoint or not is_telemetry_enabled():
+    if not is_telemetry_enabled():
         return
     entry = {
         "user_name":      _revit_username(),
@@ -209,7 +190,7 @@ def _fire(script_name, script_type="python", success=True,
         # "wwptools_version": None,
         # "document_name":   None,
     }
-    t = threading.Thread(target=_worker, args=(entry,))
+    t = threading.Thread(target=_log_via_clr, args=(entry,))
     t.daemon = True
     t.start()
 

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sheets-Views Manager pulldown: reordered by function group.
 - Export2Ex and Beta: renamed Project Info parameter to `! P_STATS_Export_Text`.
 - Export2Ex: added Project Info settings sync and named save sets.
+- Script usage logging (Python): rewired to call C# ScriptLogger directly via CLR -- no separate Vercel POST endpoint required.
 
 ## [1.5.0] - 2026-05-04
 
