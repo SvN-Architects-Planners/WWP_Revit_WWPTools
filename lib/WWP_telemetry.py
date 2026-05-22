@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-"""WWP_telemetry.py - Per-script usage logging via C# ScriptLogger."""
+"""WWP_telemetry.py - Per-script usage logging to Neon Postgres via Vercel endpoint."""
 import json
 import os
 import socket
 import threading
+
+try:
+    from urllib.request import urlopen, Request
+except ImportError:
+    from urllib2 import urlopen, Request  # type: ignore
 
 try:
     from pyrevit import EXEC_PARAMS
@@ -16,13 +21,13 @@ from WWP_versioning import get_installed_version
 _APP_NAME = "WWPTools"
 _APPDATA = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
 
-_PENDING_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
+_ENDPOINT = "https://wwp-revit-wwp-tools-logger.vercel.app/api/addin-config?key=c5ce6b85-9619-4b24-8db5-6c133534b9f0"
 
+_PENDING_PATH   = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
 _LOCAL_LOG_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "script_log.jsonl")
+_PREFS_PATH     = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
 
 _LOCAL_LOG_MAX_LINES = 2000
-
-_PREFS_PATH = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
 
 _user_pref_enabled = None  # None = not yet read from disk
 _prefs_lock = threading.Lock()
@@ -108,43 +113,11 @@ def _get_hostname():
         return None
 
 
-def _dll_path():
-    try:
-        version = int(str(__revit__.Application.VersionNumber))  # type: ignore
-    except Exception:
-        version = None
-    dll_name = "WWPTools.WpfUI.net8.0-windows.dll" if version and version >= 2025 else "WWPTools.WpfUI.net48.dll"
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), dll_name)
-
-
-def _add_wpfui_reference(dll_path):
-    try:
-        import clr
-        if hasattr(clr, "AddReferenceToFileAndPath"):
-            clr.AddReferenceToFileAndPath(dll_path)
-        else:
-            clr.AddReference(dll_path)
-    except Exception:
-        pass
-
-
-def _log_via_clr(entry):
-    try:
-        dll_path = _dll_path()
-        if not os.path.isfile(dll_path):
-            return
-        _add_wpfui_reference(dll_path)
-        from WWP.Revit.Logging import ScriptLogger  # type: ignore
-        ScriptLogger.Log(
-            entry.get("script_name"),
-            bool(entry.get("success", True)),
-            int(entry.get("duration_ms") or 0),
-            entry.get("error_msg"),
-            entry.get("project_number"),
-            entry.get("revit_version"),
-        )
-    except Exception:
-        pass
+def _post(entry):
+    data = json.dumps(entry).encode("utf-8")
+    req = Request(_ENDPOINT, data=data, headers={"Content-Type": "application/json"})
+    req.get_method = lambda: "POST"
+    urlopen(req, timeout=5)
 
 
 def _write_local_log(entry):
@@ -152,10 +125,8 @@ def _write_local_log(entry):
         folder = os.path.dirname(_LOCAL_LOG_PATH)
         if folder and not os.path.isdir(folder):
             os.makedirs(folder)
-        line = json.dumps(entry) + "\n"
         with open(_LOCAL_LOG_PATH, "a") as f:
-            f.write(line)
-        # Trim to last _LOCAL_LOG_MAX_LINES lines to prevent unbounded growth
+            f.write(json.dumps(entry) + "\n")
         try:
             with open(_LOCAL_LOG_PATH, "r") as f:
                 lines = f.readlines()
@@ -188,10 +159,18 @@ def _flush_pending():
         for line in lines:
             line = line.strip()
             if line:
-                _log_via_clr(json.loads(line))
+                _post(json.loads(line))
         os.remove(_PENDING_PATH)
     except Exception:
         pass  # leave file intact - retry on next execution
+
+
+def _worker(entry):
+    try:
+        _post(entry)
+        _flush_pending()
+    except Exception:
+        _queue(entry)
 
 
 def _fire(script_name, script_type="python", success=True,
@@ -216,7 +195,7 @@ def _fire(script_name, script_type="python", success=True,
         # "document_name":   None,
     }
     _write_local_log(entry)
-    t = threading.Thread(target=_log_via_clr, args=(entry,))
+    t = threading.Thread(target=_worker, args=(entry,))
     t.daemon = True
     t.start()
 
