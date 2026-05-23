@@ -117,8 +117,15 @@ try:
 				_t.daemon = True
 				_t.start()
 			shutil.move(_tel_file, os.path.join(_done_dir, os.path.basename(_tel_file)))
-		except BaseException:
-			pass
+		except BaseException as _exc:
+			try:
+				import traceback as _tb
+				_dbg = os.path.join(_wwp_dir, "telemetry_debug.txt")
+				with open(_dbg, "a") as _df:
+					_df.write("FILE: {}\nERROR: {}\n{}\n---\n".format(
+						_tel_file, str(_exc), _tb.format_exc()))
+			except Exception:
+				pass
 except BaseException:
 	pass
 
