@@ -159,7 +159,7 @@ def _get_hostname():
 
 
 def _post(entry):
-    data = json.dumps(entry).encode("utf-8")
+    data = json.dumps(entry, ensure_ascii=False).encode("utf-8")
     req = Request(_ENDPOINT, data=data, headers={"Content-Type": "application/json"})
     req.get_method = lambda: "POST"
     urlopen(req, timeout=5)
