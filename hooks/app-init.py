@@ -111,8 +111,9 @@ try:
 					"wwptools_version": None,
 					"details":          _details,
 				}
-				with open(_log_path, "a") as _lf:
-					_lf.write(json.dumps(_entry) + "\n")
+				import io as _io
+				with _io.open(_log_path, "a", encoding="utf-8") as _lf:
+					_lf.write(json.dumps(_entry, ensure_ascii=False) + u"\n")
 				_t = threading.Thread(target=_wwp_tel._worker, args=(_entry,))
 				_t.daemon = True
 				_t.start()
