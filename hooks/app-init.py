@@ -26,7 +26,6 @@ try:
 	import glob
 	import shutil
 	import sys
-	import threading
 	import socket
 	from pyrevit import telemetry as _pyrvit_tel
 	from pyrevit.userconfig import user_config as _pyr_cfg
@@ -114,9 +113,7 @@ try:
 				import io as _io
 				with _io.open(_log_path, "a", encoding="utf-8") as _lf:
 					_lf.write(json.dumps(_entry, ensure_ascii=False) + u"\n")
-				_t = threading.Thread(target=_wwp_tel._worker, args=(_entry,))
-				_t.daemon = True
-				_t.start()
+				_wwp_tel._worker(_entry)
 			shutil.move(_tel_file, os.path.join(_done_dir, os.path.basename(_tel_file)))
 		except BaseException as _exc:
 			try:

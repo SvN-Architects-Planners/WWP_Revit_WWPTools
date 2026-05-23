@@ -167,16 +167,17 @@ def _post(entry):
 
 def _write_local_log(entry):
     try:
+        import io as _io
         folder = os.path.dirname(_LOCAL_LOG_PATH)
         if folder and not os.path.isdir(folder):
             os.makedirs(folder)
-        with open(_LOCAL_LOG_PATH, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        with _io.open(_LOCAL_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + u"\n")
         try:
-            with open(_LOCAL_LOG_PATH, "r") as f:
+            with _io.open(_LOCAL_LOG_PATH, "r", encoding="utf-8") as f:
                 lines = f.readlines()
             if len(lines) > _LOCAL_LOG_MAX_LINES:
-                with open(_LOCAL_LOG_PATH, "w") as f:
+                with _io.open(_LOCAL_LOG_PATH, "w", encoding="utf-8") as f:
                     f.writelines(lines[-_LOCAL_LOG_MAX_LINES:])
         except Exception:
             pass
@@ -186,11 +187,12 @@ def _write_local_log(entry):
 
 def _queue(entry):
     try:
+        import io as _io
         folder = os.path.dirname(_PENDING_PATH)
         if folder and not os.path.isdir(folder):
             os.makedirs(folder)
-        with open(_PENDING_PATH, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        with _io.open(_PENDING_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + u"\n")
     except Exception:
         pass
 
@@ -199,7 +201,8 @@ def _flush_pending():
     if not os.path.exists(_PENDING_PATH):
         return
     try:
-        with open(_PENDING_PATH, "r") as f:
+        import io as _io
+        with _io.open(_PENDING_PATH, "r", encoding="utf-8") as f:
             lines = f.readlines()
         for line in lines:
             line = line.strip()
