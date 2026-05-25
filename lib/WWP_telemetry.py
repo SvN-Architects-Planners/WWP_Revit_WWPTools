@@ -253,9 +253,7 @@ def _fire(script_name, script_type="python", event_type="tool_use", success=True
         ),
     }
     _write_local_log(entry)
-    t = threading.Thread(target=_worker, args=(entry,))
-    t.daemon = True
-    t.start()
+    _worker(entry)
 
 
 # ---------------------------------------------------------------------------
