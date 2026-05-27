@@ -1,4 +1,3 @@
-#!python3
 # -*- coding: utf-8 -*-
 """Create Fire Rating Lines for Selected Walls in Current View.
 
