@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2026-05-22
 
 ### Added
+- `tools/sync_bundle_versions.py`: dev utility that reads `WWPTools.version.json` and updates every `Version: X.X.X` occurrence in all `bundle.yaml` files under `WWPTools.extension/`. Runs automatically as a CI step in the publish workflow before rsync so the distribution repo always has the correct version in every tooltip.
+- Family Swapper: new tool in Manage panel → Match Property pulldown. Swaps all instances of a source titleblock family to a target family in configurable batches; runtime WPF form lets user configure source family, type mappings, parameter remapping (with auto-discover from project), shift offsets, and batch size. Match Property moved into the same pulldown.
+
 - Auto-update on Revit close: `startup.py` registers a `UIApplication.ApplicationClosing` event at pyRevit startup. Silently checks for updates in a background thread; if updates are available when the user closes Revit, a TaskDialog prompts to install. A detached batch watcher waits for Revit to fully exit, waits 15 seconds, then runs `git fetch / reset --hard / clean` and sends a toast notification on completion.
 - Script usage logging (Python): rewrote `WWP_telemetry.py` to POST log entries to a Neon Postgres database via a Vercel API endpoint. Uses `urllib` only (no pip dependencies). Adds `track_use()` function; preserves `track_current_command()` and `track_app_init()`. Falls back to a local JSONL queue at `%APPDATA%\pyRevit\WWPTools\pending_script_logs.jsonl` when offline; queue flushes automatically on next successful connection.
 - Script usage logging (C#): added `ScriptLogger.cs` to `WWPTools.WpfUI` (`WWP.Revit.Logging` namespace). Fetches Neon connection string from live Vercel config endpoint (`wwp-revit-wwp-tools-logger.vercel.app`) on first call; writes directly via Npgsql. Uses same offline queue path as Python side.
