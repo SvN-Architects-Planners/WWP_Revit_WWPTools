@@ -26,7 +26,7 @@ def _net_str_list(py_list):
 
 
 def _id_val(eid):
-    """Return the integer value of an ElementId — handles Revit 2025+ (.Value) and older (.IntegerValue)."""
+    """Return the integer value of an ElementId - handles Revit 2025+ (.Value) and older (.IntegerValue)."""
     try:
         return eid.Value
     except AttributeError:
