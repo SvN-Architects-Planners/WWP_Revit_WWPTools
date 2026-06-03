@@ -1,8 +1,8 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Family Swapper"
-        Width="600" Height="780"
-        MinWidth="480" MinHeight="520"
+        Width="560" Height="780"
+        MinWidth="440" MinHeight="540"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI"
         FontSize="12">
@@ -10,30 +10,36 @@
     <Window.Resources>
 
         <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="0,0,0,10"/>
-            <Setter Property="Padding" Value="8,6,8,8"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="Margin"          Value="0,0,0,10"/>
+            <Setter Property="Padding"         Value="8,6,8,8"/>
+            <Setter Property="BorderBrush"     Value="#CCCCCC"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
-        <Style TargetType="TextBox">
-            <Setter Property="Padding" Value="5,3"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="BorderBrush" Value="#BBBBBB"/>
-            <Setter Property="Height" Value="26"/>
-        </Style>
-
         <Style TargetType="Label">
-            <Setter Property="Padding" Value="0,0,0,2"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding"    Value="0,0,0,2"/>
+            <Setter Property="FontSize"   Value="11"/>
             <Setter Property="Foreground" Value="#444444"/>
         </Style>
 
+        <Style TargetType="TextBox">
+            <Setter Property="Padding"                  Value="5,3"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush"              Value="#BBBBBB"/>
+            <Setter Property="Height"                   Value="26"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Height"                   Value="28"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush"              Value="#BBBBBB"/>
+        </Style>
+
         <Style TargetType="Button">
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Padding"     Value="10,4"/>
             <Setter Property="BorderBrush" Value="#BBBBBB"/>
-            <Setter Property="Background" Value="#F5F5F5"/>
-            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background"  Value="#F5F5F5"/>
+            <Setter Property="Cursor"      Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#E8E8E8"/>
@@ -42,13 +48,13 @@
         </Style>
 
         <Style x:Key="RunButton" TargetType="Button">
-            <Setter Property="Padding" Value="0,9"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Background" Value="#2B579A"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding"          Value="0,9"/>
+            <Setter Property="FontSize"         Value="13"/>
+            <Setter Property="FontWeight"       Value="Medium"/>
+            <Setter Property="Background"       Value="#2B579A"/>
+            <Setter Property="Foreground"       Value="White"/>
+            <Setter Property="BorderThickness"  Value="0"/>
+            <Setter Property="Cursor"           Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#1E4080"/>
@@ -60,38 +66,38 @@
         </Style>
 
         <Style TargetType="DataGrid">
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="CanUserDeleteRows" Value="False"/>
-            <Setter Property="CanUserResizeRows" Value="False"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="AutoGenerateColumns"      Value="False"/>
+            <Setter Property="CanUserAddRows"           Value="False"/>
+            <Setter Property="CanUserDeleteRows"        Value="False"/>
+            <Setter Property="CanUserResizeRows"        Value="False"/>
+            <Setter Property="HeadersVisibility"        Value="Column"/>
+            <Setter Property="SelectionMode"            Value="Single"/>
+            <Setter Property="GridLinesVisibility"      Value="Horizontal"/>
             <Setter Property="HorizontalGridLinesBrush" Value="#EEEEEE"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="RowHeight" Value="28"/>
-            <Setter Property="ColumnHeaderHeight" Value="28"/>
-            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush"              Value="#CCCCCC"/>
+            <Setter Property="BorderThickness"          Value="1"/>
+            <Setter Property="RowHeight"                Value="30"/>
+            <Setter Property="ColumnHeaderHeight"       Value="28"/>
+            <Setter Property="Background"               Value="White"/>
             <Setter Property="AlternatingRowBackground" Value="#FAFAFA"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#F0F0F0"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="Background"      Value="#F0F0F0"/>
+            <Setter Property="BorderBrush"     Value="#CCCCCC"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="Padding" Value="8,0"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Padding"         Value="8,0"/>
+            <Setter Property="FontWeight"      Value="Medium"/>
+            <Setter Property="Foreground"      Value="#333333"/>
         </Style>
 
         <Style TargetType="DataGridCell">
-            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Padding"         Value="4,0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#D6E4F7"/>
-                    <Setter Property="Foreground" Value="#000000"/>
+                    <Setter Property="Background"  Value="#D6E4F7"/>
+                    <Setter Property="Foreground"  Value="#000000"/>
                     <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
             </Style.Triggers>
@@ -120,37 +126,50 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
             <StackPanel>
 
-                <!-- Source Family -->
-                <GroupBox Header="Source family">
+                <!-- Families -->
+                <GroupBox Header="Families">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Label Content="Family name:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="SourceFamilyBox" Grid.Column="1"
-                                 ToolTip="Exact name of the source family to replace"/>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="6"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Label Content="Source:"
+                               VerticalAlignment="Center"/>
+                        <ComboBox x:Name="SourceFamilyCmb"
+                                  Grid.Column="1"
+                                  ToolTip="Auto-detected from current selection — change to override"/>
+                        <Label Grid.Row="2"
+                               Content="Target:"
+                               VerticalAlignment="Center"/>
+                        <ComboBox x:Name="TargetFamilyCmb"
+                                  Grid.Row="2" Grid.Column="1"
+                                  ToolTip="Family to swap to"/>
                     </Grid>
                 </GroupBox>
 
                 <!-- Type Mapping -->
                 <GroupBox Header="Type mapping">
                     <StackPanel>
-                        <TextBlock Text="Map each source type to its replacement type."
+                        <TextBlock Text="Each source type maps to a target type."
                                    FontSize="11" Foreground="#777777" Margin="0,0,0,6"/>
-                        <DataGrid x:Name="TypeGrid" MinHeight="56" MaxHeight="150" Margin="0,0,0,6">
+                        <DataGrid x:Name="TypeGrid" MinHeight="56" MaxHeight="180" Margin="0,0,0,6">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Source type"
-                                    Binding="{Binding SourceType, UpdateSourceTrigger=LostFocus}"
+                                <DataGridComboBoxColumn Header="Source type"
+                                    SelectedValueBinding="{Binding SourceType, UpdateSourceTrigger=LostFocus}"
                                     Width="*"/>
-                                <DataGridTextColumn Header="Target type"
-                                    Binding="{Binding TargetType, UpdateSourceTrigger=LostFocus}"
+                                <DataGridComboBoxColumn Header="Target type"
+                                    SelectedValueBinding="{Binding TargetType, UpdateSourceTrigger=LostFocus}"
                                     Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="AddTypeRowBtn" Content="+ Add row" Margin="0,0,6,0"/>
-                            <Button x:Name="RemTypeRowBtn" Content="&#8722; Remove selected"/>
+                            <Button x:Name="AddTypeRowBtn"  Content="+ Add row"         Margin="0,0,6,0"/>
+                            <Button x:Name="RemTypeRowBtn"  Content="&#8722; Remove selected"/>
                         </StackPanel>
                     </StackPanel>
                 </GroupBox>
@@ -160,20 +179,22 @@
                     <StackPanel>
                         <TextBlock FontSize="11" Foreground="#777777" Margin="0,0,0,6"
                                    TextWrapping="Wrap"
-                                   Text="Map old parameter names to new names. Leave target blank to keep the same name. Click Discover to auto-populate from the project."/>
+                                   Text="Map old parameter names to new names. Leave target blank to keep the same name. Click Discover to populate dropdowns from the project."/>
                         <DataGrid x:Name="ParamGrid" MinHeight="56" MaxHeight="200" Margin="0,0,0,6">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Source parameter"
-                                    Binding="{Binding OldName, UpdateSourceTrigger=LostFocus}"
+                                <DataGridComboBoxColumn Header="Source parameter"
+                                    IsComboBoxEditable="True"
+                                    SelectedValueBinding="{Binding OldName, UpdateSourceTrigger=LostFocus}"
                                     Width="*"/>
-                                <DataGridTextColumn Header="Target parameter"
-                                    Binding="{Binding NewName, UpdateSourceTrigger=LostFocus}"
+                                <DataGridComboBoxColumn Header="Target parameter"
+                                    IsComboBoxEditable="True"
+                                    SelectedValueBinding="{Binding NewName, UpdateSourceTrigger=LostFocus}"
                                     Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="DiscoverBtn" Content="Discover from project" Margin="0,0,6,0"/>
-                            <Button x:Name="AddParamRowBtn" Content="+ Add row" Margin="0,0,6,0"/>
+                            <Button x:Name="DiscoverBtn"    Content="Discover from project" Margin="0,0,6,0"/>
+                            <Button x:Name="AddParamRowBtn" Content="+ Add row"             Margin="0,0,6,0"/>
                             <Button x:Name="RemParamRowBtn" Content="&#8722; Remove selected"/>
                         </StackPanel>
                     </StackPanel>

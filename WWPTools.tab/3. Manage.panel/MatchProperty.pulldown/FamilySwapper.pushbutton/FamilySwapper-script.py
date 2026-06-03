@@ -3,7 +3,7 @@ clr.AddReference('System.Data')
 clr.AddReference('PresentationFramework')
 import System
 import System.Data as SD
-from System.Windows.Controls import DataGridEditingUnit
+from System.Windows.Controls import DataGridEditingUnit, DataGridComboBoxColumn
 
 from pyrevit import revit, DB, forms
 import WWP_uiUtils as ui
@@ -17,13 +17,11 @@ doc = revit.doc
 # ---------------------------------------------------------------------------
 
 def _is_swappable(param):
-    """True for custom, writable, integer/string/double instance parameters."""
     if param.IsReadOnly:
         return False
     valid_types = (DB.StorageType.Integer, DB.StorageType.String, DB.StorageType.Double)
     if param.StorageType not in valid_types:
         return False
-    # Built-in system parameters have negative element IDs
     if param.Id.IntegerValue < 0:
         return False
     return True
@@ -34,11 +32,9 @@ def _collect_param_names(tb_instance):
 
 
 def _suggest_target(src_name, tgt_set, tgt_lower):
-    """Exact then case-insensitive name match; empty string if no match."""
     if src_name in tgt_set:
         return src_name
-    candidate = tgt_lower.get(src_name.lower())
-    return candidate or ''
+    return tgt_lower.get(src_name.lower(), '')
 
 
 def _safe_str(value):
@@ -55,7 +51,13 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, 'FamilySwapper.xaml')
+        self._family_type_map = {}   # {family_name: [sorted type names]}
+        self._src_types = []
+        self._tgt_types = []
+        self._src_params = []
+        self._tgt_params = []
         self._setup_grids()
+        self._load_families()
         self._wire_events()
 
     # ------------------------------------------------------------------
@@ -73,20 +75,101 @@ class FamilySwapperWindow(forms.WPFWindow):
         self._param_dt.Columns.Add('NewName', System.String)
         self.ParamGrid.ItemsSource = self._param_dt.DefaultView
 
+    def _load_families(self):
+        all_tb_types = (DB.FilteredElementCollector(doc)
+                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                        .WhereElementIsElementType()
+                        .ToElements())
+        fam_types = {}
+        for t in all_tb_types:
+            fam = t.Family.Name if t.Family else ''
+            p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+            typ = p.AsString() if p else ''
+            if fam:
+                if fam not in fam_types:
+                    fam_types[fam] = []
+                if typ and typ not in fam_types[fam]:
+                    fam_types[fam].append(typ)
+        for fam in fam_types:
+            fam_types[fam].sort()
+        self._family_type_map = fam_types
+
+        families = sorted(fam_types.keys())
+        for fam in families:
+            self.SourceFamilyCmb.Items.Add(fam)
+            self.TargetFamilyCmb.Items.Add(fam)
+
+        detected = self._detect_source_family()
+        if detected and detected in fam_types:
+            self.SourceFamilyCmb.SelectedItem = detected
+        elif families:
+            self.SourceFamilyCmb.SelectedIndex = 0
+
+    def _detect_source_family(self):
+        try:
+            tb_cat_id = DB.ElementId(DB.BuiltInCategory.OST_TitleBlocks)
+            for eid in revit.uidoc.Selection.GetElementIds():
+                elem = doc.GetElement(eid)
+                if elem and elem.Category and elem.Category.Id == tb_cat_id:
+                    ftype = doc.GetElement(elem.GetTypeId())
+                    if ftype and ftype.Family:
+                        return ftype.Family.Name
+        except Exception:
+            pass
+        return None
+
     def _wire_events(self):
-        self.AddTypeRowBtn.Click += self._add_type_row_click
-        self.RemTypeRowBtn.Click += self._rem_type_row_click
+        self.SourceFamilyCmb.SelectionChanged += self._on_source_family_changed
+        self.TargetFamilyCmb.SelectionChanged += self._on_target_family_changed
+        self.AddTypeRowBtn.Click  += self._add_type_row_click
+        self.RemTypeRowBtn.Click  += self._rem_type_row_click
         self.AddParamRowBtn.Click += self._add_param_row_click
         self.RemParamRowBtn.Click += self._rem_param_row_click
-        self.DiscoverBtn.Click += self._discover_click
-        self.RunBtn.Click += self._run_click
+        self.DiscoverBtn.Click    += self._discover_click
+        self.RunBtn.Click         += self._run_click
+
+    # ------------------------------------------------------------------
+    # Family selection handlers
+    # ------------------------------------------------------------------
+
+    def _on_source_family_changed(self, sender, args):
+        fam = self.SourceFamilyCmb.SelectedItem
+        self._src_types = list(self._family_type_map.get(str(fam), [])) if fam else []
+        self.TypeGrid.Columns[0].ItemsSource = self._src_types
+        self._rebuild_type_rows()
+
+    def _on_target_family_changed(self, sender, args):
+        fam = self.TargetFamilyCmb.SelectedItem
+        self._tgt_types = list(self._family_type_map.get(str(fam), [])) if fam else []
+        self.TypeGrid.Columns[1].ItemsSource = self._tgt_types
+        # Refresh target suggestions in existing rows
+        tgt_set   = set(self._tgt_types)
+        tgt_lower = {t.lower(): t for t in self._tgt_types}
+        for row in self._type_dt.Rows:
+            src = _safe_str(row['SourceType'])
+            if src:
+                row['TargetType'] = _suggest_target(src, tgt_set, tgt_lower)
+        self._type_dt.AcceptChanges()
 
     # ------------------------------------------------------------------
     # Type grid
     # ------------------------------------------------------------------
 
+    def _rebuild_type_rows(self):
+        self._type_dt.Clear()
+        tgt_set   = set(self._tgt_types)
+        tgt_lower = {t.lower(): t for t in self._tgt_types}
+        for src in self._src_types:
+            row = self._type_dt.NewRow()
+            row['SourceType'] = src
+            row['TargetType'] = _suggest_target(src, tgt_set, tgt_lower)
+            self._type_dt.Rows.Add(row)
+
     def _add_type_row_click(self, sender, args):
-        self._add_type_row()
+        row = self._type_dt.NewRow()
+        row['SourceType'] = ''
+        row['TargetType'] = ''
+        self._type_dt.Rows.Add(row)
 
     def _rem_type_row_click(self, sender, args):
         selected = self.TypeGrid.SelectedItem
@@ -94,11 +177,14 @@ class FamilySwapperWindow(forms.WPFWindow):
             selected.Row.Delete()
             self._type_dt.AcceptChanges()
 
-    def _add_type_row(self, src='', tgt=''):
-        row = self._type_dt.NewRow()
-        row['SourceType'] = src
-        row['TargetType'] = tgt
-        self._type_dt.Rows.Add(row)
+    def _read_type_map(self):
+        result = {}
+        for row in self._type_dt.Rows:
+            src = _safe_str(row['SourceType'])
+            tgt = _safe_str(row['TargetType'])
+            if src and tgt:
+                result[src] = tgt
+        return result
 
     # ------------------------------------------------------------------
     # Param grid
@@ -128,9 +214,9 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def _discover_click(self, sender, args):
         self._commit_grids()
-        src_fam = self.SourceFamilyBox.Text.strip()
+        src_fam = str(self.SourceFamilyCmb.SelectedItem or '')
         if not src_fam:
-            self._log('Enter source family name first.')
+            self._log('Select source family first.')
             return
 
         type_name_map = self._read_type_map()
@@ -142,7 +228,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         src_type_ids, tgt_type_ids = set(), set()
         tgt_type_names = set(type_name_map.values())
         for t in all_tb_types:
-            fam = getattr(t.Family, 'Name', '')
+            fam = t.Family.Name if t.Family else ''
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam == src_fam:
@@ -158,13 +244,19 @@ class FamilySwapperWindow(forms.WPFWindow):
         sample_tgt = next((tb for tb in all_tbs if tb.GetTypeId().IntegerValue in tgt_type_ids), None)
 
         if not sample_src:
-            self._log('No source titleblock instances found - check source family name.')
+            self._log('No source titleblock instances found.')
             return
 
         src_names = _collect_param_names(sample_src)
         tgt_names = _collect_param_names(sample_tgt) if sample_tgt else []
-        tgt_set = set(tgt_names)
+        tgt_set   = set(tgt_names)
         tgt_lower = {n.lower(): n for n in tgt_names}
+
+        # Update param column dropdowns
+        self._src_params = src_names
+        self._tgt_params = tgt_names
+        self.ParamGrid.Columns[0].ItemsSource = self._src_params
+        self.ParamGrid.Columns[1].ItemsSource = self._tgt_params
 
         existing = self._existing_src_params()
         added = 0
@@ -176,7 +268,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         self._log('Discovered {} parameter(s) from source.'.format(added))
         if not sample_tgt:
-            self._log('  (no target instance found - target suggestions unavailable)')
+            self._log('  (no target instances found - suggestions unavailable)')
 
     # ------------------------------------------------------------------
     # Run
@@ -194,21 +286,12 @@ class FamilySwapperWindow(forms.WPFWindow):
         self.TypeGrid.CommitEdit(DataGridEditingUnit.Row, True)
         self.ParamGrid.CommitEdit(DataGridEditingUnit.Row, True)
 
-    def _read_type_map(self):
-        result = {}
-        for row in self._type_dt.Rows:
-            src = _safe_str(row['SourceType'])
-            tgt = _safe_str(row['TargetType'])
-            if src and tgt:
-                result[src] = tgt
-        return result
-
     def _run(self):
         self._commit_grids()
 
-        src_fam = self.SourceFamilyBox.Text.strip()
+        src_fam = str(self.SourceFamilyCmb.SelectedItem or '')
         if not src_fam:
-            self._log('ERROR: Source family name is required.')
+            self._log('ERROR: Select source family.')
             return
 
         try:
@@ -231,7 +314,6 @@ class FamilySwapperWindow(forms.WPFWindow):
             if old:
                 param_map[old] = new if new else old
 
-        # Resolve type names to element IDs
         all_tb_types = (DB.FilteredElementCollector(doc)
                         .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
                         .WhereElementIsElementType()
@@ -239,7 +321,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         src_type_ids, tgt_type_ids = {}, {}
         tgt_type_names = set(type_name_map.values())
         for t in all_tb_types:
-            fam = getattr(t.Family, 'Name', '')
+            fam = t.Family.Name if t.Family else ''
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam == src_fam:
@@ -254,7 +336,7 @@ class FamilySwapperWindow(forms.WPFWindow):
             else:
                 msg = "WARNING: could not resolve '{}' -> '{}'".format(src_typ, tgt_typ)
                 if src_typ not in src_type_ids:
-                    msg += "\n  '{}' not in family '{}'".format(src_typ, src_fam)
+                    msg += "\n  '{}' not found in family '{}'".format(src_typ, src_fam)
                 if tgt_typ not in tgt_type_ids:
                     msg += "\n  Target type '{}' not found".format(tgt_typ)
                 self._log(msg)
@@ -269,7 +351,7 @@ class FamilySwapperWindow(forms.WPFWindow):
                    .WhereElementIsNotElementType()
                    .ToElements())
         remaining = [tb for tb in all_tbs if tb.GetTypeId().IntegerValue in src_id_set]
-        batch = remaining[:batch_size]
+        batch     = remaining[:batch_size]
 
         self._log('Source remaining : {}'.format(len(remaining)))
         self._log('Processing batch : {}'.format(len(batch)))
@@ -279,7 +361,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         shift_x_ft = shift_x_mm / 304.8
         shift_y_ft = shift_y_mm / 304.8
-        do_shift = shift_x_mm != 0 or shift_y_mm != 0
+        do_shift   = shift_x_mm != 0 or shift_y_mm != 0
 
         ok, errors = 0, []
         t = DB.Transaction(doc, 'Family Swapper')
