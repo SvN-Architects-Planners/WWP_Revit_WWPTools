@@ -157,7 +157,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         sample_tgt = next((tb for tb in all_tbs if tb.GetTypeId().IntegerValue in tgt_type_ids), None)
 
         if not sample_src:
-            self._log('No source titleblock instances found — check source family name.')
+            self._log('No source titleblock instances found - check source family name.')
             return
 
         src_names = _collect_param_names(sample_src)
@@ -175,7 +175,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         self._log('Discovered {} parameter(s) from source.'.format(added))
         if not sample_tgt:
-            self._log('  (no target instance found — target suggestions unavailable)')
+            self._log('  (no target instance found - target suggestions unavailable)')
 
     # ------------------------------------------------------------------
     # Run
@@ -328,7 +328,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         self._log('\nResult : {}/{} succeeded'.format(ok, len(batch)))
         left = len(remaining) - ok
         if left > 0:
-            self._log('{} sheet(s) still pending — run again.'.format(left))
+            self._log('{} sheet(s) still pending - run again.'.format(left))
         else:
             self._log('All done!')
         if errors:

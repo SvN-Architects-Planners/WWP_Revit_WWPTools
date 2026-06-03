@@ -5,6 +5,15 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- UI theme overhaul (`FlatTheme.xaml`): rounded corners on TextBox, ListBox, ComboBox, and ListBox; blue focus ring on text inputs; pressed state on buttons; modernised CheckBox and RadioButton with custom templates; GroupBox chrome replaced with clean card-style header; slim 6 px scrollbars with pill-shaped thumbs; dark tooltip style; DataGrid row hover highlight; ListViewItem hover/selection added. Font upgraded to `Segoe UI Variable` (Windows 11) with `Segoe UI` fallback.
+- `MatchPropertyWindow.xaml`: removed `FontFamily="Arial Narrow"` override so the window inherits the theme font.
+
+### Fixed
+- `FamilySwapper-script.py`: replaced three em dash characters (`\xe2\x80\x94`) with plain hyphens — IronPython defaults to ASCII and raised `SyntaxError: Non-ASCII character '\xe2'` on load.
+
 ## [2.0.0] - 2026-05-22
 
 ### Added
