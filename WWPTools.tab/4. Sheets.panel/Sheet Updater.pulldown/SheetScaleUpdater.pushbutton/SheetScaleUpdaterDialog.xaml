@@ -187,6 +187,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -238,7 +239,32 @@
                           Margin="0,0,0,14"
                           Style="{StaticResource ToggleSwitchCheckBox}" />
 
-                <StackPanel Grid.Row="3" Margin="0,0,0,8">
+                <StackPanel Grid.Row="3" Margin="0,0,0,14">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="SetVisibilityCheckBox"
+                                  Content="Also set a visibility parameter on the titleblock"
+                                  VerticalAlignment="Center"
+                                  Style="{StaticResource ToggleSwitchCheckBox}"/>
+                        <ComboBox x:Name="VisibilityParamCombo"
+                                  Grid.Column="2"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="True"
+                                  StaysOpenOnEdit="True"
+                                  IsEnabled="False"
+                                  Style="{StaticResource FlatComboBox}"/>
+                    </Grid>
+                    <CheckBox x:Name="HideNoScaleCheckBox"
+                              Content="Also hide (set to No) on sheets with no scaleable views"
+                              IsEnabled="False"
+                              Style="{StaticResource ToggleSwitchCheckBox}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4" Margin="0,0,0,8">
                     <DockPanel>
                         <TextBlock Text="Select sheets to update"
                                    VerticalAlignment="Center"
@@ -260,7 +286,7 @@
                 </StackPanel>
 
                 <ListBox x:Name="SheetsList"
-                         Grid.Row="4"
+                         Grid.Row="5"
                          SelectionMode="Extended"
                          MinHeight="320"
                          Margin="0,0,0,8"
@@ -268,14 +294,14 @@
                          ItemContainerStyle="{StaticResource FlatListBoxItem}" />
 
                 <TextBlock x:Name="ValidationText"
-                           Grid.Row="5"
+                           Grid.Row="6"
                            Foreground="{StaticResource DangerBrush}"
                            Visibility="Collapsed"
                            Margin="0,2,0,0"
                            TextWrapping="Wrap"
                            FontWeight="SemiBold" />
 
-                <DockPanel Grid.Row="6" Margin="0,14,0,0">
+                <DockPanel Grid.Row="7" Margin="0,14,0,0">
                     <Image x:Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="52"

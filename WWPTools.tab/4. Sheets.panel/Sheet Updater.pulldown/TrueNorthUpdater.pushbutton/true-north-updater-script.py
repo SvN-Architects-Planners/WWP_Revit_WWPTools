@@ -120,6 +120,27 @@ def _get_param_entries(titleblock_instances):
     keys = sorted(entries.keys())
     return keys, entries
 
+def _get_yesno_param_entries(titleblock_instances):
+    """Return sorted list of writable Yes/No instance parameter names."""
+    names = set()
+    for tb in titleblock_instances:
+        if not tb:
+            continue
+        try:
+            for p in tb.Parameters:
+                if not p or not p.Definition:
+                    continue
+                if p.IsReadOnly:
+                    continue
+                if not _is_yes_no_parameter(p):
+                    continue
+                name = p.Definition.Name
+                if name:
+                    names.add(name)
+        except Exception:
+            continue
+    return sorted(names)
+
 def _lookup_parameter(element, param_name):
     if not element or not param_name:
         return None
@@ -204,6 +225,8 @@ def _show_true_north_dialog(
     prompt,
     prechecked_indices=None,
     default_label=None,
+    yesno_param_labels=None,
+    default_visibility_label=None,
 ):
     if not sheet_items:
         return None
@@ -247,6 +270,9 @@ def _show_true_north_dialog(
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
+    set_visibility_checkbox = window.FindName("SetVisibilityCheckBox")
+    visibility_param_combo = window.FindName("VisibilityParamCombo")
+    hide_elev_section_checkbox = window.FindName("HideElevSectionCheckBox")
 
     prompt_text.Text = prompt or ""
     selected_indices = set(prechecked_indices or [])
@@ -263,6 +289,35 @@ def _show_true_north_dialog(
         all_sheets_checkbox.IsChecked = True
         search_box.IsEnabled = False
         sheets_list.IsEnabled = False
+
+    for label in (yesno_param_labels or []):
+        visibility_param_combo.Items.Add(label)
+    if default_visibility_label and default_visibility_label in (yesno_param_labels or []):
+        visibility_param_combo.SelectedItem = default_visibility_label
+    elif visibility_param_combo.Items.Count > 0:
+        visibility_param_combo.SelectedIndex = 0
+    if set_visibility_checkbox is not None:
+        set_visibility_checkbox.IsChecked = False
+    if hide_elev_section_checkbox is not None:
+        hide_elev_section_checkbox.IsChecked = False
+        hide_elev_section_checkbox.IsEnabled = False
+
+    def _on_visibility_checked(sender, args):
+        if visibility_param_combo is not None:
+            visibility_param_combo.IsEnabled = True
+        if hide_elev_section_checkbox is not None:
+            hide_elev_section_checkbox.IsEnabled = True
+
+    def _on_visibility_unchecked(sender, args):
+        if visibility_param_combo is not None:
+            visibility_param_combo.IsEnabled = False
+        if hide_elev_section_checkbox is not None:
+            hide_elev_section_checkbox.IsChecked = False
+            hide_elev_section_checkbox.IsEnabled = False
+
+    if set_visibility_checkbox is not None:
+        set_visibility_checkbox.Checked += _on_visibility_checked
+        set_visibility_checkbox.Unchecked += _on_visibility_unchecked
 
     try:
         lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
@@ -384,6 +439,9 @@ def _show_true_north_dialog(
     return {
         "selected_indices": sorted(selected_indices),
         "selected_parameter": selected_param,
+        "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
+        "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
+        "hide_on_elev_section": bool(hide_elev_section_checkbox is not None and hide_elev_section_checkbox.IsChecked),
     }
 
 def main():
@@ -443,6 +501,9 @@ def main():
         UI.TaskDialog.Show("True North Updater", "No numeric parameters found on titleblock instances.")
         return
 
+    yesno_param_labels = _get_yesno_param_entries(titleblocks)
+    last_visibility_param = getattr(config, "visibility_param_name", "") or ""
+
     default_label = None
     if last_param_name and last_param_scope:
         default_label = "{} [{}]".format(last_param_name, "Instance" if last_param_scope == "instance" else "Type")
@@ -455,6 +516,8 @@ def main():
             prompt="Select sheets to update and choose the target angle parameter:",
             prechecked_indices=prechecked_indices,
             default_label=default_label,
+            yesno_param_labels=yesno_param_labels,
+            default_visibility_label=last_visibility_param if last_visibility_param in yesno_param_labels else None,
         )
     except Exception as ex:
         UI.TaskDialog.Show("True North Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -478,10 +541,15 @@ def main():
     entry = param_entries.get(target_label)
     target_param_name = entry["name"] if entry else target_label
     target_param_scope = entry["scope"] if entry else "instance"
+    set_visibility = bool(dialog_result.get("set_visibility", False))
+    visibility_param_name = dialog_result.get("visibility_param", "")
+    hide_on_elev_section = bool(dialog_result.get("hide_on_elev_section", False))
 
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.true_north_param_name = target_param_name
     config.true_north_param_scope = target_param_scope
+    config.visibility_param_name = visibility_param_name if set_visibility else ""
+    config.hide_on_elev_section = hide_on_elev_section
     save_config()
 
     titleblocks_by_sheet = {}
@@ -494,6 +562,7 @@ def main():
     updated_count = 0
     updated_sheets = []
     failed_sheets = []
+    hidden_sheets = []
 
     t = DB.Transaction(doc, "Update True North Angle")
     t.Start()
@@ -530,7 +599,30 @@ def main():
                 break
 
             if primary_view is None:
+                if hide_on_elev_section and set_visibility and visibility_param_name:
+                    try:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(0)
+                        hidden_sheets.append(sheet_label + " - No plan view found (north arrow hidden)")
+                        continue
+                    except Exception:
+                        pass
                 failed_sheets.append(sheet_label + " - No suitable viewport found")
+                continue
+
+            _HIDE_VIEW_TYPES = (DB.ViewType.Elevation, DB.ViewType.Section)
+            if hide_on_elev_section and primary_view.ViewType in _HIDE_VIEW_TYPES:
+                if set_visibility and visibility_param_name:
+                    try:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(0)
+                    except Exception:
+                        pass
+                hidden_sheets.append(sheet_label + " - Primary view is {}, north arrow hidden".format(
+                    "elevation" if primary_view.ViewType == DB.ViewType.Elevation else "section"
+                ))
                 continue
 
             angle_value = _get_true_north_angle_for_view(doc, primary_view)
@@ -549,10 +641,18 @@ def main():
                 elif param.StorageType == DB.StorageType.Double:
                     value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
                     param.Set(value_to_set)
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 elif param.StorageType == DB.StorageType.Integer:
                     param.Set(int(round(angle_value)))
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 else:
@@ -567,6 +667,8 @@ def main():
         return
 
     msg = "Successfully updated {} sheet(s).".format(updated_count)
+    if hidden_sheets:
+        msg += "\nHidden (north arrow): {}".format(len(hidden_sheets))
     if failed_sheets:
         msg += "\n\nFailed/Skipped: {}".format(len(failed_sheets))
     UI.TaskDialog.Show("True North Updater", msg)
@@ -575,6 +677,7 @@ def main():
     _print_text("True North Updater Report")
     _print_text("Developed by: Jason Tian")
     _print_text("Updated: {} sheets".format(updated_count))
+    _print_text("Hidden: {} sheets".format(len(hidden_sheets)))
     _print_text("Failed/Skipped: {} sheets".format(len(failed_sheets)))
     _print_text("Target Parameter: {} ({})".format(target_param_name, target_param_scope or "instance"))
     if updated_sheets:
@@ -582,6 +685,11 @@ def main():
         _print_text("Changed Sheets:")
         for name in updated_sheets:
             _print_text(" - {}".format(name))
+    if hidden_sheets:
+        _print_text("")
+        _print_text("Hidden Sheets (north arrow set to No):")
+        for h in hidden_sheets:
+            _print_text(" - {}".format(h))
     if failed_sheets:
         _print_text("")
         _print_text("Failed/Skipped Sheets:")

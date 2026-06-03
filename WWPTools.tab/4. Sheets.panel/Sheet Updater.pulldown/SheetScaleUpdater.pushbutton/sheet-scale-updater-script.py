@@ -154,6 +154,27 @@ def _get_param_entries(titleblock_instances):
     keys = sorted(entries.keys())
     return keys, entries
 
+def _get_yesno_param_entries(titleblock_instances):
+    """Return sorted list of writable Yes/No instance parameter names."""
+    names = set()
+    for tb in titleblock_instances:
+        if not tb:
+            continue
+        try:
+            for p in tb.Parameters:
+                if not p or not p.Definition:
+                    continue
+                if p.IsReadOnly:
+                    continue
+                if not _is_yes_no_parameter(p):
+                    continue
+                name = p.Definition.Name
+                if name:
+                    names.add(name)
+        except Exception:
+            continue
+    return sorted(names)
+
 def _lookup_parameter(element, param_name):
     if not element or not param_name:
         return None
@@ -205,6 +226,8 @@ def _show_sheet_scale_dialog(
     prechecked_indices=None,
     default_label=None,
     ignore_drafting_views_default=False,
+    yesno_param_labels=None,
+    default_visibility_label=None,
 ):
     if not sheet_items:
         return None
@@ -251,6 +274,9 @@ def _show_sheet_scale_dialog(
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
+    set_visibility_checkbox = window.FindName("SetVisibilityCheckBox")
+    visibility_param_combo = window.FindName("VisibilityParamCombo")
+    hide_no_scale_checkbox = window.FindName("HideNoScaleCheckBox")
 
     prompt_text.Text = prompt or ""
     selected_indices = set(prechecked_indices or [])
@@ -268,6 +294,35 @@ def _show_sheet_scale_dialog(
         all_sheets_checkbox.IsChecked = True
         search_box.IsEnabled = False
         sheets_list.IsEnabled = False
+
+    for label in (yesno_param_labels or []):
+        visibility_param_combo.Items.Add(label)
+    if default_visibility_label and default_visibility_label in (yesno_param_labels or []):
+        visibility_param_combo.SelectedItem = default_visibility_label
+    elif visibility_param_combo.Items.Count > 0:
+        visibility_param_combo.SelectedIndex = 0
+    if set_visibility_checkbox is not None:
+        set_visibility_checkbox.IsChecked = False
+    if hide_no_scale_checkbox is not None:
+        hide_no_scale_checkbox.IsChecked = False
+        hide_no_scale_checkbox.IsEnabled = False
+
+    def _on_visibility_checked(sender, args):
+        if visibility_param_combo is not None:
+            visibility_param_combo.IsEnabled = True
+        if hide_no_scale_checkbox is not None:
+            hide_no_scale_checkbox.IsEnabled = True
+
+    def _on_visibility_unchecked(sender, args):
+        if visibility_param_combo is not None:
+            visibility_param_combo.IsEnabled = False
+        if hide_no_scale_checkbox is not None:
+            hide_no_scale_checkbox.IsChecked = False
+            hide_no_scale_checkbox.IsEnabled = False
+
+    if set_visibility_checkbox is not None:
+        set_visibility_checkbox.Checked += _on_visibility_checked
+        set_visibility_checkbox.Unchecked += _on_visibility_unchecked
 
     try:
         lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
@@ -393,6 +448,9 @@ def _show_sheet_scale_dialog(
             ignore_drafting_views_checkbox is not None and ignore_drafting_views_checkbox.IsChecked
         ),
         "selected_parameter": selected_param,
+        "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
+        "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
+        "hide_on_no_scale": bool(hide_no_scale_checkbox is not None and hide_no_scale_checkbox.IsChecked),
     }
 
 def _element_id_int(element_id):
@@ -479,6 +537,9 @@ def main():
         )
         return
 
+    yesno_param_labels = _get_yesno_param_entries(titleblocks)
+    last_visibility_param = getattr(config, "visibility_param_name", "") or ""
+
     target_param_name = last_param_name
     target_param_scope = last_param_scope
     target_label = None
@@ -494,6 +555,8 @@ def main():
             prechecked_indices=prechecked_indices,
             default_label=default_label,
             ignore_drafting_views_default=False,
+            yesno_param_labels=yesno_param_labels,
+            default_visibility_label=last_visibility_param if last_visibility_param in yesno_param_labels else None,
         )
     except Exception as ex:
         UI.TaskDialog.Show("Sheet Scale Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -518,10 +581,15 @@ def main():
     target_param_name = entry["name"] if entry else target_label
     target_param_scope = entry["scope"] if entry else "instance"
     ignore_drafting_views = bool(dialog_result.get("ignore_drafting_views", False))
+    set_visibility = bool(dialog_result.get("set_visibility", False))
+    visibility_param_name = dialog_result.get("visibility_param", "")
+    hide_on_no_scale = bool(dialog_result.get("hide_on_no_scale", False))
 
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.sheet_scale_param_name = target_param_name
     config.sheet_scale_param_scope = target_param_scope
+    config.visibility_param_name = visibility_param_name if set_visibility else ""
+    config.hide_on_no_scale = hide_on_no_scale
     save_config()
 
     titleblocks_by_sheet = {}
@@ -606,6 +674,13 @@ def main():
                 sheet_debug["warning"] = warning_message
 
             if not scales:
+                if hide_on_no_scale and set_visibility and visibility_param_name:
+                    try:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(0)
+                    except Exception:
+                        pass
                 if non_legend_view_count and non_legend_view_count == non_legend_drafting_count and ignore_drafting_views:
                     sheet_debug["error"] = "Only drafting views found and ignored"
                     failed_sheets.append(sheet_label + " - Only drafting views found and ignored")
@@ -654,24 +729,40 @@ def main():
                     sheet_scale_param.Set(float(sheet_scale_value))
                     sheet_debug["written_as"] = "Double"
                     sheet_debug["status"] = "SUCCESS"
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 elif sheet_scale_param.StorageType == DB.StorageType.Integer:
                     sheet_scale_param.Set(int(sheet_scale_value))
                     sheet_debug["written_as"] = "Integer"
                     sheet_debug["status"] = "SUCCESS"
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 elif sheet_scale_param.StorageType == DB.StorageType.String:
                     sheet_scale_param.Set(str(sheet_scale_value))
                     sheet_debug["written_as"] = "String"
                     sheet_debug["status"] = "SUCCESS"
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 else:
                     sheet_scale_param.Set(sheet_scale_value)
                     sheet_debug["written_as"] = str(sheet_scale_param.StorageType)
                     sheet_debug["status"] = "SUCCESS"
+                    if set_visibility and visibility_param_name:
+                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                            vis_p.Set(1)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
             except Exception as e:
