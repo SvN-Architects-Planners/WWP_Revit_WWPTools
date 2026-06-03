@@ -1,5 +1,4 @@
-#! python3
-"""Purge unused DirectShape type definitions left by Data Exchange or other connectors."""
+﻿"""Purge unused DirectShape type definitions left by Data Exchange or other connectors."""
 
 from System.Collections.Generic import List
 from pyrevit import revit, DB

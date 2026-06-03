@@ -1,5 +1,4 @@
-#! python3
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 For each source view on a chosen level, create an equivalent view on the
 target level(s), copying the exact ViewFamilyType, ViewTemplate, and all

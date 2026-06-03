@@ -1,5 +1,4 @@
-#! python3
-import clr
+﻿import clr
 import hashlib
 import json
 import math

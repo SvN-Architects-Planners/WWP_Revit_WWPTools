@@ -1,5 +1,4 @@
-#! python3
-"""Mass Stats By Filters - live back-of-house calculations from Revit mass elements."""
+﻿"""Mass Stats By Filters - live back-of-house calculations from Revit mass elements."""
 
 import clr
 import os

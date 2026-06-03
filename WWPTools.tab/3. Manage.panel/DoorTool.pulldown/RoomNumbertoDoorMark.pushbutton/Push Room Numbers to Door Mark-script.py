@@ -1,5 +1,4 @@
-#! python3
-from __future__ import division
+﻿from __future__ import division
 
 import math
 from pyrevit import revit, DB

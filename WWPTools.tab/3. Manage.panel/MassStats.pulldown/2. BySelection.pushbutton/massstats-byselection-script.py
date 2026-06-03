@@ -1,5 +1,4 @@
-#! python3
-"""Mass Stats By Selection - calculate only the selected Revit mass elements."""
+﻿"""Mass Stats By Selection - calculate only the selected Revit mass elements."""
 
 import clr
 import os
