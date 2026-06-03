@@ -132,6 +132,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -141,14 +142,19 @@
                         <Label Content="Source:"
                                VerticalAlignment="Center"/>
                         <ComboBox x:Name="SourceFamilyCmb"
-                                  Grid.Column="1"
-                                  ToolTip="Auto-detected from current selection — change to override"/>
+                                  Grid.Column="1" Grid.ColumnSpan="2"
+                                  ToolTip="Auto-detected from current selection -- change to override"/>
                         <Label Grid.Row="2"
                                Content="Target:"
                                VerticalAlignment="Center"/>
                         <ComboBox x:Name="TargetFamilyCmb"
                                   Grid.Row="2" Grid.Column="1"
                                   ToolTip="Family to swap to"/>
+                        <Button x:Name="SetTargetBtn"
+                                Grid.Row="2" Grid.Column="2"
+                                Content="Set target"
+                                Margin="6,0,0,0"
+                                ToolTip="Discover parameters from the selected target family"/>
                     </Grid>
                 </GroupBox>
 

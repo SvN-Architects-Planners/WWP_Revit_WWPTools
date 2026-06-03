@@ -142,6 +142,7 @@ class FamilySwapperWindow(forms.WPFWindow):
     def _wire_events(self):
         self.SourceFamilyCmb.SelectionChanged += self._on_source_family_changed
         self.TargetFamilyCmb.SelectionChanged += self._on_target_family_changed
+        self.SetTargetBtn.Click   += self._set_target_click
         self.AddTypeRowBtn.Click  += self._add_type_row_click
         self.RemTypeRowBtn.Click  += self._rem_type_row_click
         self.AddParamRowBtn.Click += self._add_param_row_click
@@ -230,8 +231,46 @@ class FamilySwapperWindow(forms.WPFWindow):
         return set(_safe_str(r['OldName']) for r in self._param_dt.Rows if _safe_str(r['OldName']))
 
     # ------------------------------------------------------------------
-    # Discover
+    # Set target / Discover
     # ------------------------------------------------------------------
+
+    def _instances_of_family(self, fam_name):
+        """Return placed titleblock instances belonging to fam_name."""
+        all_tb_types = (DB.FilteredElementCollector(doc)
+                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                        .WhereElementIsElementType()
+                        .ToElements())
+        type_ids = set()
+        for t in all_tb_types:
+            fam = t.Family.Name if t.Family else ''
+            if fam == fam_name:
+                type_ids.add(_id_val(t.Id))
+        all_tbs = (DB.FilteredElementCollector(doc)
+                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                   .WhereElementIsNotElementType()
+                   .ToElements())
+        return [tb for tb in all_tbs if _id_val(tb.GetTypeId()) in type_ids]
+
+    def _set_target_click(self, sender, args):
+        tgt_fam = str(self.TargetFamilyCmb.SelectedItem or '')
+        if not tgt_fam:
+            self._log('Select a target family first.')
+            return
+        instances = self._instances_of_family(tgt_fam)
+        if not instances:
+            self._log('No placed instances of "{}". Place one on a sheet first.'.format(tgt_fam))
+            return
+        tgt_names = _collect_param_names(instances[0])
+        self._tgt_params = tgt_names
+        self.ParamGrid.Columns[1].ItemsSource = _net_str_list(self._tgt_params)
+        tgt_set   = set(tgt_names)
+        tgt_lower = {n.lower(): n for n in tgt_names}
+        for row in self._param_dt.Rows:
+            old = _safe_str(row['OldName'])
+            if old:
+                row['NewName'] = _suggest_target(old, tgt_set, tgt_lower)
+        self._param_dt.AcceptChanges()
+        self._log('Target set: {} parameter(s) from "{}".'.format(len(tgt_names), tgt_fam))
 
     def _discover_click(self, sender, args):
         self._commit_grids()
@@ -240,44 +279,17 @@ class FamilySwapperWindow(forms.WPFWindow):
             self._log('Select source family first.')
             return
 
-        type_name_map = self._read_type_map()
-
-        all_tb_types = (DB.FilteredElementCollector(doc)
-                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsElementType()
-                        .ToElements())
-        src_type_ids, tgt_type_ids = set(), set()
-        tgt_type_names = set(type_name_map.values())
-        for t in all_tb_types:
-            fam = t.Family.Name if t.Family else ''
-            p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
-            typ = p.AsString() if p else ''
-            if fam == src_fam:
-                src_type_ids.add(_id_val(t.Id))
-            if typ in tgt_type_names:
-                tgt_type_ids.add(_id_val(t.Id))
-
-        all_tbs = (DB.FilteredElementCollector(doc)
-                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                   .WhereElementIsNotElementType()
-                   .ToElements())
-        sample_src = next((tb for tb in all_tbs if _id_val(tb.GetTypeId()) in src_type_ids), None)
-        sample_tgt = next((tb for tb in all_tbs if _id_val(tb.GetTypeId()) in tgt_type_ids), None)
-
-        if not sample_src:
+        instances = self._instances_of_family(src_fam)
+        if not instances:
             self._log('No source titleblock instances found.')
             return
 
-        src_names = _collect_param_names(sample_src)
-        tgt_names = _collect_param_names(sample_tgt) if sample_tgt else []
-        tgt_set   = set(tgt_names)
-        tgt_lower = {n.lower(): n for n in tgt_names}
+        src_names = _collect_param_names(instances[0])
+        tgt_set   = set(self._tgt_params)
+        tgt_lower = {n.lower(): n for n in self._tgt_params}
 
-        # Update param column dropdowns
         self._src_params = src_names
-        self._tgt_params = tgt_names
         self.ParamGrid.Columns[0].ItemsSource = _net_str_list(self._src_params)
-        self.ParamGrid.Columns[1].ItemsSource = _net_str_list(self._tgt_params)
 
         existing = self._existing_src_params()
         added = 0
@@ -288,8 +300,8 @@ class FamilySwapperWindow(forms.WPFWindow):
             added += 1
 
         self._log('Discovered {} parameter(s) from source.'.format(added))
-        if not sample_tgt:
-            self._log('  (no target instances found - suggestions unavailable)')
+        if not self._tgt_params:
+            self._log('  (click Set target to populate target parameter suggestions)')
 
     # ------------------------------------------------------------------
     # Run
