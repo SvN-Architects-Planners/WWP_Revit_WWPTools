@@ -49,7 +49,16 @@ def _is_swappable(param):
 
 
 def _collect_param_names(tb_instance):
-    return sorted(set(p.Definition.Name for p in tb_instance.Parameters if _is_swappable(p)))
+    names = set()
+    for p in tb_instance.Parameters:
+        if _is_swappable(p):
+            names.add(p.Definition.Name)
+    ftype = doc.GetElement(tb_instance.GetTypeId())
+    if ftype:
+        for p in ftype.Parameters:
+            if _is_swappable(p):
+                names.add(p.Definition.Name)
+    return sorted(names)
 
 
 def _suggest_target(src_name, tgt_set, tgt_lower):
@@ -414,6 +423,17 @@ class FamilySwapperWindow(forms.WPFWindow):
                             old_vals[n] = ('str', p.AsString())
                         elif p.StorageType == DB.StorageType.Double:
                             old_vals[n] = ('dbl', p.AsDouble())
+                old_ftype = doc.GetElement(tb.GetTypeId())
+                if old_ftype:
+                    for p in old_ftype.Parameters:
+                        if _is_swappable(p) and p.Definition.Name not in old_vals:
+                            n = p.Definition.Name
+                            if p.StorageType == DB.StorageType.Integer:
+                                old_vals[n] = ('int', p.AsInteger())
+                            elif p.StorageType == DB.StorageType.String:
+                                old_vals[n] = ('str', p.AsString())
+                            elif p.StorageType == DB.StorageType.Double:
+                                old_vals[n] = ('dbl', p.AsDouble())
                 was_pinned = tb.Pinned
                 if was_pinned:
                     tb.Pinned = False
@@ -422,11 +442,14 @@ class FamilySwapperWindow(forms.WPFWindow):
                     DB.ElementTransformUtils.MoveElement(doc, tb.Id, DB.XYZ(shift_x_ft, shift_y_ft, 0))
                 if was_pinned:
                     tb.Pinned = True
+                new_ftype = doc.GetElement(tb.GetTypeId())
                 for old_n, new_n in param_map.items():
                     if old_n not in old_vals:
                         continue
                     t_type, val = old_vals[old_n]
                     new_p = tb.LookupParameter(new_n)
+                    if (new_p is None or new_p.IsReadOnly) and new_ftype:
+                        new_p = new_ftype.LookupParameter(new_n)
                     if new_p is None or new_p.IsReadOnly:
                         continue
                     if t_type == 'int':
