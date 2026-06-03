@@ -1,5 +1,6 @@
 import clr
 clr.AddReference('System.Data')
+clr.AddReference('PresentationFramework')
 import System
 import System.Data as SD
 from System.Windows.Controls import DataGridEditingUnit
