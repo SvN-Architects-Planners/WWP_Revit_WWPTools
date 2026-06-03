@@ -183,13 +183,23 @@
                         <DataGrid x:Name="ParamGrid" MinHeight="56" MaxHeight="200" Margin="0,0,0,6">
                             <DataGrid.Columns>
                                 <DataGridComboBoxColumn Header="Source parameter"
-                                    IsComboBoxEditable="True"
                                     SelectedValueBinding="{Binding OldName, UpdateSourceTrigger=LostFocus}"
-                                    Width="*"/>
+                                    Width="*">
+                                    <DataGridComboBoxColumn.EditingElementStyle>
+                                        <Style TargetType="ComboBox">
+                                            <Setter Property="IsEditable" Value="True"/>
+                                        </Style>
+                                    </DataGridComboBoxColumn.EditingElementStyle>
+                                </DataGridComboBoxColumn>
                                 <DataGridComboBoxColumn Header="Target parameter"
-                                    IsComboBoxEditable="True"
                                     SelectedValueBinding="{Binding NewName, UpdateSourceTrigger=LostFocus}"
-                                    Width="*"/>
+                                    Width="*">
+                                    <DataGridComboBoxColumn.EditingElementStyle>
+                                        <Style TargetType="ComboBox">
+                                            <Setter Property="IsEditable" Value="True"/>
+                                        </Style>
+                                    </DataGridComboBoxColumn.EditingElementStyle>
+                                </DataGridComboBoxColumn>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
