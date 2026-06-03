@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `FamilySwapper-script.py`: replaced three em dash characters (`\xe2\x80\x94`) with plain hyphens — IronPython defaults to ASCII and raised `SyntaxError: Non-ASCII character '\xe2'` on load.
 - `FamilySwapper-script.py`: added `clr.AddReference('PresentationFramework')` before the `System.Windows.Controls` import — IronPython raises `ImportError: No module named Controls` without it.
+- `ukcontextbuilder-script.py`, `webcontextbuilder-script.py`: added `clr.AddReference` calls for `System`, `System.Xml`, `PresentationFramework`, `PresentationCore`, and `WindowsBase` before the `from System.*` imports — IronPython does not auto-load these assemblies unlike CPython/pythonnet.
 
 ## [2.0.0] - 2026-05-22
 

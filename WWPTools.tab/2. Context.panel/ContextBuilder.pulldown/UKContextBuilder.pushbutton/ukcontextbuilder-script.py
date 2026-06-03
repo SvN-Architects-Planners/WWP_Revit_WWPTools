@@ -1,4 +1,9 @@
 ﻿import clr
+clr.AddReference('System')
+clr.AddReference('System.Xml')
+clr.AddReference('PresentationFramework')
+clr.AddReference('PresentationCore')
+clr.AddReference('WindowsBase')
 import hashlib
 import json
 import math
