@@ -3,6 +3,7 @@ clr.AddReference('System.Data')
 clr.AddReference('PresentationFramework')
 import System
 import System.Data as SD
+from System.Collections.Generic import List as NList
 from System.Windows.Controls import DataGridEditingUnit, DataGridComboBoxColumn
 
 from pyrevit import revit, DB, forms
@@ -10,6 +11,26 @@ import WWP_uiUtils as ui
 import WWP_telemetry
 
 doc = revit.doc
+
+
+# ---------------------------------------------------------------------------
+# Revit API compatibility
+# ---------------------------------------------------------------------------
+
+def _net_str_list(py_list):
+    """Convert a Python string list to List[String] for WPF ItemsSource binding."""
+    lst = NList[System.String]()
+    for item in py_list:
+        lst.Add(item)
+    return lst
+
+
+def _id_val(eid):
+    """Return the integer value of an ElementId — handles Revit 2025+ (.Value) and older (.IntegerValue)."""
+    try:
+        return eid.Value
+    except AttributeError:
+        return eid.IntegerValue
 
 
 # ---------------------------------------------------------------------------
@@ -22,7 +43,7 @@ def _is_swappable(param):
     valid_types = (DB.StorageType.Integer, DB.StorageType.String, DB.StorageType.Double)
     if param.StorageType not in valid_types:
         return False
-    if param.Id.IntegerValue < 0:
+    if _id_val(param.Id) < 0:
         return False
     return True
 
@@ -57,8 +78,8 @@ class FamilySwapperWindow(forms.WPFWindow):
         self._src_params = []
         self._tgt_params = []
         self._setup_grids()
+        self._wire_events()   # wire before load so SelectionChanged fires on initial selection
         self._load_families()
-        self._wire_events()
 
     # ------------------------------------------------------------------
     # Setup
@@ -135,13 +156,13 @@ class FamilySwapperWindow(forms.WPFWindow):
     def _on_source_family_changed(self, sender, args):
         fam = self.SourceFamilyCmb.SelectedItem
         self._src_types = list(self._family_type_map.get(str(fam), [])) if fam else []
-        self.TypeGrid.Columns[0].ItemsSource = self._src_types
+        self.TypeGrid.Columns[0].ItemsSource = _net_str_list(self._src_types)
         self._rebuild_type_rows()
 
     def _on_target_family_changed(self, sender, args):
         fam = self.TargetFamilyCmb.SelectedItem
         self._tgt_types = list(self._family_type_map.get(str(fam), [])) if fam else []
-        self.TypeGrid.Columns[1].ItemsSource = self._tgt_types
+        self.TypeGrid.Columns[1].ItemsSource = _net_str_list(self._tgt_types)
         # Refresh target suggestions in existing rows
         tgt_set   = set(self._tgt_types)
         tgt_lower = {t.lower(): t for t in self._tgt_types}
@@ -232,16 +253,16 @@ class FamilySwapperWindow(forms.WPFWindow):
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam == src_fam:
-                src_type_ids.add(t.Id.IntegerValue)
+                src_type_ids.add(_id_val(t.Id))
             if typ in tgt_type_names:
-                tgt_type_ids.add(t.Id.IntegerValue)
+                tgt_type_ids.add(_id_val(t.Id))
 
         all_tbs = (DB.FilteredElementCollector(doc)
                    .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
                    .WhereElementIsNotElementType()
                    .ToElements())
-        sample_src = next((tb for tb in all_tbs if tb.GetTypeId().IntegerValue in src_type_ids), None)
-        sample_tgt = next((tb for tb in all_tbs if tb.GetTypeId().IntegerValue in tgt_type_ids), None)
+        sample_src = next((tb for tb in all_tbs if _id_val(tb.GetTypeId()) in src_type_ids), None)
+        sample_tgt = next((tb for tb in all_tbs if _id_val(tb.GetTypeId()) in tgt_type_ids), None)
 
         if not sample_src:
             self._log('No source titleblock instances found.')
@@ -255,8 +276,8 @@ class FamilySwapperWindow(forms.WPFWindow):
         # Update param column dropdowns
         self._src_params = src_names
         self._tgt_params = tgt_names
-        self.ParamGrid.Columns[0].ItemsSource = self._src_params
-        self.ParamGrid.Columns[1].ItemsSource = self._tgt_params
+        self.ParamGrid.Columns[0].ItemsSource = _net_str_list(self._src_params)
+        self.ParamGrid.Columns[1].ItemsSource = _net_str_list(self._tgt_params)
 
         existing = self._existing_src_params()
         added = 0
@@ -325,9 +346,9 @@ class FamilySwapperWindow(forms.WPFWindow):
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam == src_fam:
-                src_type_ids[typ] = t.Id.IntegerValue
+                src_type_ids[typ] = _id_val(t.Id)
             if typ in tgt_type_names:
-                tgt_type_ids[typ] = t.Id.IntegerValue
+                tgt_type_ids[typ] = _id_val(t.Id)
 
         type_id_map = {}
         for src_typ, tgt_typ in type_name_map.items():
@@ -350,7 +371,7 @@ class FamilySwapperWindow(forms.WPFWindow):
                    .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
                    .WhereElementIsNotElementType()
                    .ToElements())
-        remaining = [tb for tb in all_tbs if tb.GetTypeId().IntegerValue in src_id_set]
+        remaining = [tb for tb in all_tbs if _id_val(tb.GetTypeId()) in src_id_set]
         batch     = remaining[:batch_size]
 
         self._log('Source remaining : {}'.format(len(remaining)))
@@ -369,7 +390,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         for tb in batch:
             sheet = None
             try:
-                old_type_id = tb.GetTypeId().IntegerValue
+                old_type_id = _id_val(tb.GetTypeId())
                 sheet = doc.GetElement(tb.OwnerViewId)
                 old_vals = {}
                 for p in tb.Parameters:
