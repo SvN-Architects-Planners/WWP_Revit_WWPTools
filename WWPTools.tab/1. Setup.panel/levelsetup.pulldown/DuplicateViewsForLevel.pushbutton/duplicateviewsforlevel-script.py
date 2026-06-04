@@ -113,6 +113,28 @@ def _views_for_level(doc, level):
     return result
 
 
+def _derive_name(view_name, src_level_name, tgt_level_name):
+    """Derive the target view name by replacing the source level name.
+
+    Strategy 1 - exact or substring match on the full level name string.
+    Strategy 2 - fallback: substitute the last numeric token only.
+    This correctly handles parking levels (LEVEL P1) where the prefix
+    differs from above-ground levels (FLOOR 01).
+    """
+    if view_name == src_level_name:
+        return tgt_level_name
+    if src_level_name and src_level_name in view_name:
+        return view_name.replace(src_level_name, tgt_level_name, 1)
+    # Fallback: number substitution
+    src_nums = re.findall(r'\d+', src_level_name)
+    tgt_nums = re.findall(r'\d+', tgt_level_name)
+    src_num = src_nums[-1] if src_nums else None
+    tgt_num = tgt_nums[-1] if tgt_nums else None
+    if src_num and tgt_num:
+        return re.sub(r'(?<!\d)' + re.escape(src_num) + r'(?!\d)', tgt_num, view_name)
+    return view_name
+
+
 def _copy_writable_params(src, dst):
     """Copy all writable instance parameters from src view to dst view."""
     # Built-in parameters that are set automatically or are meaningless to copy
@@ -213,38 +235,22 @@ def main():
     t.Start()
     try:
         for target_level in target_levels:
-            # Pre-compute the level-number substitution for this target level.
-            # e.g. source "LEVEL 02" → src_num="02", target "LEVEL 00" → tgt_num="00"
-            _src_nums = re.findall(r'\d+', source_level.Name)
-            _tgt_nums = re.findall(r'\d+', target_level.Name)
-            src_num = _src_nums[-1] if _src_nums else None
-            tgt_num = _tgt_nums[-1] if _tgt_nums else None
-
-            # Skip check is by derived name, not by (ViewType, TypeId), so that
-            # multiple views of the same family type can coexist on a level (e.g.
-            # DD_LEVEL 00 and SD_LEVEL 00 are both FloorPlans of the same type).
-            existing_names = {ev.Name for ev in _views_for_level(doc, target_level)}
-            # AreaPlans are still unique per scheme per level (Revit limitation).
-            existing_area_schemes = {
-                ev.AreaScheme.Id.IntegerValue
-                for ev in _views_for_level(doc, target_level)
-                if ev.ViewType == DB.ViewType.AreaPlan and ev.AreaScheme is not None
-            }
+            # Track existing names per view type so floor plans and ceiling plans
+            # don't block each other (they can coexist with the same name in Revit).
+            existing_by_type = {}
+            existing_area_schemes = set()
+            for ev in _views_for_level(doc, target_level):
+                existing_by_type.setdefault(ev.ViewType, set()).add(ev.Name)
+                if ev.ViewType == DB.ViewType.AreaPlan and ev.AreaScheme is not None:
+                    existing_area_schemes.add(ev.AreaScheme.Id.IntegerValue)
 
             for src_view in source_views:
                 vtype = src_view.ViewType
 
-                # Compute derived name up-front so the skip message shows the target name.
-                if src_num and tgt_num:
-                    derived = re.sub(
-                        r'(?<!\d)' + re.escape(src_num) + r'(?!\d)',
-                        tgt_num,
-                        src_view.Name,
-                    )
-                else:
-                    derived = src_view.Name
+                derived = _derive_name(src_view.Name, source_level.Name, target_level.Name)
 
-                # Skip if a view with that derived name already exists on the target.
+                # Skip if a view with that derived name already exists on the target
+                # (checked per view type, not globally).
                 if vtype == DB.ViewType.AreaPlan:
                     src_scheme = src_view.AreaScheme
                     scheme_id = src_scheme.Id.IntegerValue if src_scheme else -1
@@ -252,7 +258,8 @@ def main():
                         skipped.append("'{}' already exists on '{}'".format(derived, target_level.Name))
                         continue
                 else:
-                    if derived in existing_names:
+                    type_names = existing_by_type.get(vtype, set())
+                    if derived in type_names:
                         skipped.append("'{}' already exists on '{}'".format(derived, target_level.Name))
                         continue
 
@@ -267,11 +274,11 @@ def main():
                         new_view = DB.ViewPlan.CreateAreaPlan(doc, src_scheme.Id, target_level.Id)
 
                     else:
-                        skipped.append("'{}' — unsupported type ({})".format(src_view.Name, vtype))
+                        skipped.append("'{}' - unsupported type ({})".format(src_view.Name, vtype))
                         continue
 
                     # Track so subsequent iterations in the same run don't re-create.
-                    existing_names.add(derived)
+                    existing_by_type.setdefault(vtype, set()).add(derived)
                     if vtype == DB.ViewType.AreaPlan:
                         existing_area_schemes.add(scheme_id)
 
@@ -294,7 +301,7 @@ def main():
                     # Copy all writable instance parameters.
                     _copy_writable_params(src_view, new_view)
 
-                    created.append("{} → {}".format(src_view.Name, final_name))
+                    created.append("{} -> {}".format(src_view.Name, final_name))
 
                 except Exception as ex:
                     failed.append("'{}' on '{}': {}".format(src_view.Name, target_level.Name, str(ex)))
