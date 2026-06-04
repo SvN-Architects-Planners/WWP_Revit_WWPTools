@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Level Setup: existing levels are now renamed to the canonical FLOOR XX format when their elevation is updated (e.g. "Level 1" becomes "FLOOR 01"). Avoids name collisions by excluding the level's own current name from the uniqueness check.
 - Level Setup: diagram now draws L1 (or L00) nearest the ground line and the highest floor at the top, matching a real building section orientation.
 - Level Setup: added "Numbering Convention" toggle — choose L01/L02 (North America) or L00/L01 (UK/Europe). The dialog labels, live section diagram, and Revit level names all update accordingly. Levels are created as FLOOR 00, FLOOR 01... in UK mode.
 - Level Setup: redesigned input dialog with two-column layout — structured form (Above Ground / Underground sections with inline label + value rows) alongside a live building cross-section diagram that updates in real time as you type. Floor slabs, level labels (L1, L2… / P1, P2…), and height annotations are drawn dynamically on a sky/earth canvas.

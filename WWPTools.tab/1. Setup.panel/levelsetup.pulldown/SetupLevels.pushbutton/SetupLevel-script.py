@@ -232,6 +232,19 @@ def main():
             existing_names.add(lvl_base.Name)
             created.append(lvl_base.Name)
             levels_by_number[start_num] = [lvl_base]
+        else:
+            lvl_base = base_level_list[0]
+            target_name = _level_name(start_num)
+            if lvl_base.Name != target_name:
+                try:
+                    old_name = lvl_base.Name
+                    new_name = _unique_name(existing_names - {old_name}, target_name)
+                    lvl_base.Name = new_name
+                    existing_names.discard(old_name)
+                    existing_names.add(new_name)
+                    updated.append(new_name)
+                except Exception:
+                    pass
 
         # Update/Create levels above ground
         current_elevation = base_elevation
@@ -249,6 +262,16 @@ def main():
                 level_list.sort(key=lambda l: l.Elevation)
                 lvl = level_list[0]
                 if _set_level_elevation(lvl, current_elevation):
+                    target_name = _level_name(number)
+                    if lvl.Name != target_name:
+                        try:
+                            old_name = lvl.Name
+                            new_name = _unique_name(existing_names - {old_name}, target_name)
+                            lvl.Name = new_name
+                            existing_names.discard(old_name)
+                            existing_names.add(new_name)
+                        except Exception:
+                            pass
                     updated.append(lvl.Name)
             else:
                 lvl = DB.Level.Create(doc, current_elevation)
