@@ -91,6 +91,26 @@ def _unique_name(existing_names, base_name):
         index += 1
 
 
+def _rename_views_for_level(doc, level, old_name, new_name):
+    """Rename plan/RCP views associated with a level when the level is renamed."""
+    try:
+        views = DB.FilteredElementCollector(doc).OfClass(DB.View).ToElements()
+        for view in views:
+            try:
+                if view.IsTemplate:
+                    continue
+                gen_level = getattr(view, "GenLevel", None)
+                if gen_level is None or gen_level.Id != level.Id:
+                    continue
+                if view.Name != old_name:
+                    continue
+                view.Name = new_name
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def _get_levels(doc):
     return list(DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements())
 
@@ -239,6 +259,7 @@ def main():
                 try:
                     old_name = lvl_base.Name
                     new_name = _unique_name(existing_names - {old_name}, target_name)
+                    _rename_views_for_level(doc, lvl_base, old_name, new_name)
                     lvl_base.Name = new_name
                     existing_names.discard(old_name)
                     existing_names.add(new_name)
@@ -267,6 +288,7 @@ def main():
                         try:
                             old_name = lvl.Name
                             new_name = _unique_name(existing_names - {old_name}, target_name)
+                            _rename_views_for_level(doc, lvl, old_name, new_name)
                             lvl.Name = new_name
                             existing_names.discard(old_name)
                             existing_names.add(new_name)
