@@ -281,17 +281,21 @@ class FamilySwapperWindow(forms.WPFWindow):
                         names.add(p.Definition.Name)
                 break
 
-        # Instance parameters - project/shared params apply to all titleblock families,
-        # so any placed titleblock instance gives us the full instance param list.
-        all_tbs = (DB.FilteredElementCollector(doc)
-                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                   .WhereElementIsNotElementType()
-                   .ToElements())
-        for tb in all_tbs:
-            for p in tb.Parameters:
-                if _is_swappable(p):
-                    names.add(p.Definition.Name)
-            break
+        # Instance parameters - read from the project parameter registry.
+        # Project/shared parameters are bound to the TitleBlocks category, not to a
+        # specific family, so ParameterBindings gives the full instance param list
+        # without requiring any placed instance of the target family.
+        tb_cat_id = DB.ElementId(DB.BuiltInCategory.OST_TitleBlocks)
+        it = doc.ParameterBindings.ForwardIterator()
+        it.Reset()
+        while it.MoveNext():
+            binding = it.Current
+            if not isinstance(binding, DB.InstanceBinding):
+                continue
+            for cat in binding.Categories:
+                if _id_val(cat.Id) == _id_val(tb_cat_id):
+                    names.add(it.Key.Name)
+                    break
 
         tgt_names = sorted(names)
         self._tgt_params = tgt_names
