@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Mass Stats: "Export CSV..." button exports one row per mass floor to a CSV file. Columns include all string parameters found on the mass floor and its parent mass (in priority order: Mass ID, Building ID, Block, Program, Site, then alphabetical), plus fixed columns for Level, Design Option, area, and — for rows that match the current filter — GIA ratio, NIA ratio, GIA sqm, NIA sqm, estimated total units, and unit-type breakdown (Studios through 4-Bed+). Opens a Save dialog; the file is UTF-8 with BOM for Excel compatibility. Works in both By Filters and By Selection modes.
+
 ### Fixed
 - Mass Stats (By Filters): removed UTF-8 BOM, box-drawing characters, and Unicode arrow from script — IronPython defaulted to ASCII and raised `SyntaxError: Non-ASCII character` at parse time, preventing the tool from loading.
 - Mass Stats (By Filters, By Selection): DLL loader now selects `net8.0-windows.dll` for Revit 2025+ and `net48.dll` for Revit 2024 and earlier, matching the pattern used by other WPF tools; previously `net48.dll` was always loaded first regardless of Revit version, causing type-resolution errors on Revit 2025+. Switched to `clr.AddReferenceToFileAndPath` where available.
