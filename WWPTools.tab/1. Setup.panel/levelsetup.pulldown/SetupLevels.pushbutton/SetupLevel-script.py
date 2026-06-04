@@ -217,14 +217,20 @@ def main():
 
     existing_names = {lvl.Name for lvl in levels if getattr(lvl, "Name", None)}
 
-    # Determine base elevation from ground level (0 for UK, 1 for Canada)
+    # Determine base elevation.
+    # If below-range levels exist (e.g. FLOOR 00 when switching UK->NA), anchor at
+    # their elevation so the new ground floor shifts down to fill the vacated slot.
     base_elevation = 0.0
     base_level_list = levels_by_number.get(start_num)
-    if base_level_list:
+    below_range = sorted(
+        [level for number, level in candidates if number < start_num],
+        key=lambda l: l.Elevation
+    )
+    if below_range:
+        base_elevation = below_range[0].Elevation
+    elif base_level_list:
         base_level_list.sort(key=lambda l: l.Elevation)
         base_elevation = base_level_list[0].Elevation
-    else:
-        pass
 
     created = []
     updated = []
@@ -256,6 +262,8 @@ def main():
             levels_by_number[start_num] = [lvl_base]
         else:
             lvl_base = base_level_list[0]
+            if lvl_base.Elevation != base_elevation:
+                _set_level_elevation(lvl_base, base_elevation)
             target_name = _level_name(start_num)
             if lvl_base.Name != target_name:
                 try:
@@ -315,14 +323,19 @@ def main():
                 if level_list:
                     level_list.sort(key=lambda l: l.Elevation)
                     lvl = level_list[0]
-                if _set_level_elevation(lvl, target_elevation):
-                    if lvl.Name != _parking_level_name(number):
-                        try:
-                            lvl.Name = _unique_name(existing_names, _parking_level_name(number))
-                            existing_names.add(lvl.Name)
-                        except Exception:
-                            pass
-                    updated.append(lvl.Name)
+                    if _set_level_elevation(lvl, target_elevation):
+                        target_pname = _parking_level_name(number)
+                        if lvl.Name != target_pname:
+                            try:
+                                old_name = lvl.Name
+                                new_name = _unique_name(existing_names - {old_name}, target_pname)
+                                _rename_views_for_level(doc, lvl, old_name, new_name)
+                                lvl.Name = new_name
+                                existing_names.discard(old_name)
+                                existing_names.add(new_name)
+                            except Exception:
+                                pass
+                        updated.append(lvl.Name)
                 else:
                     lvl = DB.Level.Create(doc, target_elevation)
                     lvl.Name = _unique_name(existing_names, _parking_level_name(number))
