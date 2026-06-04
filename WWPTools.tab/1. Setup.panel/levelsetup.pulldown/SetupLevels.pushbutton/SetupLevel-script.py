@@ -240,6 +240,9 @@ def main():
     if level_count < 1:
         level_count = 1
 
+    start_from_zero = bool(inputs.get("start_from_zero", False))
+    start_num = 0 if start_from_zero else 1
+
     h12_mm = _parse_number(inputs.get("height12"), 4500, cast_int=False)
     h23_mm = _parse_number(inputs.get("height23"), 4500, cast_int=False)
     typical_mm = _parse_number(inputs.get("typical_height"), 3000, cast_int=False)
@@ -284,7 +287,7 @@ def main():
     for number, level in candidates:
         levels_by_number.setdefault(number, []).append(level)
 
-    levels_to_delete = [level for number, level in candidates if number > level_count]
+    levels_to_delete = [level for number, level in candidates if number >= start_num + level_count]
     parking_by_number = {}
     for number, level in parking_candidates:
         parking_by_number.setdefault(number, []).append(level)
@@ -304,14 +307,13 @@ def main():
 
     existing_names = {lvl.Name for lvl in levels if getattr(lvl, "Name", None)}
 
-    # Determine base elevation from level 1 if present
+    # Determine base elevation from ground level (0 for UK, 1 for Canada)
     base_elevation = 0.0
-    level1_list = levels_by_number.get(1)
-    if level1_list:
-        level1_list.sort(key=lambda l: l.Elevation)
-        base_elevation = level1_list[0].Elevation
+    base_level_list = levels_by_number.get(start_num)
+    if base_level_list:
+        base_level_list.sort(key=lambda l: l.Elevation)
+        base_elevation = base_level_list[0].Elevation
     else:
-        # create level 1 at elevation 0
         pass
 
     created = []
@@ -335,23 +337,24 @@ def main():
             except Exception:
                 pass
 
-        # Ensure level 1 exists
-        if not level1_list:
-            lvl1 = DB.Level.Create(doc, base_elevation)
-            lvl1.Name = _unique_name(existing_names, _level_name(1))
-            existing_names.add(lvl1.Name)
-            created.append(lvl1.Name)
-            levels_by_number[1] = [lvl1]
+        # Ensure ground level exists (FLOOR 00 in UK, FLOOR 01 in Canada)
+        if not base_level_list:
+            lvl_base = DB.Level.Create(doc, base_elevation)
+            lvl_base.Name = _unique_name(existing_names, _level_name(start_num))
+            existing_names.add(lvl_base.Name)
+            created.append(lvl_base.Name)
+            levels_by_number[start_num] = [lvl_base]
 
-        # Update/Create levels 2..N
+        # Update/Create levels above ground
         current_elevation = base_elevation
-        for number in range(2, level_count + 1):
-            if number == 2:
+        for number in range(start_num + 1, start_num + level_count):
+            offset = number - start_num
+            if offset == 1:
                 current_elevation = base_elevation + h12
-            elif number == 3:
+            elif offset == 2:
                 current_elevation = base_elevation + h12 + h23
             else:
-                current_elevation = base_elevation + h12 + h23 + (number - 3) * typical
+                current_elevation = base_elevation + h12 + h23 + (offset - 2) * typical
 
             level_list = levels_by_number.get(number, [])
             if level_list:

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Level Setup: added "Numbering Convention" toggle — choose L01/L02 (North America) or L00/L01 (UK/Europe). The dialog labels, live section diagram, and Revit level names all update accordingly. Levels are created as FLOOR 00, FLOOR 01... in UK mode.
 - Level Setup: redesigned input dialog with two-column layout — structured form (Above Ground / Underground sections with inline label + value rows) alongside a live building cross-section diagram that updates in real time as you type. Floor slabs, level labels (L1, L2… / P1, P2…), and height annotations are drawn dynamically on a sky/earth canvas.
 - Update WWPTools: split update strategy for DLL-containing updates. Python/config files that changed are now updated in-place immediately (no restart needed), and pyRevit reload is offered. DLL files get a one-click `UpdateWWPTools.bat` written to `%LOCALAPPDATA%\WWPTools\PendingUpdates\` — Explorer opens to it automatically. Close Revit, double-click the script. No git CLI? The bat falls back to PowerShell zip download from GitHub (DLLs only; run Update once more after to sync the git record).
 - Mass Stats: status bar now shows "Calculating..." immediately when a refresh is triggered (Refresh button or auto-refresh debounce), giving instant feedback on slow or linked models.

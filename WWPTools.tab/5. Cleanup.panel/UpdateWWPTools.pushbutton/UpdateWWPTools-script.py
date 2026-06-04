@@ -448,7 +448,7 @@ def _partial_update_non_dll(repo_root, target_branch, files):
 def _write_deferred_update_bat(repo_root, target_branch):
     """Write a self-contained .bat that applies the full update after Revit is closed.
 
-    Primary path: uses git CLI (fetch + reset --hard + clean) — proper update, HEAD advances.
+    Primary path: uses git CLI (fetch + reset --hard + clean) - proper update, HEAD advances.
     Fallback (no git CLI): PowerShell downloads the GitHub archive zip and copies only the
     DLL files. The .git HEAD stays at the old commit, but the DLLs are correct; the NEXT
     run of Update WWPTools will see 0 commits behind (or reconcile cleanly via reset --hard).
@@ -527,7 +527,7 @@ def _write_deferred_update_bat(repo_root, target_branch):
         "git --version >nul 2>&1",
         "if errorlevel 1 goto :nogit",
         "",
-        ":: ── git path: full fetch + reset + clean ────────────────────────────",
+        ":: -- git path: full fetch + reset + clean --",
         "echo  Updating with git...",
         'git -C "{repo}" fetch origin {branch}'.format(repo=repo_norm, branch=target_branch),
         "if errorlevel 1 goto :fail",
@@ -537,7 +537,7 @@ def _write_deferred_update_bat(repo_root, target_branch):
         "if errorlevel 1 goto :fail",
         "goto :success",
         "",
-        ":: ── no-git path: PowerShell zip download (DLLs only) ───────────────",
+        ":: -- no-git path: PowerShell zip download (DLLs only) --",
         ":nogit",
         "echo  Git not found on PATH. Using PowerShell download (DLLs only)...",
         ps_fallback,
@@ -700,18 +700,18 @@ def _update_repo(repo_info, repo_root):
             confirm_msg +
             "\n\nThis update includes DLL files that require Revit to be closed.\n"
             "Python/config files will be updated now. A one-click script will be\n"
-            "prepared for the DLL update — run it after closing Revit."
+            "prepared for the DLL update - run it after closing Revit."
         )
     if not _confirm(confirm_msg, TITLE):
         return
 
     if needs_revit_close:
-        # Step 1 — update Python/config files in-place now (no Revit close needed).
+        # Step 1 - update Python/config files in-place now (no Revit close needed).
         # Only M (modified) non-DLL files are safe to update without a full reset.
         modified_non_dll = _incoming_modified_non_dll_files(repo_root, target_branch)
         python_updated   = _partial_update_non_dll(repo_root, target_branch, modified_non_dll)
 
-        # Step 2 — write deferred bat for the DLL update.
+        # Step 2 - write deferred bat for the DLL update.
         bat_path = _write_deferred_update_bat(repo_root, target_branch)
 
         python_note = (
@@ -724,7 +724,7 @@ def _update_repo(repo_info, repo_root):
             if launched:
                 _alert(
                     "{}A console window is now waiting for Revit to close.\n\n"
-                    "Close Revit — the update will start automatically.\n\n"
+                    "Close Revit - the update will start automatically.\n\n"
                     "Script location (if the window was blocked):\n"
                     "{}".format(python_note, bat_path),
                     TITLE,
@@ -753,7 +753,7 @@ def _update_repo(repo_info, repo_root):
                 TITLE,
             )
 
-        # Step 3 — if Python files were updated, offer a pyRevit reload now.
+        # Step 3 - if Python files were updated, offer a pyRevit reload now.
         if python_updated > 0:
             if _confirm(
                 "{} Python/config file(s) updated successfully.\n\n"
@@ -785,7 +785,7 @@ def _update_repo(repo_info, repo_root):
                     _alert(
                         "{}A WWPTools DLL is locked by Revit.\n\n"
                         "A console window is now waiting for Revit to close.\n"
-                        "Close Revit — the update will finish automatically.\n\n"
+                        "Close Revit - the update will finish automatically.\n\n"
                         "Script location (if the window was blocked):\n"
                         "{}".format(python_note, bat_path),
                         TITLE,

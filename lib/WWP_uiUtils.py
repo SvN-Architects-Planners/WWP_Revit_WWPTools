@@ -977,6 +977,7 @@ def uiUtils_level_setup_inputs(
 		"underground_count": result.UndergroundCount or "",
 		"height_p1_to_l1": result.HeightP1ToL1 or "",
 		"typical_depth": result.TypicalDepth or "",
+		"start_from_zero": bool(result.StartFromZero),
 	}
 
 
