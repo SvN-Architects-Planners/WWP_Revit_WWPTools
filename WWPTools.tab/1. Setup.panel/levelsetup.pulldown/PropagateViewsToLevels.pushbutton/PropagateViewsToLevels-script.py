@@ -11,7 +11,7 @@ from Autodesk.Revit import DB
 import WWP_uiUtils as ui
 
 
-def _show_level_picker(level_names, title="Duplicate Views For Level"):
+def _show_level_picker(level_names, title="Propagate Views To Levels"):
     """Single form with source (single-select) and target (multi-select) level lists."""
     import clr
     clr.AddReference("PresentationFramework")
@@ -197,13 +197,13 @@ def _copy_writable_params(src, dst):
 def main():
     uidoc = __revit__.ActiveUIDocument
     if uidoc is None:
-        ui.uiUtils_alert("No active Revit document found.", title="Duplicate Views For Level")
+        ui.uiUtils_alert("No active Revit document found.", title="Propagate Views To Levels")
         return
 
     doc = uidoc.Document
     levels = _collect_levels(doc)
     if not levels:
-        ui.uiUtils_alert("No levels found in the document.", title="Duplicate Views For Level")
+        ui.uiUtils_alert("No levels found in the document.", title="Propagate Views To Levels")
         return
 
     level_names = [lvl.Name for lvl in levels]
@@ -215,14 +215,14 @@ def main():
     source_level = levels[src_idx]
     target_levels = [levels[i] for i in (tgt_indices or []) if levels[i].Id != source_level.Id]
     if not target_levels:
-        ui.uiUtils_alert("No valid target levels selected.", title="Duplicate Views For Level")
+        ui.uiUtils_alert("No valid target levels selected.", title="Propagate Views To Levels")
         return
 
     source_views = _views_for_level(doc, source_level)
     if not source_views:
         ui.uiUtils_alert(
             "No views found associated with '{}'.".format(source_level.Name),
-            title="Duplicate Views For Level",
+            title="Propagate Views To Levels",
         )
         return
 
@@ -231,7 +231,7 @@ def main():
     failed = []
     skipped = []
 
-    t = DB.Transaction(doc, "Duplicate Views For Level")
+    t = DB.Transaction(doc, "Propagate Views To Levels")
     t.Start()
     try:
         for target_level in target_levels:
@@ -331,11 +331,11 @@ def main():
         summary.append("\nSkipped:")
         summary.extend("  " + n for n in skipped[:20])
 
-    ui.uiUtils_alert("\n".join(summary), title="Duplicate Views For Level")
+    ui.uiUtils_alert("\n".join(summary), title="Propagate Views To Levels")
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception:
-        ui.uiUtils_alert(traceback.format_exc(), title="Duplicate Views For Level - Error")
+        ui.uiUtils_alert(traceback.format_exc(), title="Propagate Views To Levels - Error")

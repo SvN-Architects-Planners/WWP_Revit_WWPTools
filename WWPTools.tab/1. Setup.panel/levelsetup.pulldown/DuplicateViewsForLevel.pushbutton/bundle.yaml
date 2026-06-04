@@ -1,5 +1,0 @@
-title:  "Duplicate\nViews"
-tooltip: |
-  Duplicate all views from a source level to one or more target levels, preserving view type, view template, and all browser-organisation parameters.
-  Version: 2.0.0
-author: "Jason Tian"

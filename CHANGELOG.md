@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Renamed "Duplicate Views For Level" to **Propagate Views to Levels**. Fixed P-level view naming (views now carry the full target level name, e.g. "LEVEL P1", instead of losing the "P" prefix). Fixed ceiling plan / floor plan collision: tracking is now per view type so both can be created with the same name.
 - Level Setup: existing levels are now renamed to the canonical FLOOR XX format when their elevation is updated (e.g. "Level 1" becomes "FLOOR 01"). Avoids name collisions by excluding the level's own current name from the uniqueness check.
 - Level Setup: diagram now draws L1 (or L00) nearest the ground line and the highest floor at the top, matching a real building section orientation.
 - Level Setup: added "Numbering Convention" toggle — choose L01/L02 (North America) or L00/L01 (UK/Europe). The dialog labels, live section diagram, and Revit level names all update accordingly. Levels are created as FLOOR 00, FLOOR 01... in UK mode.
