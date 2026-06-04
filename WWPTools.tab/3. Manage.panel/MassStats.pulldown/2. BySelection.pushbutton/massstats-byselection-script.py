@@ -1,4 +1,4 @@
-﻿"""Mass Stats By Selection - calculate only the selected Revit mass elements."""
+"""Mass Stats By Selection - calculate only the selected Revit mass elements."""
 
 import clr
 import os
@@ -9,19 +9,24 @@ lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib
 
 
 def _load_dll():
-    candidates = [
-        os.path.join(lib_path, "WWPTools.WpfUI.net48.dll"),
-        os.path.join(lib_path, "WWPTools.WpfUI.net8.0-windows.dll"),
-        os.path.join(lib_path, "WWPTools.WpfUI.dll"),
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            clr.AddReference(path)
-            return path
-    raise IOError(
-        "WWPTools.WpfUI DLL not found in {}. "
-        "Build the solution first (Build -> Build Solution).".format(lib_path)
+    try:
+        revit_version = int(str(__revit__.Application.VersionNumber))  # noqa: F821
+    except Exception:
+        revit_version = 0
+    dll_name = (
+        "WWPTools.WpfUI.net8.0-windows.dll" if revit_version >= 2025
+        else "WWPTools.WpfUI.net48.dll"
     )
+    dll_path = os.path.join(lib_path, dll_name)
+    if not os.path.isfile(dll_path):
+        raise IOError(
+            "WWPTools.WpfUI DLL not found in {}. "
+            "Build the solution first (Build -> Build Solution).".format(lib_path)
+        )
+    if hasattr(clr, "AddReferenceToFileAndPath"):
+        clr.AddReferenceToFileAndPath(dll_path)
+    else:
+        clr.AddReference(dll_path)
 
 
 def main():

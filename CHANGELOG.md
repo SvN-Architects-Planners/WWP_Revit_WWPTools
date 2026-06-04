@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Mass Stats (By Filters): removed UTF-8 BOM, box-drawing characters, and Unicode arrow from script — IronPython defaulted to ASCII and raised `SyntaxError: Non-ASCII character` at parse time, preventing the tool from loading.
+- Mass Stats (By Filters, By Selection): DLL loader now selects `net8.0-windows.dll` for Revit 2025+ and `net48.dll` for Revit 2024 and earlier, matching the pattern used by other WPF tools; previously `net48.dll` was always loaded first regardless of Revit version, causing type-resolution errors on Revit 2025+. Switched to `clr.AddReferenceToFileAndPath` where available.
+- Mass Stats: `_isExecuting = true` is now set before `_refreshQueued = false` in the external event handler, closing a race window where a `DocumentChanged` event could permanently block all future dashboard refreshes.
+- Mass Stats: dashboard now auto-refreshes after Save Settings, Save Set, and Delete Set operations; previously the display stayed stale until the user manually clicked Refresh.
+- Mass Stats: `GetElementIdValue` now returns `long` instead of `int`, preventing silent overflow for large Revit 2025+ element IDs (> 2 billion) that corrupted selection-scope filtering in By Selection mode.
+- Mass Stats: `GetDesignOptionSetName` now constructs `ElementId` from `(long)param.AsInteger()` to be compatible with the Revit 2025+ API where the `ElementId(int)` constructor was removed.
+- Mass Stats: `GetFloorAreaFt2` generic fallback now requires an exact "Floor Area" name match instead of a substring `Contains("area")` check, preventing false matches against custom parameters like "Fill Area" or "Surface Area" that would silently produce wrong GEA totals.
+- Mass Stats: removed unreachable `switch(p.StorageType)` block in `WriteUnitCountsToMass` — the preceding guard already ensures `StorageType == Integer`, making the switch and its dead `default` branch unnecessary.
+
 ### Changed
 - Family Swapper: source family is now auto-detected from the current Revit selection (falls back to first available family); target family is a sorted dropdown of all titleblock families in the model; type mapping rows now use `DataGridComboBoxColumn` dropdowns populated from each family's types, with auto-matching by name on family change; parameter mapping rows now use editable `DataGridComboBoxColumn` dropdowns populated by the Discover button.
 - Rolled back 10 scripts from `#! python3` (CPython) to IronPython by removing the engine header — pyRevit 6.4 does not support `forms` under CPython. Scripts that remain on CPython are those with a hard `openpyxl` dependency: `ImportTypeLayers`, `ExportTypeLayers`, `Export2ex`, `Export2exBeta`, `Key Schedule`. Rolled-back scripts: `Add Line Type`, `SetupLevel`, `DuplicateViewsForLevel`, `CreateViewsFromLevel`, `WipeDataExchange`, `massstats-byfilters`, `massstats-byselection`, `Push Room Numbers to Door Mark`, `ukcontextbuilder`, `webcontextbuilder`.
