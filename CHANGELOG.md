@@ -8,9 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Mass Stats: status bar now shows "Calculating..." immediately when a refresh is triggered (Refresh button or auto-refresh debounce), giving instant feedback on slow or linked models.
+- Mass Stats: Delete Set now requires confirmation before removing a saved set (the action is non-undoable).
+- Mass Stats: "Write units to mass" button is now disabled until a write target parameter is selected; enables automatically when a parameter is chosen.
 - Mass Stats: "Export CSV..." button exports one row per mass floor to a CSV file. Columns include all string parameters found on the mass floor and its parent mass (in priority order: Mass ID, Building ID, Block, Program, Site, then alphabetical), plus fixed columns for Level, Design Option, area, and — for rows that match the current filter — GIA ratio, NIA ratio, GIA sqm, NIA sqm, estimated total units, and unit-type breakdown (Studios through 4-Bed+). Opens a Save dialog; the file is UTF-8 with BOM for Excel compatibility. Works in both By Filters and By Selection modes.
 
 ### Fixed
+- Mass Stats: all hardcoded hex colour values in XAML replaced with theme token references (`SurfaceBrush`, `AccentSoftBrush`, `DangerBrush`, `DangerSoftBrush`, `TextBrush`) — error panel and accent card were visually mismatched against the rest of the UI.
+- Mass Stats: `FontWeight="Medium"` on the Button base style in `FlatTheme.xaml` changed to `SemiBold`; `Segoe UI Variable` has no weight-500 face so all buttons were silently rendering at Normal weight.
+- Mass Stats: filter row labels ("Parameter", "Operator", "Value") now use the `MutedBrush` theme token instead of `Brushes.Gray` (#808080 vs the theme's #5F7185).
+- Mass Stats: combo boxes (`CboSavedSet`, `CboMixParam`, `CboWriteParam`) no longer override `Height="28"` — they now use the theme's `MinHeight="34"` and render at the same height as adjacent buttons.
+- Mass Stats: removed the unused `CardValueLarge` XAML style (dead code, was never applied).
 - Mass Stats (By Filters): removed UTF-8 BOM, box-drawing characters, and Unicode arrow from script — IronPython defaulted to ASCII and raised `SyntaxError: Non-ASCII character` at parse time, preventing the tool from loading.
 - Mass Stats (By Filters, By Selection): DLL loader now selects `net8.0-windows.dll` for Revit 2025+ and `net48.dll` for Revit 2024 and earlier, matching the pattern used by other WPF tools; previously `net48.dll` was always loaded first regardless of Revit version, causing type-resolution errors on Revit 2025+. Switched to `clr.AddReferenceToFileAndPath` where available.
 - Mass Stats: `_isExecuting = true` is now set before `_refreshQueued = false` in the external event handler, closing a race window where a `DocumentChanged` event could permanently block all future dashboard refreshes.
