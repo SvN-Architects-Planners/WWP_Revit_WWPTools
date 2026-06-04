@@ -21,8 +21,9 @@ RELEASES_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/re
 SUPPORTED_UPDATE_BRANCHES = ("main", "pyrevit-6.1", "pyrevit-6.4")
 
 # Windows process-creation flags (safe fallback for IronPython)
-_DETACHED_PROCESS       = getattr(subprocess, "DETACHED_PROCESS",       0x00000008)
+_DETACHED_PROCESS         = getattr(subprocess, "DETACHED_PROCESS",         0x00000008)
 _CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+_CREATE_NEW_CONSOLE       = 0x00000010  # opens a visible console window for the child process
 
 
 def _revit_ui():
@@ -502,9 +503,25 @@ def _write_deferred_update_bat(repo_root, target_branch):
     lines = [
         "@echo off",
         "setlocal",
+        "title WWPTools Update",
         "echo.",
         "echo  WWPTools Update",
         "echo  ================",
+        "echo.",
+        ":: Wait for all Revit.exe processes to exit before updating",
+        ":waitrevit",
+        'tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul 2>&1',
+        "if not errorlevel 1 (",
+        "  echo  Revit is still running. Close Revit to continue...",
+        "  timeout /t 5 /nobreak >nul",
+        "  cls",
+        "  echo.",
+        "  echo  WWPTools Update",
+        "  echo  ================",
+        "  echo.",
+        "  goto :waitrevit",
+        ")",
+        "echo  Revit has closed. Starting update...",
         "echo.",
         ":: Check whether git is available on PATH",
         "git --version >nul 2>&1",
@@ -550,6 +567,19 @@ def _write_deferred_update_bat(repo_root, target_branch):
         return bat_path
     except Exception:
         return None
+
+
+def _launch_bat_in_console(bat_path):
+    """Spawn the bat file in a new visible console window, detached from Revit.
+    Returns True if the process launched successfully."""
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", bat_path],
+            creationflags=_CREATE_NEW_CONSOLE | _CREATE_NEW_PROCESS_GROUP,
+        )
+        return True
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -690,25 +720,32 @@ def _update_repo(repo_info, repo_root):
         )
 
         if bat_path:
-            _alert(
-                "{}DLL files require Revit to be closed before they can be replaced.\n\n"
-                "A one-click update script has been prepared:\n"
-                "{}\n\n"
-                "1. Close Revit completely.\n"
-                "2. Double-click the script to apply the DLL update.\n\n"
-                "The script deletes itself after running.\n"
-                "(No git CLI? The script will download the DLLs from GitHub instead.)".format(
-                    python_note, bat_path),
-                TITLE,
-            )
-            try:
-                subprocess.Popen(
-                    ["explorer", "/select,", bat_path],
-                    shell=False,
-                    creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            launched = _launch_bat_in_console(bat_path)
+            if launched:
+                _alert(
+                    "{}A console window is now waiting for Revit to close.\n\n"
+                    "Close Revit — the update will start automatically.\n\n"
+                    "Script location (if the window was blocked):\n"
+                    "{}".format(python_note, bat_path),
+                    TITLE,
                 )
-            except Exception:
-                pass
+            else:
+                _alert(
+                    "{}DLL files require Revit to be closed before they can be replaced.\n\n"
+                    "Double-click this script after closing Revit:\n"
+                    "{}\n\n"
+                    "(No git CLI? The script will download the DLLs from GitHub instead.)".format(
+                        python_note, bat_path),
+                    TITLE,
+                )
+                try:
+                    subprocess.Popen(
+                        ["explorer", "/select,", bat_path],
+                        shell=False,
+                        creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+                    )
+                except Exception:
+                    pass
         else:
             _alert(
                 "{}DLL files require Revit to be closed before they can be replaced.\n\n"
@@ -743,23 +780,31 @@ def _update_repo(repo_info, repo_root):
                 if python_updated > 0 else ""
             )
             if bat_path:
-                _alert(
-                    "{}A WWPTools DLL is locked by Revit.\n\n"
-                    "A one-click update script has been prepared:\n"
-                    "{}\n\n"
-                    "1. Close Revit completely.\n"
-                    "2. Double-click the script to finish the DLL update.".format(
-                        python_note, bat_path),
-                    TITLE,
-                )
-                try:
-                    subprocess.Popen(
-                        ["explorer", "/select,", bat_path],
-                        shell=False,
-                        creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+                launched = _launch_bat_in_console(bat_path)
+                if launched:
+                    _alert(
+                        "{}A WWPTools DLL is locked by Revit.\n\n"
+                        "A console window is now waiting for Revit to close.\n"
+                        "Close Revit — the update will finish automatically.\n\n"
+                        "Script location (if the window was blocked):\n"
+                        "{}".format(python_note, bat_path),
+                        TITLE,
                     )
-                except Exception:
-                    pass
+                else:
+                    _alert(
+                        "{}A WWPTools DLL is locked by Revit.\n\n"
+                        "Double-click this script after closing Revit:\n"
+                        "{}".format(python_note, bat_path),
+                        TITLE,
+                    )
+                    try:
+                        subprocess.Popen(
+                            ["explorer", "/select,", bat_path],
+                            shell=False,
+                            creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+                        )
+                    except Exception:
+                        pass
             else:
                 _alert(
                     "{}A WWPTools DLL is locked by Revit.\n\n"
