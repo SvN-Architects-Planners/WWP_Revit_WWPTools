@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Update WWPTools: when an update includes locked DLLs, a one-click update script (`UpdateWWPTools.bat`) is now written to `%LOCALAPPDATA%\WWPTools\PendingUpdates\` and Explorer opens to it automatically. Close Revit, double-click the script — it fetches and applies the update, then deletes itself. No more "close Revit and try again" dead end.
+- Update WWPTools: split update strategy for DLL-containing updates. Python/config files that changed are now updated in-place immediately (no restart needed), and pyRevit reload is offered. DLL files get a one-click `UpdateWWPTools.bat` written to `%LOCALAPPDATA%\WWPTools\PendingUpdates\` — Explorer opens to it automatically. Close Revit, double-click the script. No git CLI? The bat falls back to PowerShell zip download from GitHub (DLLs only; run Update once more after to sync the git record).
 - Mass Stats: status bar now shows "Calculating..." immediately when a refresh is triggered (Refresh button or auto-refresh debounce), giving instant feedback on slow or linked models.
 - Mass Stats: Delete Set now requires confirmation before removing a saved set (the action is non-undoable).
 - Mass Stats: "Write units to mass" button is now disabled until a write target parameter is selected; enables automatically when a parameter is chosen.
