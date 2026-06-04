@@ -251,21 +251,24 @@ class FamilySwapperWindow(forms.WPFWindow):
     # ------------------------------------------------------------------
 
     def _instances_of_family(self, fam_name):
-        """Return placed titleblock instances belonging to fam_name."""
-        all_tb_types = (DB.FilteredElementCollector(doc)
-                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsElementType()
-                        .ToElements())
+        """Return placed instances of fam_name using the source family's category."""
+        cat_id = self._src_cat_id
+        if cat_id is None:
+            return []
+        all_types = (DB.FilteredElementCollector(doc)
+                     .OfCategoryId(cat_id)
+                     .WhereElementIsElementType()
+                     .ToElements())
         type_ids = set()
-        for t in all_tb_types:
+        for t in all_types:
             fam = t.Family.Name if t.Family else ''
             if fam == fam_name:
                 type_ids.add(_id_val(t.Id))
-        all_tbs = (DB.FilteredElementCollector(doc)
-                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                   .WhereElementIsNotElementType()
-                   .ToElements())
-        return [tb for tb in all_tbs if _id_val(tb.GetTypeId()) in type_ids]
+        all_instances = (DB.FilteredElementCollector(doc)
+                         .OfCategoryId(cat_id)
+                         .WhereElementIsNotElementType()
+                         .ToElements())
+        return [inst for inst in all_instances if _id_val(inst.GetTypeId()) in type_ids]
 
     def _set_target_click(self, sender, args):
         tgt_fam = str(self.TargetFamilyCmb.SelectedItem or '')
@@ -284,7 +287,6 @@ class FamilySwapperWindow(forms.WPFWindow):
         # filtered to the source family's category (not hardcoded to OST_TitleBlocks).
         cat_id_val = _id_val(cat_id)
         it = doc.ParameterBindings.ForwardIterator()
-        it.Reset()
         while it.MoveNext():
             for cat in it.Current.Categories:
                 if _id_val(cat.Id) == cat_id_val:
@@ -301,7 +303,7 @@ class FamilySwapperWindow(forms.WPFWindow):
             if old:
                 row['NewName'] = _suggest_target(old, tgt_set, tgt_lower)
         self._param_dt.AcceptChanges()
-        self._log('Target set: {} parameter(s) from "{}".'.format(len(tgt_names), tgt_fam))
+        self._log('Target set: {} parameter(s) available for "{}".'.format(len(tgt_names), tgt_fam))
 
     def _discover_click(self, sender, args):
         self._commit_grids()
@@ -312,7 +314,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         instances = self._instances_of_family(src_fam)
         if not instances:
-            self._log('No source titleblock instances found.')
+            self._log('No placed instances of source family found.')
             return
 
         src_names = _collect_param_names(instances[0])
@@ -378,19 +380,28 @@ class FamilySwapperWindow(forms.WPFWindow):
             if old:
                 param_map[old] = new if new else old
 
-        all_tb_types = (DB.FilteredElementCollector(doc)
-                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsElementType()
-                        .ToElements())
+        cat_id = self._src_cat_id
+        if cat_id is None:
+            self._log('ERROR: Source family category unknown. Re-select source family.')
+            return
+        tgt_fam = str(self.TargetFamilyCmb.SelectedItem or '')
+        if not tgt_fam:
+            self._log('ERROR: Select target family.')
+            return
+
+        all_types = (DB.FilteredElementCollector(doc)
+                     .OfCategoryId(cat_id)
+                     .WhereElementIsElementType()
+                     .ToElements())
         src_type_ids, tgt_type_ids = {}, {}
         tgt_type_names = set(type_name_map.values())
-        for t in all_tb_types:
+        for t in all_types:
             fam = t.Family.Name if t.Family else ''
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam == src_fam:
                 src_type_ids[typ] = _id_val(t.Id)
-            if typ in tgt_type_names:
+            if fam == tgt_fam and typ in tgt_type_names:
                 tgt_type_ids[typ] = _id_val(t.Id)
 
         type_id_map = {}
@@ -411,7 +422,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         src_id_set = set(type_id_map.keys())
         all_tbs = (DB.FilteredElementCollector(doc)
-                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                   .OfCategoryId(cat_id)
                    .WhereElementIsNotElementType()
                    .ToElements())
         remaining = [tb for tb in all_tbs if _id_val(tb.GetTypeId()) in src_id_set]
@@ -428,6 +439,7 @@ class FamilySwapperWindow(forms.WPFWindow):
         do_shift   = shift_x_mm != 0 or shift_y_mm != 0
 
         ok, errors = 0, []
+        type_param_skipped = set()
         t = DB.Transaction(doc, 'Family Swapper')
         t.Start()
         for tb in batch:
@@ -470,9 +482,11 @@ class FamilySwapperWindow(forms.WPFWindow):
                         continue
                     t_type, val = old_vals[old_n]
                     new_p = tb.LookupParameter(new_n)
-                    if (new_p is None or new_p.IsReadOnly) and new_ftype:
-                        new_p = new_ftype.LookupParameter(new_n)
                     if new_p is None or new_p.IsReadOnly:
+                        # Skip type params -- writing them affects every instance of the
+                        # new type, not just this one. Track for end-of-run notice.
+                        if new_ftype and new_ftype.LookupParameter(new_n):
+                            type_param_skipped.add(new_n)
                         continue
                     if t_type == 'int':
                         new_p.Set(val)
@@ -492,6 +506,10 @@ class FamilySwapperWindow(forms.WPFWindow):
             self._log('{} sheet(s) still pending - run again.'.format(left))
         else:
             self._log('All done!')
+        if type_param_skipped:
+            self._log('\nNote: {} type parameter(s) skipped (type params affect all instances, edit manually):'.format(len(type_param_skipped)))
+            for name in sorted(type_param_skipped):
+                self._log('  ' + name)
         if errors:
             self._log('\nErrors ({}) :'.format(len(errors)))
             for err in errors:
