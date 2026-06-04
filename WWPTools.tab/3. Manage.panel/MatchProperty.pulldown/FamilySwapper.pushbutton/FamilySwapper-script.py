@@ -82,6 +82,8 @@ class FamilySwapperWindow(forms.WPFWindow):
     def __init__(self):
         forms.WPFWindow.__init__(self, 'FamilySwapper.xaml')
         self._family_type_map = {}   # {family_name: [sorted type names]}
+        self._family_cat_map  = {}   # {family_name: category ElementId}
+        self._src_cat_id = None
         self._src_types = []
         self._tgt_types = []
         self._src_params = []
@@ -111,6 +113,7 @@ class FamilySwapperWindow(forms.WPFWindow):
                         .WhereElementIsElementType()
                         .ToElements())
         fam_types = {}
+        fam_cats  = {}
         for t in all_tb_types:
             fam = t.Family.Name if t.Family else ''
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
@@ -120,9 +123,12 @@ class FamilySwapperWindow(forms.WPFWindow):
                     fam_types[fam] = []
                 if typ and typ not in fam_types[fam]:
                     fam_types[fam].append(typ)
+                if fam not in fam_cats and t.Category:
+                    fam_cats[fam] = t.Category.Id
         for fam in fam_types:
             fam_types[fam].sort()
         self._family_type_map = fam_types
+        self._family_cat_map  = fam_cats
 
         families = sorted(fam_types.keys())
         for fam in families:
@@ -165,7 +171,8 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def _on_source_family_changed(self, sender, args):
         fam = self.SourceFamilyCmb.SelectedItem
-        self._src_types = list(self._family_type_map.get(str(fam), [])) if fam else []
+        self._src_types  = list(self._family_type_map.get(str(fam), [])) if fam else []
+        self._src_cat_id = self._family_cat_map.get(str(fam)) if fam else None
         self.TypeGrid.Columns[0].ItemsSource = _net_str_list(self._src_types)
         self._rebuild_type_rows()
 
@@ -266,15 +273,21 @@ class FamilySwapperWindow(forms.WPFWindow):
             self._log('Select a target family first.')
             return
 
+        cat_id = self._src_cat_id
+        if cat_id is None:
+            self._log('Select source family first so its category is known.')
+            return
+
         names = set()
 
-        # Read all parameters (instance and type) from the project parameter registry.
-        tb_cat_id = DB.ElementId(DB.BuiltInCategory.OST_TitleBlocks)
+        # Read all parameters (instance and type) from the project parameter registry,
+        # filtered to the source family's category (not hardcoded to OST_TitleBlocks).
+        cat_id_val = _id_val(cat_id)
         it = doc.ParameterBindings.ForwardIterator()
         it.Reset()
         while it.MoveNext():
             for cat in it.Current.Categories:
-                if _id_val(cat.Id) == _id_val(tb_cat_id):
+                if _id_val(cat.Id) == cat_id_val:
                     names.add(it.Key.Name)
                     break
 
