@@ -268,31 +268,12 @@ class FamilySwapperWindow(forms.WPFWindow):
 
         names = set()
 
-        # Type parameters - read directly from FamilySymbol (no placed instance needed)
-        all_tb_types = (DB.FilteredElementCollector(doc)
-                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsElementType()
-                        .ToElements())
-        for t in all_tb_types:
-            fam = t.Family.Name if t.Family else ''
-            if fam == tgt_fam:
-                for p in t.Parameters:
-                    if _is_swappable(p):
-                        names.add(p.Definition.Name)
-                break
-
-        # Instance parameters - read from the project parameter registry.
-        # Project/shared parameters are bound to the TitleBlocks category, not to a
-        # specific family, so ParameterBindings gives the full instance param list
-        # without requiring any placed instance of the target family.
+        # Read all parameters (instance and type) from the project parameter registry.
         tb_cat_id = DB.ElementId(DB.BuiltInCategory.OST_TitleBlocks)
         it = doc.ParameterBindings.ForwardIterator()
         it.Reset()
         while it.MoveNext():
-            binding = it.Current
-            if not isinstance(binding, DB.InstanceBinding):
-                continue
-            for cat in binding.Categories:
+            for cat in it.Current.Categories:
                 if _id_val(cat.Id) == _id_val(tb_cat_id):
                     names.add(it.Key.Name)
                     break
