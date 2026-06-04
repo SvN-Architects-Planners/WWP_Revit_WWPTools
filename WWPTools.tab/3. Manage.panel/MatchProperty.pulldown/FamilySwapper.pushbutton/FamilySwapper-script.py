@@ -265,11 +265,35 @@ class FamilySwapperWindow(forms.WPFWindow):
         if not tgt_fam:
             self._log('Select a target family first.')
             return
-        instances = self._instances_of_family(tgt_fam)
-        if not instances:
-            self._log('No placed instances of "{}". Place one on a sheet first.'.format(tgt_fam))
-            return
-        tgt_names = _collect_param_names(instances[0])
+
+        names = set()
+
+        # Type parameters - read directly from FamilySymbol (no placed instance needed)
+        all_tb_types = (DB.FilteredElementCollector(doc)
+                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                        .WhereElementIsElementType()
+                        .ToElements())
+        for t in all_tb_types:
+            fam = t.Family.Name if t.Family else ''
+            if fam == tgt_fam:
+                for p in t.Parameters:
+                    if _is_swappable(p):
+                        names.add(p.Definition.Name)
+                break
+
+        # Instance parameters - project/shared params apply to all titleblock families,
+        # so any placed titleblock instance gives us the full instance param list.
+        all_tbs = (DB.FilteredElementCollector(doc)
+                   .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
+                   .WhereElementIsNotElementType()
+                   .ToElements())
+        for tb in all_tbs:
+            for p in tb.Parameters:
+                if _is_swappable(p):
+                    names.add(p.Definition.Name)
+            break
+
+        tgt_names = sorted(names)
         self._tgt_params = tgt_names
         self.ParamGrid.Columns[1].ItemsSource = _net_str_list(self._tgt_params)
         tgt_set   = set(tgt_names)
