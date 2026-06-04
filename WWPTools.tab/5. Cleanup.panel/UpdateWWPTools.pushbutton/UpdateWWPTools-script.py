@@ -3,6 +3,7 @@ __context__ = "zero-doc"
 import os
 import subprocess
 import sys
+import tempfile
 import traceback
 
 from pyrevit import script  # type: ignore
@@ -381,6 +382,63 @@ def _show_not_repo_message():
 
 
 # ---------------------------------------------------------------------------
+# Deferred update (for DLL-locked updates that require Revit to be closed)
+# ---------------------------------------------------------------------------
+
+def _write_deferred_update_bat(repo_root, target_branch):
+    """Write a self-contained .bat that runs the git update after Revit is closed.
+    Returns the path to the written file, or None on failure.
+    """
+    base_dir = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    out_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "PendingUpdates"))
+    try:
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
+    except Exception:
+        out_dir = tempfile.gettempdir()
+
+    bat_path = os.path.normpath(os.path.join(out_dir, "UpdateWWPTools.bat"))
+    repo_norm = os.path.normpath(repo_root)
+    remote = "origin/{}".format(target_branch)
+
+    lines = [
+        "@echo off",
+        "setlocal",
+        "echo.",
+        "echo  WWPTools Update",
+        "echo  ================",
+        "echo.",
+        "echo  Fetching latest version from GitHub...",
+        'git -C "{repo}" fetch origin {branch}'.format(repo=repo_norm, branch=target_branch),
+        "if errorlevel 1 goto :fail",
+        'git -C "{repo}" reset --hard {remote}'.format(repo=repo_norm, remote=remote),
+        "if errorlevel 1 goto :fail",
+        'git -C "{repo}" clean -ffdx'.format(repo=repo_norm),
+        "if errorlevel 1 goto :fail",
+        "echo.",
+        "echo  WWPTools updated successfully.",
+        "echo  Start Revit to use the new version.",
+        "echo.",
+        "goto :done",
+        ":fail",
+        "echo.",
+        "echo  Update failed. See the error above.",
+        "echo.",
+        ":done",
+        "pause",
+        # Reliable self-delete: redirect goto to suppress the error, then delete this file
+        "(goto) 2>nul & del /f /q \"%~f0\"",
+    ]
+
+    try:
+        with open(bat_path, "w") as fh:
+            fh.write("\r\n".join(lines) + "\r\n")
+        return bat_path
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Main update flow
 # ---------------------------------------------------------------------------
 
@@ -503,22 +561,63 @@ def _update_repo(repo_info, repo_root):
         return
 
     if needs_revit_close:
-        _alert(
-            "This update includes DLL files that Revit can not replace while it is running.\n\n"
-            "Please close Revit completely, then run Update WWPTools again.",
-            TITLE,
-        )
+        bat_path = _write_deferred_update_bat(repo_root, target_branch)
+        if bat_path:
+            _alert(
+                "This update includes DLL files that Revit can not replace while it is running.\n\n"
+                "A one-click update script has been prepared:\n"
+                "{}\n\n"
+                "Steps:\n"
+                "1. Close Revit completely.\n"
+                "2. Double-click the script above to apply the update.\n\n"
+                "The script deletes itself after running.".format(bat_path),
+                TITLE,
+            )
+            # Open Explorer to the folder so the user can see the script
+            try:
+                subprocess.Popen(
+                    ["explorer", "/select,", bat_path],
+                    shell=False,
+                    creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+                )
+            except Exception:
+                pass
+        else:
+            _alert(
+                "This update includes DLL files that Revit can not replace while it is running.\n\n"
+                "Please close Revit completely, then run Update WWPTools again.",
+                TITLE,
+            )
         return
 
     try:
         updated_repo = _sync_to_github(repo_root, target_branch)
     except Exception as sync_err:
         if _is_revit_locked_update_error(sync_err):
-            _alert(
-                "A WWPTools DLL is locked by Revit.\n\n"
-                "Please close Revit completely, then run Update WWPTools again.",
-                TITLE,
-            )
+            bat_path = _write_deferred_update_bat(repo_root, target_branch)
+            if bat_path:
+                _alert(
+                    "A WWPTools DLL is locked by Revit.\n\n"
+                    "A one-click update script has been prepared:\n"
+                    "{}\n\n"
+                    "1. Close Revit completely.\n"
+                    "2. Double-click the script to finish the update.".format(bat_path),
+                    TITLE,
+                )
+                try:
+                    subprocess.Popen(
+                        ["explorer", "/select,", bat_path],
+                        shell=False,
+                        creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+                    )
+                except Exception:
+                    pass
+            else:
+                _alert(
+                    "A WWPTools DLL is locked by Revit.\n\n"
+                    "Please close Revit completely, then run Update WWPTools again.",
+                    TITLE,
+                )
             return
         raise
 
