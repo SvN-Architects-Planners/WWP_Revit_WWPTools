@@ -195,16 +195,18 @@ def main():
     for number, level in candidates:
         levels_by_number.setdefault(number, []).append(level)
 
-    levels_to_delete = [level for number, level in candidates if number >= start_num + level_count]
+    levels_to_delete = [
+        level for number, level in candidates
+        if number < start_num or number >= start_num + level_count
+    ]
     parking_by_number = {}
     for number, level in parking_candidates:
         parking_by_number.setdefault(number, []).append(level)
     parking_to_delete = [level for number, level in parking_candidates if number > underground_count]
     if levels_to_delete or parking_to_delete:
         delete_names = [lvl.Name for lvl in levels_to_delete + parking_to_delete]
-        message = "Delete {} levels above {}?\n\n{}".format(
+        message = "Remove {} level(s) outside the target range?\n\n{}".format(
             len(delete_names),
-            level_count,
             "\n".join(delete_names[:20]),
         )
         if len(delete_names) > 20:
