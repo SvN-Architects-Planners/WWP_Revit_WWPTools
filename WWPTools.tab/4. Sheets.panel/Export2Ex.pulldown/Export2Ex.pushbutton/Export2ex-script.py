@@ -35,6 +35,7 @@ CONFIG_LAST_CSV_COLUMN_HEADERS = "last_csv_column_headers"
 CONFIG_LAST_CSV_GROUP_HEADERS = "last_csv_group_headers"
 CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
 CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
+CONFIG_LAST_USE_CATEGORY_SHEET_NAME = "last_use_category_sheet_name"
 LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 PARAM_SAVED_SETS = "! P_STATS_Export_Text"
@@ -62,6 +63,29 @@ def sanitize_file_name(name):
     invalid = r'[<>:"/\\|?*]'
     safe = re.sub(invalid, "_", name).strip()
     return safe or "Schedule"
+
+
+def _get_schedule_category_name(doc, view):
+    """Return the Revit category name for a schedule view, falling back to view.Name."""
+    try:
+        cat_id = view.Definition.CategoryId
+        if cat_id is None:
+            return view.Name
+        try:
+            cat = DB.Category.GetCategory(doc, cat_id)
+            if cat is not None:
+                return cat.Name
+        except Exception:
+            pass
+        for cat in doc.Settings.Categories:
+            try:
+                if cat.Id.IntegerValue == cat_id.IntegerValue:
+                    return cat.Name
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return view.Name
 
 
 def normalize_excel_output_path(path, default_ext=".xlsx"):
@@ -481,6 +505,7 @@ def _show_export_form(
     last_text_qualifier,
     saved_sets,
     doc,
+    last_use_category_sheet_name=False,
 ):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -529,6 +554,8 @@ def _show_export_form(
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
+    use_category_sheet_name_ctrl = window.FindName("UseCategorySheetName")
+    batch_export_button = window.FindName("BatchExportButton")
 
     schedule_list.ItemsSource = _to_net_list(items)
     delimiter_items = [
@@ -576,6 +603,9 @@ def _show_export_form(
         csv_mode.IsChecked = True
     else:
         excel_mode.IsChecked = True
+
+    if use_category_sheet_name_ctrl is not None:
+        use_category_sheet_name_ctrl.IsChecked = bool(last_use_category_sheet_name)
 
     try:
         lib_path = os.path.abspath(os.path.join(dialog_script_dir, "..", "..", "..", "lib"))
@@ -648,6 +678,9 @@ def _show_export_form(
             "export_column_headers": bool(export_column_headers.IsChecked),
             "export_group_headers": bool(export_group_headers.IsChecked),
             "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
+            "excel_path": excel_path.Text or "",
+            "csv_folder": csv_folder.Text or "",
+            "use_category_sheet_name": bool(use_category_sheet_name_ctrl.IsChecked) if use_category_sheet_name_ctrl is not None else False,
         }
 
     def _save_sets_to_project():
@@ -693,6 +726,14 @@ def _show_export_form(
             export_column_headers.IsChecked = bool(set_data.get("export_column_headers", True))
             export_group_headers.IsChecked = bool(set_data.get("export_group_headers", False))
             export_grouped_column_headers.IsChecked = bool(set_data.get("export_grouped_column_headers", False))
+            if use_category_sheet_name_ctrl is not None:
+                use_category_sheet_name_ctrl.IsChecked = bool(set_data.get("use_category_sheet_name", False))
+            saved_excel = set_data.get("excel_path", "")
+            if saved_excel:
+                excel_path.Text = saved_excel
+            saved_csv = set_data.get("csv_folder", "")
+            if saved_csv:
+                csv_folder.Text = saved_csv
         except Exception:
             pass
 
@@ -727,6 +768,40 @@ def _show_export_form(
         _save_sets_to_project()
         saved_set_box.Text = ""
         _refresh_saved_set_dropdown()
+
+    _batch_result = [None]
+
+    def _batch_export(_sender=None, _args=None):
+        if not saved_sets:
+            ui.uiUtils_alert("No saved sets available. Save a set first.", title="Multiple Schedules Exporter")
+            return
+        set_names = sorted(saved_sets.keys())
+        labels = []
+        for sname in set_names:
+            sdata = saved_sets.get(sname) or {}
+            n = len(sdata.get("schedule_names") or [])
+            raw_path = sdata.get("excel_path") or sdata.get("csv_folder") or ""
+            dest = os.path.basename(raw_path) if raw_path else "(no path saved)"
+            labels.append("{} -- {} ({} schedule{})".format(sname, dest, n, "" if n == 1 else "s"))
+        try:
+            selected = ui.uiUtils_select_indices(
+                labels,
+                title="Batch Export Sets",
+                prompt="Select saved sets to export. Each set exports to its saved file path.",
+                multiselect=True,
+                width=600,
+                height=440,
+            )
+        except Exception:
+            selected = []
+        if not selected:
+            return
+        chosen = [set_names[i] for i in selected if 0 <= i < len(set_names)]
+        if not chosen:
+            return
+        _batch_result[0] = chosen
+        window.DialogResult = True
+        window.Close()
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
@@ -794,12 +869,17 @@ def _show_export_form(
         save_set_button.Click += _save_set
     if delete_set_button is not None:
         delete_set_button.Click += _delete_set
+    if batch_export_button is not None:
+        batch_export_button.Click += _batch_export
 
     _refresh_saved_set_dropdown()
     _update_enabled_state()
 
     if not window.ShowDialog():
         return None
+
+    if _batch_result[0] is not None:
+        return {"batch_sets": _batch_result[0]}
 
     selected_indices = [idx for idx, item in enumerate(items) if item in selected_names]
     selected_mode = 0 if excel_mode.IsChecked else 1
@@ -824,6 +904,7 @@ def _show_export_form(
         "export_column_headers": bool(export_column_headers.IsChecked),
         "export_group_headers": bool(export_group_headers.IsChecked),
         "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
+        "use_category_sheet_name": bool(use_category_sheet_name_ctrl.IsChecked) if use_category_sheet_name_ctrl is not None else False,
     }
 
 
@@ -1179,6 +1260,7 @@ def export_to_excel(
     export_grouped_column_headers=False,
     text_qualifier="",
     delimiter=",",
+    use_category_sheet_name=False,
 ):
     log_message(
         "export_to_excel start file_path='{}' schedules={} delimiter={!r} quotechar={!r} title={} col_headers={} group_headers={} grouped_col_headers={}".format(
@@ -1226,7 +1308,8 @@ def export_to_excel(
         for view in schedules:
             log_message("export_to_excel schedule start name='{}' id={}".format(view.Name, element_id_value(view.Id)))
             key_schedule = is_key_schedule(view)
-            base_name = sanitize_sheet_name(view.Name)
+            raw_name = _get_schedule_category_name(doc, view) if use_category_sheet_name else view.Name
+            base_name = sanitize_sheet_name(raw_name)
             if base_name in workbook.sheetnames and base_name not in used_names:
                 sheet_name = base_name
             else:
@@ -1460,6 +1543,7 @@ def main():
     last_group_headers = project_settings.get(CONFIG_LAST_CSV_GROUP_HEADERS, config_get(config, CONFIG_LAST_CSV_GROUP_HEADERS, False))
     last_grouped_column_headers = project_settings.get(CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, config_get(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False))
     last_text_qualifier = project_settings.get(CONFIG_LAST_CSV_TEXT_QUALIFIER, config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, ""))
+    last_use_category_sheet_name = project_settings.get(CONFIG_LAST_USE_CATEGORY_SHEET_NAME, config_get(config, CONFIG_LAST_USE_CATEGORY_SHEET_NAME, False))
     saved_sets = proj_data.get("sets", {})
     if not isinstance(saved_sets, dict):
         saved_sets = {}
@@ -1483,10 +1567,75 @@ def main():
         last_text_qualifier,
         saved_sets,
         doc,
+        last_use_category_sheet_name=last_use_category_sheet_name,
     )
     if inputs is not False:
         if not inputs:
             return
+        if "batch_sets" in inputs:
+            batch_set_names = inputs["batch_sets"]
+            all_schedules_by_name = {v.Name: v for v in schedules}
+            success_count = 0
+            skipped = []
+            for set_name in batch_set_names:
+                set_data = saved_sets.get(set_name)
+                if not isinstance(set_data, dict):
+                    skipped.append("{}: set not found".format(set_name))
+                    continue
+                set_mode = int(set_data.get("export_mode", 0))
+                set_sched_names = set_data.get("schedule_names") or []
+                set_views = [all_schedules_by_name[n] for n in set_sched_names if n in all_schedules_by_name]
+                if not set_views:
+                    skipped.append("{}: no matching schedules found in this model".format(set_name))
+                    continue
+                set_use_cat = bool(set_data.get("use_category_sheet_name", False))
+                set_exp_title = bool(set_data.get("export_title", False))
+                set_col_hdr = bool(set_data.get("export_column_headers", True))
+                set_grp_hdr = bool(set_data.get("export_group_headers", False))
+                set_grpd_col = bool(set_data.get("export_grouped_column_headers", False))
+                set_delim = set_data.get("csv_delim", ",")
+                set_qualifier = set_data.get("csv_text_qualifier", "")
+                if set_mode == 0:
+                    set_excel_path = normalize_excel_output_path(set_data.get("excel_path", ""))
+                    if not set_excel_path:
+                        skipped.append("{}: no Excel file path saved -- load the set, set a path, then re-save it".format(set_name))
+                        continue
+                    ok = export_to_excel(
+                        doc, set_views, set_excel_path, ui,
+                        export_title=set_exp_title,
+                        export_column_headers=set_col_hdr,
+                        export_group_headers=set_grp_hdr,
+                        export_grouped_column_headers=set_grpd_col,
+                        text_qualifier=set_qualifier,
+                        delimiter=set_delim,
+                        use_category_sheet_name=set_use_cat,
+                    )
+                    if ok:
+                        success_count += 1
+                    else:
+                        skipped.append("{}: export failed (see log)".format(set_name))
+                else:
+                    set_csv_folder = (set_data.get("csv_folder") or "").strip()
+                    if not set_csv_folder:
+                        skipped.append("{}: no CSV folder saved -- load the set, set a folder, then re-save it".format(set_name))
+                        continue
+                    export_to_csv(
+                        doc, set_views, set_csv_folder,
+                        quote_all=bool(int(set_data.get("csv_mode", 0)) == 1),
+                        delimiter=set_delim,
+                        export_title=set_exp_title,
+                        export_column_headers=set_col_hdr,
+                        export_group_headers=set_grp_hdr,
+                        export_grouped_column_headers=set_grpd_col,
+                        text_qualifier=set_qualifier,
+                    )
+                    success_count += 1
+            msg = "{} of {} set(s) exported successfully.".format(success_count, len(batch_set_names))
+            if skipped:
+                msg += "\n\nSkipped:\n" + "\n".join(skipped)
+            ui.uiUtils_alert(msg, title="Multiple Schedules Exporter")
+            return
+
         selected_indices = inputs.get("selected_indices") or []
         if not selected_indices:
             ui.uiUtils_alert("Select at least one schedule.", title="Multiple Schedules Exporter")
@@ -1500,6 +1649,7 @@ def main():
         csv_text_qualifier = inputs.get("csv_text_qualifier") or ""
         csv_delim = inputs.get("csv_delimiter") or last_csv_delim
         quote_all = bool(inputs.get("csv_quote_all"))
+        use_category = bool(inputs.get("use_category_sheet_name", False))
         mode = int(inputs.get("mode", 0))
         if mode == 0:
             file_path = normalize_excel_output_path(inputs.get("excel_path"))
@@ -1520,6 +1670,7 @@ def main():
                 export_grouped_column_headers=export_grouped_column_headers,
                 text_qualifier=csv_text_qualifier,
                 delimiter=csv_delim,
+                use_category_sheet_name=use_category,
             )
             if not success:
                 return
@@ -1554,6 +1705,7 @@ def main():
         config.last_csv_column_headers = export_column_headers
         config.last_csv_group_headers = export_group_headers
         config.last_csv_grouped_column_headers = export_grouped_column_headers
+        config.last_use_category_sheet_name = use_category
         proj_data = _normalize_namespace_data(read_saved_sets(doc))
         proj_data["settings"] = {
             CONFIG_LAST_SCHEDULE_IDS: [element_id_value(v.Id) for v in selected_views],
@@ -1565,6 +1717,7 @@ def main():
             CONFIG_LAST_CSV_GROUP_HEADERS: export_group_headers,
             CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS: export_grouped_column_headers,
             CONFIG_LAST_CSV_TEXT_QUALIFIER: csv_text_qualifier,
+            CONFIG_LAST_USE_CATEGORY_SHEET_NAME: use_category,
         }
         proj_data["sets"] = proj_data.get("sets", {})
         write_saved_sets(doc, proj_data)
