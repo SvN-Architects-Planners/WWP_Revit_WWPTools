@@ -65,6 +65,25 @@ def sanitize_file_name(name):
     return safe or "Schedule"
 
 
+def _pluralize(name):
+    """Return a simple English plural of name (for sheet naming). Most Revit category
+    names are already plural (Walls, Areas, Rooms); this handles the singular ones."""
+    if not name:
+        return name
+    lower = name.lower()
+    # Already ends in s/x/z -- treat as plural (Walls, Areas, Rooms, Stairs, ...)
+    if lower[-1] in "sxz":
+        return name
+    # Ends in consonant + y: change to ies (e.g. "Category" -> "Categories")
+    if lower.endswith("y") and len(name) > 1 and lower[-2] not in "aeiou":
+        return name[:-1] + "ies"
+    # Ends in ch/sh: add es
+    if lower.endswith("ch") or lower.endswith("sh"):
+        return name + "es"
+    # Default: add s  (Parking -> Parkings, Fixture -> Fixtures, etc.)
+    return name + "s"
+
+
 def _get_schedule_category_name(doc, view):
     """Return the Revit category name for a schedule view, falling back to view.Name."""
     try:
@@ -1308,7 +1327,7 @@ def export_to_excel(
         for view in schedules:
             log_message("export_to_excel schedule start name='{}' id={}".format(view.Name, element_id_value(view.Id)))
             key_schedule = is_key_schedule(view)
-            raw_name = _get_schedule_category_name(doc, view) if use_category_sheet_name else view.Name
+            raw_name = _pluralize(_get_schedule_category_name(doc, view)) if use_category_sheet_name else view.Name
             base_name = sanitize_sheet_name(raw_name)
             if base_name in workbook.sheetnames and base_name not in used_names:
                 sheet_name = base_name
