@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Add Line Type: replaced wildcard `from Autodesk.Revit.DB import *` with explicit symbol imports to reduce first-click load overhead.
+
 ### Added
 - Renamed "Duplicate Views For Level" to **Propagate Views to Levels**. Fixed P-level view naming (views now carry the full target level name, e.g. "LEVEL P1", instead of losing the "P" prefix). Fixed ceiling plan / floor plan collision: tracking is now per view type so both can be created with the same name.
 - Level Setup: existing levels are now renamed to the canonical FLOOR XX format when their elevation is updated (e.g. "Level 1" becomes "FLOOR 01"). Avoids name collisions by excluding the level's own current name from the uniqueness check.

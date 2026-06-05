@@ -2,8 +2,11 @@
 import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
-from Autodesk.Revit.DB import *
-from Autodesk.Revit.DB import Transaction as RevitTransaction
+from Autodesk.Revit.DB import (
+    Color, FilteredElementCollector, LinePatternElement, LinePattern,
+    LinePatternSegment, LinePatternSegmentType, BuiltInCategory, GraphicsStyleType,
+    Transaction as RevitTransaction
+)
 from Autodesk.Revit.UI import TaskDialog, TaskDialogCommandLinkId, TaskDialogResult
 import os
 import datetime
