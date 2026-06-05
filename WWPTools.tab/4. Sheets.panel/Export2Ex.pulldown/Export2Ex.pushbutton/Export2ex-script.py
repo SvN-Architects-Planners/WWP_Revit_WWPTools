@@ -640,6 +640,8 @@ def _show_export_form(
         browse_excel.IsEnabled = is_excel
         csv_folder.IsEnabled = not is_excel
         browse_csv.IsEnabled = not is_excel
+        if use_category_sheet_name_ctrl is not None:
+            use_category_sheet_name_ctrl.IsEnabled = is_excel
 
     def _filter_list(_sender=None, _args=None):
         text = search_box.Text or ""
@@ -665,6 +667,8 @@ def _show_export_form(
         for name in sorted(saved_sets.keys()):
             saved_set_box.Items.Add(name)
         saved_set_box.Text = current_text
+        if batch_export_button is not None:
+            batch_export_button.IsEnabled = bool(saved_sets)
 
     def _get_current_set_data():
         selected_indices = [idx for idx, item in enumerate(items) if item in selected_names]
@@ -728,12 +732,8 @@ def _show_export_form(
             export_grouped_column_headers.IsChecked = bool(set_data.get("export_grouped_column_headers", False))
             if use_category_sheet_name_ctrl is not None:
                 use_category_sheet_name_ctrl.IsChecked = bool(set_data.get("use_category_sheet_name", False))
-            saved_excel = set_data.get("excel_path", "")
-            if saved_excel:
-                excel_path.Text = saved_excel
-            saved_csv = set_data.get("csv_folder", "")
-            if saved_csv:
-                csv_folder.Text = saved_csv
+            excel_path.Text = set_data.get("excel_path") or ""
+            csv_folder.Text = set_data.get("csv_folder") or ""
         except Exception:
             pass
 
@@ -1577,6 +1577,7 @@ def main():
             all_schedules_by_name = {v.Name: v for v in schedules}
             success_count = 0
             skipped = []
+            warnings = []
             for set_name in batch_set_names:
                 set_data = saved_sets.get(set_name)
                 if not isinstance(set_data, dict):
@@ -1588,6 +1589,11 @@ def main():
                 if not set_views:
                     skipped.append("{}: no matching schedules found in this model".format(set_name))
                     continue
+                missing = [n for n in set_sched_names if n not in all_schedules_by_name]
+                if missing:
+                    sample = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
+                    warnings.append("{}: {}/{} schedules not found (renamed?) -- {}".format(
+                        set_name, len(set_views), len(set_sched_names), sample))
                 set_use_cat = bool(set_data.get("use_category_sheet_name", False))
                 set_exp_title = bool(set_data.get("export_title", False))
                 set_col_hdr = bool(set_data.get("export_column_headers", True))
@@ -1619,18 +1625,24 @@ def main():
                     if not set_csv_folder:
                         skipped.append("{}: no CSV folder saved -- load the set, set a folder, then re-save it".format(set_name))
                         continue
-                    export_to_csv(
-                        doc, set_views, set_csv_folder,
-                        quote_all=bool(int(set_data.get("csv_mode", 0)) == 1),
-                        delimiter=set_delim,
-                        export_title=set_exp_title,
-                        export_column_headers=set_col_hdr,
-                        export_group_headers=set_grp_hdr,
-                        export_grouped_column_headers=set_grpd_col,
-                        text_qualifier=set_qualifier,
-                    )
-                    success_count += 1
+                    try:
+                        export_to_csv(
+                            doc, set_views, set_csv_folder,
+                            quote_all=bool(int(set_data.get("csv_mode", 0)) == 1),
+                            delimiter=set_delim,
+                            export_title=set_exp_title,
+                            export_column_headers=set_col_hdr,
+                            export_group_headers=set_grp_hdr,
+                            export_grouped_column_headers=set_grpd_col,
+                            text_qualifier=set_qualifier,
+                        )
+                        success_count += 1
+                    except Exception as _csv_exc:
+                        log_exception("batch CSV export set '{}'".format(set_name), _csv_exc)
+                        skipped.append("{}: export failed (see log)".format(set_name))
             msg = "{} of {} set(s) exported successfully.".format(success_count, len(batch_set_names))
+            if warnings:
+                msg += "\n\nPartial exports (some schedules not found):\n" + "\n".join(warnings)
             if skipped:
                 msg += "\n\nSkipped:\n" + "\n".join(skipped)
             ui.uiUtils_alert(msg, title="Multiple Schedules Exporter")
