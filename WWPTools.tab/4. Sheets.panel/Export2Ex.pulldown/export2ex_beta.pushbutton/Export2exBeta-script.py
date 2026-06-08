@@ -297,6 +297,11 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                     <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">
+                        <Button Name="BatchExportButton"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Content="Batch Export..."/>
                         <Button Name="OkButton"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Width="150"
@@ -409,12 +414,51 @@ def _looks_like_legacy_saved_sets(data):
     return all(isinstance(v, dict) for v in data.values())
 
 
+def _ensure_export_param(doc):
+    """Create PARAM_SAVED_SETS as a project text parameter on ProjectInformation if it doesn't exist."""
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return False
+        if proj_info.LookupParameter(PARAM_SAVED_SETS) is not None:
+            return True
+        app = doc.Application
+        cat_set = app.Create.NewCategorySet()
+        pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
+        if pi_cat is None:
+            return False
+        cat_set.Insert(pi_cat)
+        binding = app.Create.NewInstanceBinding(cat_set)
+        opts = DB.InternalDefinitionCreationOptions(PARAM_SAVED_SETS, DB.SpecTypeId.String.Text)
+        opts.Visible = True
+        t = DB.Transaction(doc, "Create Export Settings Parameter")
+        t.Start()
+        try:
+            try:
+                from Autodesk.Revit.DB import GroupTypeId
+                doc.ParameterBindings.Insert(opts, binding, GroupTypeId.Data)
+            except Exception:
+                doc.ParameterBindings.Insert(opts, binding, DB.BuiltInParameterGroup.PG_DATA)
+            t.Commit()
+        except Exception as inner:
+            t.RollBack()
+            log_exception("_ensure_export_param transaction", inner)
+            return False
+        return proj_info.LookupParameter(PARAM_SAVED_SETS) is not None
+    except Exception as exc:
+        log_exception("_ensure_export_param", exc)
+        return False
+
+
 def write_saved_sets(doc, sets_dict):
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
             return False
         param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None:
+            _ensure_export_param(doc)
+            param = proj_info.LookupParameter(PARAM_SAVED_SETS)
         if param is None or param.IsReadOnly:
             return False
         raw = (param.AsString() or "").strip()
@@ -790,6 +834,189 @@ def _load_export_window():
     raise last_exc
 
 
+def _show_beta_batch_dialog(saved_sets, doc):
+    """Batch export dialog: checkbox | set name | sheet name (editable) | file path | ..."""
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.Windows import (Window, WindowStartupLocation, Thickness,
+                                 HorizontalAlignment, VerticalAlignment,
+                                 FontWeights, TextTrimming, GridLength, GridUnitType)
+    from System.Windows.Controls import (Grid, StackPanel, ScrollViewer, Button,
+                                          CheckBox, TextBlock, TextBox, ColumnDefinition,
+                                          RowDefinition, Orientation, ScrollBarVisibility)
+
+    set_names = sorted(saved_sets.keys())
+    if not set_names:
+        return None
+
+    paths = {}
+    sheet_names = {}
+    for sname in set_names:
+        sdata = saved_sets.get(sname) or {}
+        paths[sname] = (sdata.get("excel_path") or "").strip()
+        sheet_names[sname] = (sdata.get("sheet_name") or sanitize_sheet_name(sname)).strip()
+
+    _ok_clicked = [False]
+    checkboxes = {}
+    path_labels = {}
+    sheet_boxes = {}
+
+    window = Window()
+    window.Title = "Batch Export"
+    window.Width = 820
+    window.MinWidth = 560
+    window.Height = min(200 + len(set_names) * 34, 580)
+    window.MinHeight = 200
+    window.WindowStartupLocation = WindowStartupLocation.CenterScreen
+
+    outer = Grid()
+    outer.Margin = Thickness(12)
+    rh = RowDefinition(); rh.Height = GridLength.Auto
+    rc = RowDefinition()
+    rb = RowDefinition(); rb.Height = GridLength.Auto
+    outer.RowDefinitions.Add(rh)
+    outer.RowDefinitions.Add(rc)
+    outer.RowDefinitions.Add(rb)
+    window.Content = outer
+
+    prompt = TextBlock()
+    prompt.Text = "Select sets to export. Edit sheet name if needed, click ... to choose the output file."
+    prompt.Margin = Thickness(0, 0, 0, 8)
+    Grid.SetRow(prompt, 0)
+    outer.Children.Add(prompt)
+
+    scroll = ScrollViewer()
+    scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+    scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+    Grid.SetRow(scroll, 1)
+    outer.Children.Add(scroll)
+
+    tbl = Grid()
+    for w in [28, 160, 150, -1, 34]:
+        cd = ColumnDefinition()
+        cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
+        tbl.ColumnDefinitions.Add(cd)
+    scroll.Content = tbl
+
+    hrd = RowDefinition(); hrd.Height = GridLength.Auto
+    tbl.RowDefinitions.Add(hrd)
+    for col, text in [(1, "Set Name"), (2, "Sheet Name"), (3, "File Path")]:
+        tb = TextBlock()
+        tb.Text = text
+        tb.FontWeight = FontWeights.Bold
+        tb.Margin = Thickness(4, 2, 4, 6)
+        Grid.SetRow(tb, 0)
+        Grid.SetColumn(tb, col)
+        tbl.Children.Add(tb)
+
+    for row_idx, sname in enumerate(set_names, 1):
+        rd = RowDefinition(); rd.Height = GridLength(34)
+        tbl.RowDefinitions.Add(rd)
+
+        cb = CheckBox()
+        cb.IsChecked = True
+        cb.VerticalAlignment = VerticalAlignment.Center
+        cb.HorizontalAlignment = HorizontalAlignment.Center
+        Grid.SetRow(cb, row_idx)
+        Grid.SetColumn(cb, 0)
+        tbl.Children.Add(cb)
+        checkboxes[sname] = cb
+
+        name_tb = TextBlock()
+        name_tb.Text = sname
+        name_tb.VerticalAlignment = VerticalAlignment.Center
+        name_tb.Margin = Thickness(4, 0, 8, 0)
+        name_tb.TextTrimming = TextTrimming.CharacterEllipsis
+        Grid.SetRow(name_tb, row_idx)
+        Grid.SetColumn(name_tb, 1)
+        tbl.Children.Add(name_tb)
+
+        sheet_tb = TextBox()
+        sheet_tb.Text = sheet_names.get(sname, "")
+        sheet_tb.VerticalAlignment = VerticalAlignment.Center
+        sheet_tb.Margin = Thickness(4, 3, 8, 3)
+        Grid.SetRow(sheet_tb, row_idx)
+        Grid.SetColumn(sheet_tb, 2)
+        tbl.Children.Add(sheet_tb)
+        sheet_boxes[sname] = sheet_tb
+
+        path_tb = TextBlock()
+        path_tb.Text = paths[sname] or "(no path)"
+        path_tb.VerticalAlignment = VerticalAlignment.Center
+        path_tb.Margin = Thickness(4, 0, 4, 0)
+        path_tb.TextTrimming = TextTrimming.CharacterEllipsis
+        Grid.SetRow(path_tb, row_idx)
+        Grid.SetColumn(path_tb, 3)
+        tbl.Children.Add(path_tb)
+        path_labels[sname] = path_tb
+
+        btn = Button()
+        btn.Content = "..."
+        btn.Margin = Thickness(2, 3, 2, 3)
+        Grid.SetRow(btn, row_idx)
+        Grid.SetColumn(btn, 4)
+        tbl.Children.Add(btn)
+
+        def _make_browse(sname_):
+            def _on_browse(_s, _e):
+                cur = paths.get(sname_) or ""
+                init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
+                safe = re.sub(r'[\\/:*?"<>|]', "_", sname_)
+                fname = os.path.basename(cur) if cur else "{}.xlsx".format(safe)
+                new_path = _pick_save_file(
+                    title="'{}' -- Choose Output File".format(sname_),
+                    filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                    default_extension="xlsx",
+                    initial_directory=init_dir,
+                    file_name=fname,
+                )
+                new_path = normalize_excel_output_path(new_path or "")
+                if new_path:
+                    paths[sname_] = new_path
+                    path_labels[sname_].Text = new_path
+            return _on_browse
+
+        btn.Click += _make_browse(sname)
+
+    btns = StackPanel()
+    btns.Orientation = Orientation.Horizontal
+    btns.HorizontalAlignment = HorizontalAlignment.Right
+    btns.Margin = Thickness(0, 10, 0, 0)
+    Grid.SetRow(btns, 2)
+    outer.Children.Add(btns)
+
+    ok_btn = Button()
+    ok_btn.Content = "Export Selected"
+    ok_btn.MinWidth = 110
+    ok_btn.Margin = Thickness(0, 0, 6, 0)
+
+    cancel_btn = Button()
+    cancel_btn.Content = "Cancel"
+    cancel_btn.MinWidth = 70
+
+    def _ok(_s, _e):
+        _ok_clicked[0] = True
+        window.Close()
+
+    def _cancel(_s, _e):
+        window.Close()
+
+    ok_btn.Click += _ok
+    cancel_btn.Click += _cancel
+    btns.Children.Add(ok_btn)
+    btns.Children.Add(cancel_btn)
+
+    window.ShowDialog()
+
+    if not _ok_clicked[0]:
+        return None
+
+    selected = [sname for sname in set_names if checkboxes[sname].IsChecked]
+    final_sheet_names = {sname: (sheet_boxes[sname].Text or "").strip() for sname in set_names}
+    return selected, dict(paths), final_sheet_names
+
+
 def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names, initial_sheet_name=""):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -816,6 +1043,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     browse_excel = window.FindName("BrowseExcel")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
+    batch_export_button = window.FindName("BatchExportButton")
     logo_image = window.FindName("LogoImage")
     show_read_only_filter = window.FindName("ShowReadOnlyFilter")
     sheet_name_box = window.FindName("SheetNameBox")
@@ -1113,6 +1341,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             "category_id": category_id,
             "param_names": list(selected_params_by_category.get(category_id, [])),
             "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
+            "excel_path": (excel_path.Text or "").strip() if excel_path is not None else "",
         }
 
     def _apply_saved_set(set_data):
@@ -1123,6 +1352,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             category_id = _coerce_int(set_data.get("category_id"), None)
             param_names = set_data.get("param_names") or []
             saved_sheet = (set_data.get("sheet_name") or "").strip()
+            saved_excel = (set_data.get("excel_path") or "").strip()
             if category_id is not None:
                 selected_params_by_category[category_id] = list(param_names)
             mode_box.SelectedIndex = 1 if mode == MODE_BY_CATEGORY else 0
@@ -1133,6 +1363,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
                     break
             if sheet_name_box is not None and saved_sheet:
                 sheet_name_box.Text = saved_sheet
+            if excel_path is not None and saved_excel:
+                excel_path.Text = saved_excel
             _refresh_parameter_list()
         finally:
             _initialized[0] = True
@@ -1179,6 +1411,16 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         saved_set_box.Text = ""
         _refresh_saved_set_dropdown()
 
+    _batch_result = [None]
+
+    def _batch_export(_sender, _args):
+        result = _show_beta_batch_dialog(saved_sets, doc)
+        if result is None:
+            return
+        _batch_result[0] = result
+        window.DialogResult = False
+        window.Close()
+
     def _ok(_sender, _args):
         window.DialogResult = True
         window.Close()
@@ -1218,6 +1460,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         save_set_button.Click += _save_set
     if delete_set_button is not None:
         delete_set_button.Click += _delete_set
+    if batch_export_button is not None:
+        batch_export_button.Click += _batch_export
     if sheet_name_box is not None:
         sheet_name_box.TextChanged += _sheet_name_changed
     _refresh_saved_set_dropdown()
@@ -1234,6 +1478,9 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             _refresh_sheet_name_default(force=True)
 
     if not window.ShowDialog():
+        if _batch_result[0] is not None:
+            selected, paths, sheet_names = _batch_result[0]
+            return {"batch_sets": selected, "batch_paths": paths, "batch_sheet_names": sheet_names}
         return None
 
     selected_item = source_list.SelectedItem
@@ -1834,6 +2081,80 @@ def main():
         "",
     )
     if not result:
+        return
+
+    if "batch_sets" in result:
+        batch_sets = result.get("batch_sets") or []
+        batch_paths = result.get("batch_paths") or {}
+        batch_sheet_names = result.get("batch_sheet_names") or {}
+        if not batch_sets:
+            ui.uiUtils_alert("No sets selected for batch export.", title="Export2Ex Beta")
+            return
+        saved_sets_data = read_saved_sets(doc)
+        exported = []
+        failed = []
+        for sname in batch_sets:
+            sdata = saved_sets_data.get(sname)
+            if not isinstance(sdata, dict):
+                failed.append("{}: set not found".format(sname))
+                continue
+            cat_id_val = _coerce_int(sdata.get("category_id"), None)
+            if cat_id_val in (None, -1):
+                failed.append("{}: no category".format(sname))
+                continue
+            param_names = sdata.get("param_names") or []
+            if not param_names:
+                failed.append("{}: no parameters configured".format(sname))
+                continue
+            file_path = normalize_excel_output_path(batch_paths.get(sname) or "")
+            if not file_path:
+                failed.append("{}: no output file path".format(sname))
+                continue
+            sheet_name_val = (batch_sheet_names.get(sname) or "").strip()
+            category_record = None
+            for item in categories:
+                if item.id_value == cat_id_val:
+                    category_record = item.record
+                    break
+            category_name = category_record["name"] if category_record else sname
+            try:
+                ok = export_to_excel(
+                    doc, category_name, DB.ElementId(cat_id_val),
+                    param_names, file_path, ui, sheet_name=sheet_name_val,
+                )
+                if ok:
+                    exported.append(sname)
+                else:
+                    failed.append("{}: export failed".format(sname))
+            except Exception as exc:
+                log_exception("batch export {}".format(sname), exc)
+                failed.append("{}: {}".format(sname, str(exc)))
+        changed = False
+        for sname, new_path in batch_paths.items():
+            sdata = saved_sets_data.get(sname)
+            if not isinstance(sdata, dict):
+                continue
+            if new_path and new_path != (sdata.get("excel_path") or "").strip():
+                sdata["excel_path"] = new_path
+                changed = True
+        for sname, new_sheet in batch_sheet_names.items():
+            sdata = saved_sets_data.get(sname)
+            if not isinstance(sdata, dict):
+                continue
+            if new_sheet and new_sheet != (sdata.get("sheet_name") or "").strip():
+                sdata["sheet_name"] = new_sheet
+                changed = True
+        if changed:
+            write_saved_sets(doc, saved_sets_data)
+        msg_parts = []
+        if exported:
+            msg_parts.append("Exported: {}".format(", ".join(exported)))
+        if failed:
+            msg_parts.append("Failed:\n{}".format("\n".join(failed)))
+        ui.uiUtils_alert(
+            "\n\n".join(msg_parts) if msg_parts else "Nothing exported.",
+            title="Export2Ex Beta",
+        )
         return
 
     category_id_value = _coerce_int(result.get("category_id"), None)
