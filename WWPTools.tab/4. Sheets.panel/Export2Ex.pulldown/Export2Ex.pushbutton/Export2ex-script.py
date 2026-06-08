@@ -1623,7 +1623,16 @@ def main():
                 if set_mode == 0:
                     set_excel_path = normalize_excel_output_path(set_data.get("excel_path", ""))
                     if not set_excel_path:
-                        skipped.append("{}: no Excel file path saved -- load the set, set a path, then re-save it".format(set_name))
+                        chosen = _pick_save_file(
+                            title="'{}' -- Choose Output File".format(set_name),
+                            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                            default_extension="xlsx",
+                            initial_directory=get_default_dir(doc),
+                            file_name="{}.xlsx".format(sanitize_file_name(set_name)),
+                        )
+                        set_excel_path = normalize_excel_output_path(chosen or "")
+                    if not set_excel_path:
+                        skipped.append("{}: skipped (no output path chosen)".format(set_name))
                         continue
                     ok = export_to_excel(
                         doc, set_views, set_excel_path, ui,
@@ -1642,7 +1651,13 @@ def main():
                 else:
                     set_csv_folder = (set_data.get("csv_folder") or "").strip()
                     if not set_csv_folder:
-                        skipped.append("{}: no CSV folder saved -- load the set, set a folder, then re-save it".format(set_name))
+                        chosen_folder = _pick_folder(
+                            title="'{}' -- Choose CSV Folder".format(set_name),
+                            initial_directory=get_default_dir(doc),
+                        )
+                        set_csv_folder = (chosen_folder or "").strip()
+                    if not set_csv_folder:
+                        skipped.append("{}: skipped (no output folder chosen)".format(set_name))
                         continue
                     try:
                         export_to_csv(
