@@ -1622,15 +1622,16 @@ def main():
                 set_qualifier = set_data.get("csv_text_qualifier", "")
                 if set_mode == 0:
                     set_excel_path = normalize_excel_output_path(set_data.get("excel_path", ""))
-                    if not set_excel_path:
-                        chosen = _pick_save_file(
-                            title="'{}' -- Choose Output File".format(set_name),
-                            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                            default_extension="xlsx",
-                            initial_directory=get_default_dir(doc),
-                            file_name="{}.xlsx".format(sanitize_file_name(set_name)),
-                        )
-                        set_excel_path = normalize_excel_output_path(chosen or "")
+                    saved_dir = os.path.dirname(set_excel_path) if set_excel_path else get_default_dir(doc)
+                    saved_name = os.path.basename(set_excel_path) if set_excel_path else "{}.xlsx".format(sanitize_file_name(set_name))
+                    chosen = _pick_save_file(
+                        title="'{}' -- Choose Output File".format(set_name),
+                        filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                        default_extension="xlsx",
+                        initial_directory=saved_dir,
+                        file_name=saved_name,
+                    )
+                    set_excel_path = normalize_excel_output_path(chosen or "")
                     if not set_excel_path:
                         skipped.append("{}: skipped (no output path chosen)".format(set_name))
                         continue
@@ -1650,12 +1651,12 @@ def main():
                         skipped.append("{}: export failed (see log)".format(set_name))
                 else:
                     set_csv_folder = (set_data.get("csv_folder") or "").strip()
-                    if not set_csv_folder:
-                        chosen_folder = _pick_folder(
-                            title="'{}' -- Choose CSV Folder".format(set_name),
-                            initial_directory=get_default_dir(doc),
-                        )
-                        set_csv_folder = (chosen_folder or "").strip()
+                    init_folder = set_csv_folder if set_csv_folder else get_default_dir(doc)
+                    chosen_folder = _pick_folder(
+                        title="'{}' -- Choose CSV Folder".format(set_name),
+                        initial_directory=init_folder,
+                    )
+                    set_csv_folder = (chosen_folder or "").strip()
                     if not set_csv_folder:
                         skipped.append("{}: skipped (no output folder chosen)".format(set_name))
                         continue
