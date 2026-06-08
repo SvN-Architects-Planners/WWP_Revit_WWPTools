@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Export to Excel (Beta): **Batch Export manager is now the primary screen** — launching Export2Ex Beta opens the set manager directly. Add, Edit, and Delete buttons let you create or modify sets without leaving the manager; clicking Add or Edit opens the full config form. Clicking Export Selected runs the batch export.
 - Export to Excel (Beta): **Batch Export** button — select multiple saved sets and export them all in one click. A table shows **Set Name**, **Sheet Name** (editable inline), and **File Path** columns; each row has a **...** button to choose or change the output file. Path and sheet name changes are written back to the project so they persist for future runs. If the `! P_STATS_Export_Text` parameter does not exist it is created automatically.
 - Export to Excel (Beta): **excel_path** is now saved as part of each named set, so each set remembers its destination file across sessions. Loading a saved set restores the file path into the Export dialog.
 - Export to Excel (Classic): added **Use Category as Sheet Name** toggle — when enabled, each exported sheet is named after the schedule's Revit category pluralised (e.g. "Parkings", "Areas", "Walls") instead of the full schedule view name. Multiple schedules with the same category get `_1`, `_2` suffixes as normal.
