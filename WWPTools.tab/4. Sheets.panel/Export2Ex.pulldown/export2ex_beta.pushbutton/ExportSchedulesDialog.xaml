@@ -263,6 +263,11 @@
                     <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">
+                        <Button Name="BatchExportButton"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Content="Batch Export..."/>
                         <Button Name="OkButton"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Width="150"
