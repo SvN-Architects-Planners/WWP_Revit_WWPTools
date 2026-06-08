@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to Excel (Classic): added **Use Category as Sheet Name** toggle — when enabled, each exported sheet is named after the schedule's Revit category pluralised (e.g. "Parkings", "Areas", "Walls") instead of the full schedule view name. Multiple schedules with the same category get `_1`, `_2` suffixes as normal.
 - Export to Excel (Classic): **per-set destination path** — the Excel file path and CSV folder are now saved as part of each named set so each set always exports to its own file.
 - Export to Excel (Classic): **Batch Export** button — select multiple saved sets and export them all in one click; each set uses its stored destination path. A summary reports how many succeeded and lists any skipped sets with the reason.
-- Export to Excel (Classic): Batch Export now shows a table with **Schedule Name**, **Sheet Name**, and **File Path** columns. Each row has a **...** button to choose or change the output file path before exporting. Unchecking a row skips that set.
+- Export to Excel (Classic): Batch Export now shows a table with **Schedule Name**, **Sheet Name**, and **File Path** columns. Each row has a **...** button to choose or change the output file path before exporting. Unchecking a row skips that set. Path changes are written back to the project saved sets so they persist for future runs. If the `! P_STATS_Export_Text` parameter does not exist on the project, it is created automatically.
 
 ### Fixed
 - Add Line Type: replaced wildcard `from Autodesk.Revit.DB import *` with explicit symbol imports to reduce first-click load overhead.

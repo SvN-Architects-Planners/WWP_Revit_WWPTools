@@ -191,12 +191,51 @@ def _looks_like_legacy_saved_sets(data):
     return all(isinstance(v, dict) for v in data.values())
 
 
+def _ensure_export_param(doc):
+    """Create PARAM_SAVED_SETS as a project text parameter on ProjectInformation if it doesn't exist."""
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return False
+        if proj_info.LookupParameter(PARAM_SAVED_SETS) is not None:
+            return True
+        app = doc.Application
+        cat_set = app.Create.NewCategorySet()
+        pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
+        if pi_cat is None:
+            return False
+        cat_set.Insert(pi_cat)
+        binding = app.Create.NewInstanceBinding(cat_set)
+        opts = DB.InternalDefinitionCreationOptions(PARAM_SAVED_SETS, DB.SpecTypeId.String.Text)
+        opts.Visible = True
+        t = DB.Transaction(doc, "Create Export Settings Parameter")
+        t.Start()
+        try:
+            try:
+                from Autodesk.Revit.DB import GroupTypeId
+                doc.ParameterBindings.Insert(opts, binding, GroupTypeId.Data)
+            except Exception:
+                doc.ParameterBindings.Insert(opts, binding, DB.BuiltInParameterGroup.PG_DATA)
+            t.Commit()
+        except Exception as inner:
+            t.RollBack()
+            log_exception("_ensure_export_param transaction", inner)
+            return False
+        return proj_info.LookupParameter(PARAM_SAVED_SETS) is not None
+    except Exception as exc:
+        log_exception("_ensure_export_param", exc)
+        return False
+
+
 def write_saved_sets(doc, sets_dict):
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
             return False
         param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None:
+            _ensure_export_param(doc)
+            param = proj_info.LookupParameter(PARAM_SAVED_SETS)
         if param is None or param.IsReadOnly:
             return False
         raw = (param.AsString() or "").strip()
@@ -1861,6 +1900,25 @@ def main():
                     except Exception as _csv_exc:
                         log_exception("batch CSV export set '{}'".format(set_name), _csv_exc)
                         skipped.append("{}: export failed (see log)".format(set_name))
+            paths_changed = False
+            for sname, new_path in batch_paths.items():
+                sdata = saved_sets.get(sname)
+                if not isinstance(sdata, dict):
+                    continue
+                mode = int(sdata.get("export_mode", 0))
+                if mode == 0:
+                    if new_path and new_path != (sdata.get("excel_path") or "").strip():
+                        sdata["excel_path"] = new_path
+                        paths_changed = True
+                else:
+                    if new_path and new_path != (sdata.get("csv_folder") or "").strip():
+                        sdata["csv_folder"] = new_path
+                        paths_changed = True
+            if paths_changed:
+                proj_data_back = _normalize_namespace_data(read_saved_sets(doc))
+                proj_data_back["sets"] = saved_sets
+                write_saved_sets(doc, proj_data_back)
+
             msg = "{} of {} set(s) exported successfully.".format(success_count, len(batch_set_names))
             if warnings:
                 msg += "\n\nPartial exports (some schedules not found):\n" + "\n".join(warnings)
