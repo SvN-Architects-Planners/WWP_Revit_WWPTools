@@ -507,6 +507,224 @@ def load_uiutils():
     return ui
 
 
+def _show_batch_dialog(saved_sets, doc):
+    """Batch export dialog: checkbox | schedule name | sheet name | file path | ..."""
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.Windows import (Window, WindowStartupLocation, Thickness,
+                                 HorizontalAlignment, VerticalAlignment,
+                                 FontWeights, TextTrimming, GridLength, GridUnitType)
+    from System.Windows.Controls import (Grid, StackPanel, ScrollViewer, Button,
+                                          CheckBox, TextBlock, ColumnDefinition,
+                                          RowDefinition, Orientation, ScrollBarVisibility)
+
+    set_names = sorted(saved_sets.keys())
+    if not set_names:
+        return None
+
+    all_schedules_by_name = {v.Name: v for v in collect_schedules(doc)}
+
+    paths = {}
+    set_modes = {}
+    sheet_name_labels = {}
+    for sname in set_names:
+        sdata = saved_sets.get(sname) or {}
+        mode = int(sdata.get("export_mode", 0))
+        set_modes[sname] = mode
+        raw = sdata.get("excel_path") if mode == 0 else sdata.get("csv_folder")
+        paths[sname] = (raw or "").strip()
+        sched_names = sdata.get("schedule_names") or []
+        use_cat = bool(sdata.get("use_category_sheet_name", False))
+        if not sched_names:
+            sheet_name_labels[sname] = "(no schedules)"
+        elif len(sched_names) == 1:
+            view = all_schedules_by_name.get(sched_names[0])
+            if view is None:
+                sheet_name_labels[sname] = sanitize_sheet_name(sched_names[0])
+            elif use_cat:
+                sheet_name_labels[sname] = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view)))
+            else:
+                sheet_name_labels[sname] = sanitize_sheet_name(view.Name)
+        else:
+            if use_cat:
+                first = all_schedules_by_name.get(sched_names[0])
+                if first:
+                    first_label = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, first)))
+                else:
+                    first_label = sched_names[0]
+                sheet_name_labels[sname] = "{}, ... ({})".format(first_label, len(sched_names))
+            else:
+                sheet_name_labels[sname] = "{} sheets".format(len(sched_names))
+
+    _ok_clicked = [False]
+    checkboxes = {}
+    path_labels = {}
+
+    window = Window()
+    window.Title = "Batch Export"
+    window.Width = 760
+    window.MinWidth = 520
+    window.Height = min(180 + len(set_names) * 30, 560)
+    window.MinHeight = 200
+    window.WindowStartupLocation = WindowStartupLocation.CenterScreen
+
+    outer = Grid()
+    outer.Margin = Thickness(12)
+    rh = RowDefinition(); rh.Height = GridLength.Auto
+    rc = RowDefinition()
+    rb = RowDefinition(); rb.Height = GridLength.Auto
+    outer.RowDefinitions.Add(rh)
+    outer.RowDefinitions.Add(rc)
+    outer.RowDefinitions.Add(rb)
+    window.Content = outer
+
+    prompt = TextBlock()
+    prompt.Text = "Select sets to export. Click ... to choose or change the output file path."
+    prompt.Margin = Thickness(0, 0, 0, 8)
+    Grid.SetRow(prompt, 0)
+    outer.Children.Add(prompt)
+
+    scroll = ScrollViewer()
+    scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+    scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+    Grid.SetRow(scroll, 1)
+    outer.Children.Add(scroll)
+
+    tbl = Grid()
+    # checkbox | schedule name | sheet name | file path | ...
+    for w in [28, 150, 120, -1, 34]:
+        cd = ColumnDefinition()
+        cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
+        tbl.ColumnDefinitions.Add(cd)
+    scroll.Content = tbl
+
+    hrd = RowDefinition(); hrd.Height = GridLength.Auto
+    tbl.RowDefinitions.Add(hrd)
+    for col, text in [(1, "Schedule Name"), (2, "Sheet Name"), (3, "File Path")]:
+        tb = TextBlock()
+        tb.Text = text
+        tb.FontWeight = FontWeights.Bold
+        tb.Margin = Thickness(4, 2, 4, 6)
+        Grid.SetRow(tb, 0)
+        Grid.SetColumn(tb, col)
+        tbl.Children.Add(tb)
+
+    for row_idx, sname in enumerate(set_names, 1):
+        mode = set_modes[sname]
+
+        rd = RowDefinition(); rd.Height = GridLength(30)
+        tbl.RowDefinitions.Add(rd)
+
+        cb = CheckBox()
+        cb.IsChecked = True
+        cb.VerticalAlignment = VerticalAlignment.Center
+        cb.HorizontalAlignment = HorizontalAlignment.Center
+        Grid.SetRow(cb, row_idx)
+        Grid.SetColumn(cb, 0)
+        tbl.Children.Add(cb)
+        checkboxes[sname] = cb
+
+        name_tb = TextBlock()
+        name_tb.Text = sname
+        name_tb.VerticalAlignment = VerticalAlignment.Center
+        name_tb.Margin = Thickness(4, 0, 8, 0)
+        name_tb.TextTrimming = TextTrimming.CharacterEllipsis
+        Grid.SetRow(name_tb, row_idx)
+        Grid.SetColumn(name_tb, 1)
+        tbl.Children.Add(name_tb)
+
+        sheet_tb = TextBlock()
+        sheet_tb.Text = sheet_name_labels.get(sname, "")
+        sheet_tb.VerticalAlignment = VerticalAlignment.Center
+        sheet_tb.Margin = Thickness(4, 0, 8, 0)
+        sheet_tb.TextTrimming = TextTrimming.CharacterEllipsis
+        Grid.SetRow(sheet_tb, row_idx)
+        Grid.SetColumn(sheet_tb, 2)
+        tbl.Children.Add(sheet_tb)
+
+        path_tb = TextBlock()
+        path_tb.Text = paths[sname] or "(no path)"
+        path_tb.VerticalAlignment = VerticalAlignment.Center
+        path_tb.Margin = Thickness(4, 0, 4, 0)
+        path_tb.TextTrimming = TextTrimming.CharacterEllipsis
+        Grid.SetRow(path_tb, row_idx)
+        Grid.SetColumn(path_tb, 3)
+        tbl.Children.Add(path_tb)
+        path_labels[sname] = path_tb
+
+        btn = Button()
+        btn.Content = "..."
+        btn.Margin = Thickness(2, 3, 2, 3)
+        Grid.SetRow(btn, row_idx)
+        Grid.SetColumn(btn, 4)
+        tbl.Children.Add(btn)
+
+        def _make_browse(sname_, mode_):
+            def _on_browse(_s, _e):
+                cur = paths.get(sname_) or ""
+                if mode_ == 0:
+                    init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
+                    fname = os.path.basename(cur) if cur else "{}.xlsx".format(sanitize_file_name(sname_))
+                    new_path = _pick_save_file(
+                        title="'{}' -- Choose Output File".format(sname_),
+                        filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                        default_extension="xlsx",
+                        initial_directory=init_dir,
+                        file_name=fname,
+                    )
+                    new_path = normalize_excel_output_path(new_path or "")
+                else:
+                    init_dir = cur if cur and os.path.isdir(cur) else get_default_dir(doc)
+                    new_path = _pick_folder(
+                        title="'{}' -- Choose CSV Folder".format(sname_),
+                        initial_directory=init_dir,
+                    )
+                    new_path = (new_path or "").strip()
+                if new_path:
+                    paths[sname_] = new_path
+                    path_labels[sname_].Text = new_path
+            return _on_browse
+
+        btn.Click += _make_browse(sname, mode)
+
+    btns = StackPanel()
+    btns.Orientation = Orientation.Horizontal
+    btns.HorizontalAlignment = HorizontalAlignment.Right
+    btns.Margin = Thickness(0, 10, 0, 0)
+    Grid.SetRow(btns, 2)
+    outer.Children.Add(btns)
+
+    ok_btn = Button()
+    ok_btn.Content = "Export Selected"
+    ok_btn.MinWidth = 110
+    ok_btn.Margin = Thickness(0, 0, 6, 0)
+
+    cancel_btn = Button()
+    cancel_btn.Content = "Cancel"
+    cancel_btn.MinWidth = 70
+
+    def _ok(_s, _e):
+        _ok_clicked[0] = True
+        window.Close()
+
+    def _cancel(_s, _e):
+        window.Close()
+
+    ok_btn.Click += _ok
+    cancel_btn.Click += _cancel
+    btns.Children.Add(ok_btn)
+    btns.Children.Add(cancel_btn)
+
+    window.ShowDialog()
+
+    if not _ok_clicked[0]:
+        return None
+
+    selected = [sname for sname in set_names if checkboxes[sname].IsChecked]
+    return selected, dict(paths)
+
+
 def _show_export_form(
     ui,
     items,
@@ -794,31 +1012,13 @@ def _show_export_form(
         if not saved_sets:
             ui.uiUtils_alert("No saved sets available. Save a set first.", title="Multiple Schedules Exporter")
             return
-        set_names = sorted(saved_sets.keys())
-        labels = []
-        for sname in set_names:
-            sdata = saved_sets.get(sname) or {}
-            n = len(sdata.get("schedule_names") or [])
-            raw_path = sdata.get("excel_path") or sdata.get("csv_folder") or ""
-            dest = os.path.basename(raw_path) if raw_path else "(no path saved)"
-            labels.append("{} -- {} ({} schedule{})".format(sname, dest, n, "" if n == 1 else "s"))
-        try:
-            selected = ui.uiUtils_select_indices(
-                labels,
-                title="Batch Export Sets",
-                prompt="Select saved sets to export. Each set exports to its saved file path.",
-                multiselect=True,
-                width=600,
-                height=440,
-            )
-        except Exception:
-            selected = []
-        if not selected:
+        result = _show_batch_dialog(saved_sets, doc)
+        if not result:
             return
-        chosen = [set_names[i] for i in selected if 0 <= i < len(set_names)]
+        chosen, override_paths = result
         if not chosen:
             return
-        _batch_result[0] = chosen
+        _batch_result[0] = {"names": chosen, "paths": override_paths}
         window.DialogResult = True
         window.Close()
 
@@ -898,7 +1098,8 @@ def _show_export_form(
         return None
 
     if _batch_result[0] is not None:
-        return {"batch_sets": _batch_result[0]}
+        bd = _batch_result[0]
+        return {"batch_sets": bd["names"], "batch_paths": bd["paths"]}
 
     selected_indices = [idx for idx, item in enumerate(items) if item in selected_names]
     selected_mode = 0 if excel_mode.IsChecked else 1
@@ -1593,6 +1794,7 @@ def main():
             return
         if "batch_sets" in inputs:
             batch_set_names = inputs["batch_sets"]
+            batch_paths = inputs.get("batch_paths") or {}
             all_schedules_by_name = {v.Name: v for v in schedules}
             success_count = 0
             skipped = []
@@ -1621,19 +1823,9 @@ def main():
                 set_delim = set_data.get("csv_delim", ",")
                 set_qualifier = set_data.get("csv_text_qualifier", "")
                 if set_mode == 0:
-                    set_excel_path = normalize_excel_output_path(set_data.get("excel_path", ""))
-                    saved_dir = os.path.dirname(set_excel_path) if set_excel_path else get_default_dir(doc)
-                    saved_name = os.path.basename(set_excel_path) if set_excel_path else "{}.xlsx".format(sanitize_file_name(set_name))
-                    chosen = _pick_save_file(
-                        title="'{}' -- Choose Output File".format(set_name),
-                        filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                        default_extension="xlsx",
-                        initial_directory=saved_dir,
-                        file_name=saved_name,
-                    )
-                    set_excel_path = normalize_excel_output_path(chosen or "")
+                    set_excel_path = normalize_excel_output_path(batch_paths.get(set_name) or "")
                     if not set_excel_path:
-                        skipped.append("{}: skipped (no output path chosen)".format(set_name))
+                        skipped.append("{}: no output path set".format(set_name))
                         continue
                     ok = export_to_excel(
                         doc, set_views, set_excel_path, ui,
@@ -1650,15 +1842,9 @@ def main():
                     else:
                         skipped.append("{}: export failed (see log)".format(set_name))
                 else:
-                    set_csv_folder = (set_data.get("csv_folder") or "").strip()
-                    init_folder = set_csv_folder if set_csv_folder else get_default_dir(doc)
-                    chosen_folder = _pick_folder(
-                        title="'{}' -- Choose CSV Folder".format(set_name),
-                        initial_directory=init_folder,
-                    )
-                    set_csv_folder = (chosen_folder or "").strip()
+                    set_csv_folder = (batch_paths.get(set_name) or "").strip()
                     if not set_csv_folder:
-                        skipped.append("{}: skipped (no output folder chosen)".format(set_name))
+                        skipped.append("{}: no output folder set".format(set_name))
                         continue
                     try:
                         export_to_csv(
