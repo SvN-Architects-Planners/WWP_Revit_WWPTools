@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to Excel (Classic): **CSV output options** (CSV folder, delimiter, text qualifier, quote all fields) are now hidden when Excel mode is selected and only appear when CSV mode is active.
 
 ### Fixed
+- Export to Excel (Classic + Beta): saved sets were silently failing to persist in the project. Parameter creation and value write are now combined in a single transaction with `doc.Regenerate()` between binding creation and the `LookupParameter` call, fixing the stale-reference issue on first use. Classic now also shows an alert if writing fails instead of silently discarding the save.
+
+### Fixed
 - Add Line Type: replaced wildcard `from Autodesk.Revit.DB import *` with explicit symbol imports to reduce first-click load overhead.
 
 ### Added

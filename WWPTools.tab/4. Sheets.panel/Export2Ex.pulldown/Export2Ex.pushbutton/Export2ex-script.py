@@ -191,68 +191,54 @@ def _looks_like_legacy_saved_sets(data):
     return all(isinstance(v, dict) for v in data.values())
 
 
-def _ensure_export_param(doc):
-    """Create PARAM_SAVED_SETS as a project text parameter on ProjectInformation if it doesn't exist."""
-    try:
-        proj_info = doc.ProjectInformation
-        if proj_info is None:
-            return False
-        if proj_info.LookupParameter(PARAM_SAVED_SETS) is not None:
-            return True
-        app = doc.Application
-        cat_set = app.Create.NewCategorySet()
-        pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
-        if pi_cat is None:
-            return False
-        cat_set.Insert(pi_cat)
-        binding = app.Create.NewInstanceBinding(cat_set)
-        opts = DB.InternalDefinitionCreationOptions(PARAM_SAVED_SETS, DB.SpecTypeId.String.Text)
-        opts.Visible = True
-        t = DB.Transaction(doc, "Create Export Settings Parameter")
-        t.Start()
-        try:
-            try:
-                from Autodesk.Revit.DB import GroupTypeId
-                doc.ParameterBindings.Insert(opts, binding, GroupTypeId.Data)
-            except Exception:
-                doc.ParameterBindings.Insert(opts, binding, DB.BuiltInParameterGroup.PG_DATA)
-            t.Commit()
-        except Exception as inner:
-            t.RollBack()
-            log_exception("_ensure_export_param transaction", inner)
-            return False
-        return proj_info.LookupParameter(PARAM_SAVED_SETS) is not None
-    except Exception as exc:
-        log_exception("_ensure_export_param", exc)
-        return False
-
-
 def write_saved_sets(doc, sets_dict):
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
             return False
         param = proj_info.LookupParameter(PARAM_SAVED_SETS)
-        if param is None:
-            _ensure_export_param(doc)
-            param = proj_info.LookupParameter(PARAM_SAVED_SETS)
-        if param is None or param.IsReadOnly:
-            return False
-        raw = (param.AsString() or "").strip()
-        try:
-            payload = json.loads(raw) if raw else {}
-        except Exception:
-            payload = {}
-        if not isinstance(payload, dict):
-            payload = {}
-        if _looks_like_legacy_saved_sets(payload):
-            payload = {SAVED_SET_NAMESPACE: payload}
-        payload[SAVED_SET_NAMESPACE] = sets_dict
         t = DB.Transaction(doc, "Save Export2Ex Settings")
         t.Start()
-        param.Set(json.dumps(payload, ensure_ascii=False, indent=2))
-        t.Commit()
-        return True
+        try:
+            if param is None:
+                app = doc.Application
+                cat_set = app.Create.NewCategorySet()
+                pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
+                if pi_cat is None:
+                    t.RollBack()
+                    return False
+                cat_set.Insert(pi_cat)
+                binding = app.Create.NewInstanceBinding(cat_set)
+                from Autodesk.Revit.DB import GroupTypeId
+                opts = DB.InternalDefinitionCreationOptions(PARAM_SAVED_SETS, DB.SpecTypeId.String.Text)
+                opts.Visible = True
+                doc.ParameterBindings.Insert(opts, binding, GroupTypeId.Data)
+                doc.Regenerate()
+                proj_info = doc.ProjectInformation
+                param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+            if param is None or param.IsReadOnly:
+                t.RollBack()
+                return False
+            raw = (param.AsString() or "").strip()
+            try:
+                payload = json.loads(raw) if raw else {}
+            except Exception:
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            if _looks_like_legacy_saved_sets(payload):
+                payload = {SAVED_SET_NAMESPACE: payload}
+            payload[SAVED_SET_NAMESPACE] = sets_dict
+            param.Set(json.dumps(payload, ensure_ascii=False, indent=2))
+            t.Commit()
+            return True
+        except Exception as inner:
+            try:
+                t.RollBack()
+            except Exception:
+                pass
+            log_exception("write_saved_sets transaction", inner)
+            return False
     except Exception as exc:
         log_exception("write_saved_sets", exc)
         return False
@@ -971,7 +957,12 @@ def _show_export_form(
         proj_data = _normalize_namespace_data(read_saved_sets(doc))
         proj_data["settings"] = proj_data.get("settings", {})
         proj_data["sets"] = saved_sets
-        write_saved_sets(doc, proj_data)
+        if not write_saved_sets(doc, proj_data):
+            ui.uiUtils_alert(
+                "Could not save to '{}' on Project Information.\n"
+                "Check the parameter exists and the project is not read-only.".format(PARAM_SAVED_SETS),
+                title="Export Schedules",
+            )
 
     def _apply_saved_set(set_data):
         try:
