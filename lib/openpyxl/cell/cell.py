@@ -121,7 +121,7 @@ class Cell(StyleableObject):
     def coordinate(self):
         """This cell's coordinate (ex. 'A5')"""
         col = get_column_letter(self.column)
-        return f"{col}{self.row}"
+        return "{}{}".format(col, self.row)
 
 
     @property

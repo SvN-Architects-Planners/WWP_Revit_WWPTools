@@ -43,12 +43,12 @@ def coordinate_from_string(coord_string):
     """Convert a coordinate string like 'B12' to a tuple ('B', 12)"""
     match = COORD_RE.match(coord_string)
     if not match:
-        msg = f"Invalid cell coordinates ({coord_string})"
+        msg = "Invalid cell coordinates ({})".format(coord_string)
         raise CellCoordinatesException(msg)
     column, row = match.groups()
     row = int(row)
     if not row:
-        msg = f"There is no row 0 ({coord_string})"
+        msg = "There is no row 0 ({})".format(coord_string)
         raise CellCoordinatesException(msg)
     return column, row
 
@@ -57,12 +57,12 @@ def absolute_coordinate(coord_string):
     """Convert a coordinate to an absolute coordinate string (B12 -> $B$12)"""
     m = ABSOLUTE_RE.match(coord_string)
     if not m:
-        raise ValueError(f"{coord_string} is not a valid coordinate range")
+        raise ValueError("{} is not a valid coordinate range".format(coord_string))
 
     d = m.groupdict('')
     for k, v in d.items():
         if v:
-            d[k] = f"${v}"
+            d[k] = "${}".format(v)
 
     if d['max_col'] or d['max_row']:
         fmt = "{min_col}{min_row}:{max_col}{max_row}"

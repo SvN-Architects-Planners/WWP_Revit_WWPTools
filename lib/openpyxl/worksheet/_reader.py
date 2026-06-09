@@ -207,7 +207,7 @@ class WorkSheetParser(object):
                             value, self.epoch, timedelta=style_id in self.timedelta_formats
                         )
                     except (OverflowError, ValueError):
-                        msg = f"""Cell {coordinate} is marked as a date but the serial value {value} is outside the limits for dates. The cell will be treated as an error."""
+                        msg = "Cell {} is marked as a date but the serial value {} is outside the limits for dates. The cell will be treated as an error.".format(coordinate, value)
                         warn(msg)
                         data_type = "e"
                         value = "#VALUE!"
@@ -273,7 +273,7 @@ class WorkSheetParser(object):
                 if val.is_integer():
                     self.row_counter = int(val)
                 else:
-                    raise ValueError(f"{attrs['r']} is not a valid row number")
+                    raise ValueError("{} is not a valid row number".format(attrs['r']))
         else:
             self.row_counter += 1
         self.col_counter = 0
@@ -292,7 +292,7 @@ class WorkSheetParser(object):
             cf = ConditionalFormatting.from_tree(element)
             self.formatting.append(cf)
         except TypeError as e:
-            msg = f"Failed to load a conditional formatting rule. It will be discarded. Cause: {e}"
+            msg = "Failed to load a conditional formatting rule. It will be discarded. Cause: {}".format(e)
             warn(msg)
 
 

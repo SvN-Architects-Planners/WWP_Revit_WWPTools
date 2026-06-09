@@ -112,7 +112,7 @@ class Tokenizer(object):
         match = regex.match(self.formula[self.offset:])
         if match is None:
             subtype = "string" if delim == '"' else 'link'
-            raise TokenizerError(f"Reached end of formula while parsing {subtype} in {self.formula}")
+            raise TokenizerError("Reached end of formula while parsing {} in {}".format(subtype, self.formula))
         match = match.group(0)
         if delim == '"':
             self.items.append(Token.make_operand(match))
@@ -143,7 +143,7 @@ class Tokenizer(object):
                     self.formula[self.offset:self.offset + outer_right])
                 return outer_right
 
-        raise TokenizerError(f"Encountered unmatched '[' in {self.formula}")
+        raise TokenizerError("Encountered unmatched '[' in {}".format(self.formula))
 
     def _parse_error(self):
         """
@@ -161,7 +161,7 @@ class Tokenizer(object):
                 self.items.append(Token.make_operand(''.join(self.token) + err))
                 del self.token[:]
                 return len(err)
-        raise TokenizerError(f"Invalid error code at position {self.offset} in '{self.formula}'")
+        raise TokenizerError("Invalid error code at position {} in '{}'".format(self.offset, self.formula))
 
     def _parse_whitespace(self):
         """
@@ -304,7 +304,7 @@ class Tokenizer(object):
 
         """
         if self.token and self.token[-1] not in can_follow:
-            raise TokenizerError(f"Unexpected character at position {self.offset} in '{self.formula}'")
+            raise TokenizerError("Unexpected character at position {} in '{}'".format(self.offset, self.formula))
 
     def save_token(self):
         """If there's a token being parsed, add it to the item list."""

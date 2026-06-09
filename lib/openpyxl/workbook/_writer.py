@@ -175,7 +175,7 @@ class WorkbookWriter:
 
         rel = Relationship(type="officeDocument", Target=ARC_WORKBOOK)
         rels.append(rel)
-        rel = Relationship(Type=f"{PKG_REL_NS}/metadata/core-properties", Target=ARC_CORE)
+        rel = Relationship(Type="{}/metadata/core-properties".format(PKG_REL_NS), Target=ARC_CORE)
         rels.append(rel)
 
         rel = Relationship(type="extended-properties", Target=ARC_APP)

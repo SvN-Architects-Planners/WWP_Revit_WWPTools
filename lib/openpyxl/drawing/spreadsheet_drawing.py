@@ -307,7 +307,7 @@ class SpreadsheetDrawing(Serialisable):
 
 
     def _chart_frame(self, idx):
-        chart_rel = ChartRelation(f"rId{idx}")
+        chart_rel = ChartRelation("rId{}".format(idx))
         frame = GraphicFrame()
         nv = frame.nvGraphicFramePr.cNvPr
         nv.id = idx
