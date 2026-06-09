@@ -1,5 +1,5 @@
 title: "Fix\nAngles"
 tooltip: |
   Modeless off-axis warning browser. Review, zoom, edit groups, and apply 2-decimal sketch-line fixes without closing the tool. Property lines are ignored.
-  Version: 2.0.0
+  Version: 2.0.1
 author: "Jason Tian"

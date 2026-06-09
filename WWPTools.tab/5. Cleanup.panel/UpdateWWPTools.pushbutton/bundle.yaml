@@ -1,6 +1,6 @@
 title: "Update\nWWPTools"
 tooltip: |
   Update WWPTools using pyRevit's built-in Git support when this extension is installed from a repository.
-  Version: 2.0.0
+  Version: 2.0.1
 author: "Jason Tian"
 context: zero-doc

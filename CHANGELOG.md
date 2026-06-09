@@ -5,7 +5,7 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.1] - 2026-06-08
 
 ### Added
 - Export to Excel (Beta): **Batch Export manager is now the primary screen** — launching Export2Ex Beta opens the set manager directly. Add, Edit, and Delete buttons let you create or modify sets without leaving the manager; clicking Add or Edit opens the full config form. Clicking Export Selected runs the batch export.
