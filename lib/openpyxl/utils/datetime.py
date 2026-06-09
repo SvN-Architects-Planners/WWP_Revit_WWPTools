@@ -55,7 +55,7 @@ def from_ISO8601(formatted_string):
                 parts[key] = int(parts[key])
 
         if parts["microsecond"]:
-            parts["microsecond"] = int(float(parts['microsecond']) * 1_000_000)
+            parts["microsecond"] = int(float(parts['microsecond']) * 1000000)
 
         if not parts["date"]:
             dt = datetime.time(parts['hour'], parts['minute'], parts['second'], parts["microsecond"])
