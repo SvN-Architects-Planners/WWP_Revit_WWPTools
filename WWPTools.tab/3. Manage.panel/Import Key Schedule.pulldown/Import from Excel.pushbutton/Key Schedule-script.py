@@ -1,4 +1,5 @@
 import clr
+clr.AddReference('System.Xml')
 import json
 import os
 import re
