@@ -399,17 +399,24 @@ def read_saved_sets(doc):
         if not raw:
             return {}
         data = json.loads(raw)
-        if isinstance(data, dict) and isinstance(data.get(SAVED_SET_NAMESPACE), dict):
+        if not isinstance(data, dict):
+            return {}
+        if isinstance(data.get(SAVED_SET_NAMESPACE), dict):
             return data.get(SAVED_SET_NAMESPACE) or {}
-        return data if isinstance(data, dict) else {}
+        if any(k in data for k in _ALL_NAMESPACES):
+            return {}
+        return data
     except Exception:
         return {}
+
+
+_ALL_NAMESPACES = ("export2ex", "export2ex_beta", "mass_stats")
 
 
 def _looks_like_legacy_saved_sets(data):
     if not isinstance(data, dict) or not data:
         return False
-    if "mass_stats" in data or SAVED_SET_NAMESPACE in data:
+    if any(k in data for k in _ALL_NAMESPACES):
         return False
     return all(isinstance(v, dict) for v in data.values())
 

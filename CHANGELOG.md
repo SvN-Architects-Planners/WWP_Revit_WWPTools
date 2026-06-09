@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Export to Excel (Classic + Beta): saved sets were silently failing to persist in the project. Parameter creation and value write are now combined in a single transaction with `doc.Regenerate()` between binding creation and the `LookupParameter` call, fixing the stale-reference issue on first use. Classic now also shows an alert if writing fails instead of silently discarding the save.
+- Export to Excel (Classic + Beta): fixed namespace collision — Classic was misreading Beta's saved sets (and vice versa) because the legacy-data fallback in `read_saved_sets` and `_looks_like_legacy_saved_sets` only checked for its own namespace key. Both functions now check all known namespaces (`export2ex`, `export2ex_beta`, `mass_stats`) before falling back to legacy mode.
 
 ### Fixed
 - Add Line Type: replaced wildcard `from Autodesk.Revit.DB import *` with explicit symbol imports to reduce first-click load overhead.
