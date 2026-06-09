@@ -1,5 +1,3 @@
-#! python3
-
 import csv
 import importlib
 import io
