@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to Excel (Classic): **Batch Export** button — select multiple saved sets and export them all in one click; each set uses its stored destination path. A summary reports how many succeeded and lists any skipped sets with the reason.
 - Export to Excel (Classic): Batch Export now shows a table with **Schedule Name**, **Sheet Name**, and **File Path** columns. Each row has a **...** button to choose or change the output file path before exporting. Unchecking a row skips that set. Path changes are written back to the project saved sets so they persist for future runs. If the `! P_STATS_Export_Text` parameter does not exist on the project, it is created automatically.
 
+### Changed
+- Export to Excel (Classic): **Excel file path** moved above the Search schedules field (below Saved set) so it is always visible without scrolling.
+- Export to Excel (Classic): **CSV output options** (CSV folder, delimiter, text qualifier, quote all fields) are now hidden when Excel mode is selected and only appear when CSV mode is active.
+
 ### Fixed
 - Add Line Type: replaced wildcard `from Autodesk.Revit.DB import *` with explicit symbol imports to reduce first-click load overhead.
 

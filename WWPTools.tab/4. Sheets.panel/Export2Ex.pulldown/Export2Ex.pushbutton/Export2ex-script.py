@@ -832,6 +832,7 @@ def _show_export_form(
     logo_image = window.FindName("LogoImage")
     use_category_sheet_name_ctrl = window.FindName("UseCategorySheetName")
     batch_export_button = window.FindName("BatchExportButton")
+    csv_output_options = window.FindName("CsvOutputOptions")
 
     schedule_list.ItemsSource = _to_net_list(items)
     delimiter_items = [
@@ -911,6 +912,7 @@ def _show_export_form(
     _apply_selection()
 
     def _update_enabled_state():
+        from System.Windows import Visibility
         is_excel = bool(excel_mode.IsChecked)
         excel_path.IsEnabled = is_excel
         browse_excel.IsEnabled = is_excel
@@ -918,6 +920,8 @@ def _show_export_form(
         browse_csv.IsEnabled = not is_excel
         if use_category_sheet_name_ctrl is not None:
             use_category_sheet_name_ctrl.IsEnabled = is_excel
+        if csv_output_options is not None:
+            csv_output_options.Visibility = Visibility.Collapsed if is_excel else Visibility.Visible
 
     def _filter_list(_sender=None, _args=None):
         text = search_box.Text or ""

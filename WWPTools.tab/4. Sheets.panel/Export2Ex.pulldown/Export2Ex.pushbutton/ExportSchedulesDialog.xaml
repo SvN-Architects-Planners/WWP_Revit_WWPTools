@@ -159,6 +159,14 @@
                                 Width="64"
                                 Style="{StaticResource SecondaryButtonStyle}"/>
                     </Grid>
+                    <TextBlock Text="Excel file path"
+                               Margin="0,0,0,6"
+                               Foreground="#6B7280"
+                               FontWeight="SemiBold"/>
+                    <DockPanel Margin="0,0,0,10" LastChildFill="True">
+                        <Button Name="BrowseExcel" Content="Browse" Width="80" DockPanel.Dock="Right" Style="{StaticResource SecondaryButtonStyle}"/>
+                        <TextBox Name="ExcelPath" Margin="0,0,6,0"/>
+                    </DockPanel>
                     <TextBlock Text="Search schedules"
                                Margin="0,0,0,6"
                                Foreground="#6B7280"
@@ -213,12 +221,7 @@
                                     </StackPanel>
                                 </StackPanel>
                             </GroupBox>
-                            <TextBlock Text="Excel file path" Margin="0,2,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
-                            <DockPanel Margin="0,0,0,10" LastChildFill="True">
-                                <Button Name="BrowseExcel" Content="Browse" Width="80" DockPanel.Dock="Right" Style="{StaticResource SecondaryButtonStyle}"/>
-                                <TextBox Name="ExcelPath" Margin="0,0,6,0"/>
-                            </DockPanel>
-                            <GroupBox Header="Output options">
+                            <GroupBox Name="CsvOutputOptions" Header="Output options">
                                 <StackPanel>
                                     <TextBlock Text="CSV folder" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
                                     <DockPanel Margin="0,0,0,10" LastChildFill="True">
