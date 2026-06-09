@@ -33,7 +33,7 @@ else:
     QName,
     register_namespace
     )
-    from et_xmlfile import xmlfile
+    from et_xmlfile.xmlfile import xmlfile
     if DEFUSEDXML is True:
         from defusedxml.ElementTree import fromstring
 
