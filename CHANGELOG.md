@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FamilySwapper-script.py`: replaced three em dash characters (`\xe2\x80\x94`) with plain hyphens — IronPython defaults to ASCII and raised `SyntaxError: Non-ASCII character '\xe2'` on load.
 - `FamilySwapper-script.py`: added `clr.AddReference('PresentationFramework')` before the `System.Windows.Controls` import — IronPython raises `ImportError: No module named Controls` without it.
 - `ukcontextbuilder-script.py`, `webcontextbuilder-script.py`: added `clr.AddReference` calls for `System`, `System.Xml`, `PresentationFramework`, `PresentationCore`, and `WindowsBase` before the `from System.*` imports — IronPython does not auto-load these assemblies unlike CPython/pythonnet.
+- `ExportTypeLayers`, `ImportTypeLayers`, `Export2ex`, `Export2exBeta`, `Key Schedule`: added `clr.AddReference('System.Xml')` (and `import clr` where missing) immediately before each lazy `import openpyxl` call. IronPython's `xml.etree.ElementTree` internally uses `System.Xml.XmlReader`; without an explicit reference the runtime raised `ImportError: Cannot import name XmlReader` on first use.
+- `webcontextbuilder-script.py`, `ukcontextbuilder-script.py`: added `_el_name(el)` helper that wraps `.Name` in a `try/except` returning `''` on failure. All `floor_type.Name.lower()` and `topo_type.Name.lower()` sort keys and inline reads now go through this helper. IronPython 3 converts internal C# `NullReferenceException` in the `.Name` getter to `AttributeError: Name`, which previously crashed the floor/topo type pickers.
 
 ## [2.0.0] - 2026-05-22
 

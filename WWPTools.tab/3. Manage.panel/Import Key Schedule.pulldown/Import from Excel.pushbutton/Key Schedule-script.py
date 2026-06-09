@@ -1051,6 +1051,7 @@ def _download_url_to_temp(url):
 
 def read_workbook(path, ui):
     add_lib_path()
+    clr.AddReference('System.Xml')
     try:
         import openpyxl
     except Exception as exc:

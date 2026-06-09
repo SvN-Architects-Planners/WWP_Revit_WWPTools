@@ -1534,6 +1534,7 @@ def export_to_excel(
         )
     )
     add_lib_path()
+    clr.AddReference('System.Xml')
     try:
         import openpyxl
     except Exception as exc:

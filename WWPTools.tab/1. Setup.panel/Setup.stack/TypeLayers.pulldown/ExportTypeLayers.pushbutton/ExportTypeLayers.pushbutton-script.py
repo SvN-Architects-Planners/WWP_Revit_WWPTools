@@ -1,3 +1,4 @@
+import clr
 import os
 import sys
 
@@ -292,6 +293,7 @@ def collect_type_rows(doc, category_label, types):
 
 def export_to_excel(doc, selections, file_path, ui):
     add_lib_path()
+    clr.AddReference('System.Xml')
     try:
         import openpyxl
     except Exception as exc:

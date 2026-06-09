@@ -30,6 +30,13 @@ from Autodesk.Revit import DB, UI
 from WWP_versioning import apply_window_title
 
 
+def _el_name(el):
+    try:
+        return el.Name or ''
+    except Exception:
+        return ''
+
+
 TITLE = "Web Context Builder"
 APP_ID = "WWPTools.WebContextBuilder"
 DEFAULT_RADIUS_M = 500.0
@@ -1555,7 +1562,7 @@ def _pick_base_level(doc):
 
 def _get_floor_types(doc):
     floor_types = list(DB.FilteredElementCollector(doc).OfClass(DB.FloorType))
-    floor_types.sort(key=lambda floor_type: floor_type.Name.lower())
+    floor_types.sort(key=lambda floor_type: _el_name(floor_type).lower())
     return floor_types
 
 
@@ -1566,12 +1573,12 @@ def _pick_floor_type(doc, keywords):
 
     lowered_keywords = [keyword.lower() for keyword in (keywords or [])]
     for floor_type in floor_types:
-        name = floor_type.Name.lower()
+        name = _el_name(floor_type).lower()
         if any(keyword in name for keyword in lowered_keywords):
             return floor_type
 
     for floor_type in floor_types:
-        name = floor_type.Name.lower()
+        name = _el_name(floor_type).lower()
         if "foundation" not in name and "slab edge" not in name:
             return floor_type
 
@@ -1683,13 +1690,13 @@ def _pick_toposolid_type(doc, keywords=None):
         return None
 
     topo_types = list(DB.FilteredElementCollector(doc).OfClass(topo_cls))
-    topo_types.sort(key=lambda item: item.Name.lower())
+    topo_types.sort(key=lambda item: _el_name(item).lower())
     if not topo_types:
         return None
 
     lowered_keywords = [keyword.lower() for keyword in (keywords or [])]
     for topo_type in topo_types:
-        name = topo_type.Name.lower()
+        name = _el_name(topo_type).lower()
         if any(keyword in name for keyword in lowered_keywords):
             return topo_type
     return topo_types[0]

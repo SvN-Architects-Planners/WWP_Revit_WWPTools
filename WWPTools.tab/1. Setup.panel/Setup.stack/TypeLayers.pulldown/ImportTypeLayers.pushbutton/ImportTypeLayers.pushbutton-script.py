@@ -1,3 +1,4 @@
+import clr
 import os
 import re
 import sys
@@ -520,6 +521,7 @@ def resolve_duplicated_type(doc, duplicated):
 
 def read_workbook(path, ui):
     add_lib_path()
+    clr.AddReference('System.Xml')
     try:
         import openpyxl
     except Exception as exc:

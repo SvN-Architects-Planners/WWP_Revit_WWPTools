@@ -2068,6 +2068,7 @@ def make_unique_name(base, used):
 
 def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None):
     add_lib_path()
+    clr.AddReference('System.Xml')
     try:
         import openpyxl
         from openpyxl.styles import Font
