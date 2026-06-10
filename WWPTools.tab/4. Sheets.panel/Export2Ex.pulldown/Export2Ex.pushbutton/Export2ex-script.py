@@ -1535,12 +1535,11 @@ def export_to_excel(
         )
     )
     add_lib_path()
-    clr.AddReference('System.Xml')
     try:
-        import openpyxl
+        import WWP_xlsx as openpyxl
     except Exception as exc:
         ui.uiUtils_alert(
-            "openpyxl is not available.\n{}".format(exc),
+            "Excel writer is not available.\n{}".format(exc),
             title="Multiple Schedules Exporter",
         )
         return False

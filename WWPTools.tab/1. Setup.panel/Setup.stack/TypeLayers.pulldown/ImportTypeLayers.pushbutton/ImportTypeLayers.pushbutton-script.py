@@ -521,11 +521,10 @@ def resolve_duplicated_type(doc, duplicated):
 
 def read_workbook(path, ui):
     add_lib_path()
-    clr.AddReference('System.Xml')
     try:
-        import openpyxl
+        import WWP_xlsx as openpyxl
     except Exception as exc:
-        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title="Import Type Layers")
+        ui.uiUtils_alert("Excel reader is not available.\n{}".format(exc), title="Import Type Layers")
         return None
     try:
         return openpyxl.load_workbook(path, data_only=True)

@@ -1050,13 +1050,20 @@ def _download_url_to_temp(url):
     return tmp_path
 
 
+# ---------------------------------------------------------------------------
+# Excel reading is handled by the shared lib/WWP_xlsx.py shim (IronPython-safe
+# .NET .xlsx reader/writer). openpyxl cannot import under IronPython and pyRevit
+# 6.4's CPython engine breaks this dialog's WPF event delegates, so neither
+# engine could run openpyxl directly.
+# ---------------------------------------------------------------------------
+
+
 def read_workbook(path, ui):
     add_lib_path()
-    clr.AddReference('System.Xml')
     try:
-        import openpyxl
+        import WWP_xlsx
     except Exception as exc:
-        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title=TITLE)
+        ui.uiUtils_alert("Excel reader is not available.\n{}".format(exc), title=TITLE)
         return None
 
     tmp_path = None
@@ -1074,7 +1081,7 @@ def read_workbook(path, ui):
             return None
 
     try:
-        return openpyxl.load_workbook(actual_path, data_only=True)
+        return WWP_xlsx.load_workbook(actual_path, data_only=True)
     except Exception as exc:
         ui.uiUtils_alert("Failed to open workbook.\n{}".format(exc), title=TITLE)
         return None

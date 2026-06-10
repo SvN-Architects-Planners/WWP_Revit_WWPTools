@@ -12,8 +12,7 @@ except Exception:
 
 import WWP_colorSchemeUtils as csu
 try:
-    from openpyxl import Workbook, load_workbook
-    from openpyxl.utils import get_column_letter
+    from WWP_xlsx import Workbook, load_workbook, get_column_letter
 except Exception:
     Workbook = None
     load_workbook = None

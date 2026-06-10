@@ -2071,12 +2071,11 @@ def make_unique_name(base, used):
 
 def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None):
     add_lib_path()
-    clr.AddReference('System.Xml')
     try:
-        import openpyxl
-        from openpyxl.styles import Font
+        import WWP_xlsx as openpyxl
+        from WWP_xlsx import Font
     except Exception as exc:
-        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title="Export2Ex Beta")
+        ui.uiUtils_alert("Excel writer is not available.\n{}".format(exc), title="Export2Ex Beta")
         return False
 
     if os.path.exists(file_path):

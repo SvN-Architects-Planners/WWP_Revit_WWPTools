@@ -69,12 +69,14 @@ def _log(message):
 
 
 def _elem_id_int(elem_id):
+    if elem_id is None:
+        return None
     try:
-        return int(_elem_id_int(elem_id))
+        return int(elem_id.Value)  # Revit 2024+ uses .Value
     except Exception:
         pass
     try:
-        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .Value
+        return int(elem_id.IntegerValue)  # Revit 2023 and earlier
     except Exception:
         pass
     try:

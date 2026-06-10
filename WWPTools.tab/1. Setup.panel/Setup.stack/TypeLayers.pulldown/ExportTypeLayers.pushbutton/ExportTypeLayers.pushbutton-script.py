@@ -293,11 +293,10 @@ def collect_type_rows(doc, category_label, types):
 
 def export_to_excel(doc, selections, file_path, ui):
     add_lib_path()
-    clr.AddReference('System.Xml')
     try:
-        import openpyxl
+        import WWP_xlsx as openpyxl
     except Exception as exc:
-        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title="Export Type Layers")
+        ui.uiUtils_alert("Excel writer is not available.\n{}".format(exc), title="Export Type Layers")
         return False
 
     workbook = openpyxl.Workbook()

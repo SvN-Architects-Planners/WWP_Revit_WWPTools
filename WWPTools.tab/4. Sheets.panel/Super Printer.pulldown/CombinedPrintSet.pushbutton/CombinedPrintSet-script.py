@@ -424,6 +424,19 @@ def _wait_for_pdf(path_value, timeout_seconds=WAIT_TIMEOUT_SECONDS):
 
 
 def _merge_pdf_files(input_paths, output_path):
+    paths = list(input_paths)
+
+    # Prefer the compiled, engine-agnostic WWPTools.IO PDF merger (PdfSharp).
+    # Fall back to the bundled pypdf if the DLL is unavailable.
+    try:
+        import WWP_xlsx
+        from System import Array, String
+        pdf_service = WWP_xlsx.load_pdf_service()
+        pdf_service.MergePdfs(Array[String]([str(p) for p in paths]), output_path)
+        return
+    except Exception:
+        pass
+
     try:
         from pypdf import PdfReader, PdfWriter
     except Exception as exc:
@@ -431,7 +444,7 @@ def _merge_pdf_files(input_paths, output_path):
 
     writer = PdfWriter()
     try:
-        for input_path in input_paths:
+        for input_path in paths:
             reader = PdfReader(input_path)
             for page in reader.pages:
                 writer.add_page(page)
