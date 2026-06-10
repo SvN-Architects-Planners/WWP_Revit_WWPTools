@@ -7,6 +7,8 @@ import traceback
 
 import clr
 clr.AddReference('System.Xml')
+clr.AddReference('PresentationCore')
+clr.AddReference('PresentationFramework')
 from System import String
 from System import Object
 from System.Collections.Generic import List
