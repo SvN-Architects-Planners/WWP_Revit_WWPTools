@@ -1130,7 +1130,7 @@ def main():
         missing_fields = get_missing_selected_params(sheet, param_map, include_titleblock=False)
         if missing_fields:
             missing_by_sheet.append((
-                "{} — {}".format(sheet.SheetNumber, sheet.Name),
+                "{} - {}".format(sheet.SheetNumber, sheet.Name),
                 [format_param_option(field_name, param_map.get(field_name)) or FIELD_LABELS[field_name] for field_name in missing_fields],
             ))
 
@@ -1173,7 +1173,7 @@ def main():
             missing_fields = get_missing_selected_params(sheet, param_map)
             if missing_fields:
                 missing_by_sheet.append((
-                    "{} — {}".format(sheet.SheetNumber, sheet.Name),
+                    "{} - {}".format(sheet.SheetNumber, sheet.Name),
                     [format_param_option(field_name, param_map.get(field_name)) or FIELD_LABELS[field_name] for field_name in missing_fields],
                 ))
 

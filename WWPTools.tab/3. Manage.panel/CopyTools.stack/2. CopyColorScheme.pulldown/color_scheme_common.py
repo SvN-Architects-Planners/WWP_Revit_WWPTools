@@ -1137,7 +1137,7 @@ def apply_color_map_to_scheme(target, color_map, log=None):
         # After SetEntries + Regenerate, Revit may blend/reset colors for "In Use"
         # entries and clears their ElementId values, so value/caption matching is
         # not reliable here. Copy colors directly by index position instead.
-        # Do NOT regenerate after this second SetEntries — a second Regenerate
+        # Do NOT regenerate after this second SetEntries - a second Regenerate
         # causes Revit to blend the colors again.
         if len(refreshed) == len(entries):
             for src, tgt in zip(entries, refreshed):
@@ -1145,7 +1145,7 @@ def apply_color_map_to_scheme(target, color_map, log=None):
         else:
             csu._patch_entry_colors(refreshed, entries, log=log, stage="color-override-post-set")
         set_entries(csu._to_entry_collection(refreshed))
-    _log(log, "Color override: {} entries updated, {} skipped (not in Excel — colors left unchanged).".format(
+    _log(log, "Color override: {} entries updated, {} skipped (not in Excel - colors left unchanged).".format(
         updated, len(skipped)))
     return True, None
 

@@ -33,7 +33,7 @@ from System.Collections.Generic import List
 
 uidoc = getattr(__revit__, "ActiveUIDocument", None)
 doc = uidoc.Document if uidoc else None
-WINDOW_TITLE = "Create Fire Rating Lines — FRR Views"
+WINDOW_TITLE = "Create Fire Rating Lines - FRR Views"
 FRR_PARAM_NAME = "FRR Walls"
 FRR_VIEW_INDICATOR = "FRR"
 

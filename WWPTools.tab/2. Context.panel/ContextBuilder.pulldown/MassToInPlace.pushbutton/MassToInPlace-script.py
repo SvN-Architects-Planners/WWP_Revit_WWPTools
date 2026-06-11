@@ -177,7 +177,7 @@ def main():
         "",
         "Each instance will be converted to a DirectShape in the Mass category,",
         "embedded directly in the project (no external family file dependency).",
-        "Original family instances will be kept — delete them manually after verifying.",
+        "Original family instances will be kept - delete them manually after verifying.",
         "",
         "Preview of first 20 instances:",
     ]

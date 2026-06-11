@@ -18,7 +18,7 @@ from pyrevit import DB
 
 uidoc = getattr(__revit__, "ActiveUIDocument", None)
 doc = uidoc.Document if uidoc else None
-WINDOW_TITLE = "Create Fire Rating Lines — Selected Walls"
+WINDOW_TITLE = "Create Fire Rating Lines - Selected Walls"
 FRR_PARAM_NAME = "FRR Walls"
 
 
@@ -108,9 +108,9 @@ def main():
     lines = ["Created {} fire rating line(s) from {} selected wall(s).".format(
         created, len(walls))]
     if skipped_zero:
-        lines.append("{} wall(s) skipped — rated 0HR or no rating.".format(skipped_zero))
+        lines.append("{} wall(s) skipped - rated 0HR or no rating.".format(skipped_zero))
     if skipped_no_param:
-        lines.append("{} wall(s) skipped — missing '{}' parameter.".format(
+        lines.append("{} wall(s) skipped - missing '{}' parameter.".format(
             skipped_no_param, FRR_PARAM_NAME))
     ui.uiUtils_alert("\n".join(lines), title=WINDOW_TITLE)
 

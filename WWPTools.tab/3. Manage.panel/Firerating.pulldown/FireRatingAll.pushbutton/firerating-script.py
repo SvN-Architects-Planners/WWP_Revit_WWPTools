@@ -184,7 +184,7 @@ class FRRMappingDialog(object):
         Grid.SetColumn(combo, 1)
 
         skip_item = ComboBoxItem()
-        skip_item.Content = "\u2014 Skip —"
+        skip_item.Content = "\u2014 Skip -"
         skip_item.Tag = ""
         combo.Items.Add(skip_item)
         combo.SelectedIndex = 0

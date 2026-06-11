@@ -414,7 +414,7 @@ class DictionaryObject(Dict[Any, Any], PdfObject):
         Retrieve XMP (Extensible Metadata Platform) data relevant to the this
         object, if available.
 
-        See Table 347 — Additional entries in a metadata stream dictionary.
+        See Table 347 - Additional entries in a metadata stream dictionary.
 
         Returns:
           Returns a :class:`~pypdf.xmp.XmpInformation` instance

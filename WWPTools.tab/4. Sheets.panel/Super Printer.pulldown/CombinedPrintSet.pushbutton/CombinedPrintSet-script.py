@@ -493,7 +493,7 @@ def _try_native_pdf_export(current_doc, sheet, output_path):
     doc_clr_type = current_doc.GetType()
     pdf_opts_type = doc_clr_type.Assembly.GetType("Autodesk.Revit.DB.PDFExportOptions")
     if pdf_opts_type is None:
-        return False  # Pre-Revit 2022 — fall through to virtual printer
+        return False  # Pre-Revit 2022 - fall through to virtual printer
 
     # Find the PDF export overload with the expected 3-parameter signature:
     # Export(string folder, IList<ElementId> viewIds, PDFExportOptions options)
@@ -540,7 +540,7 @@ def _try_native_pdf_export(current_doc, sheet, output_path):
     if file_name_prop is not None:
         file_name_prop.SetValue(options, _sanitize_file_name("{}_{}".format(sheet.SheetNumber, sheet.Name)))
 
-    # Build List<ElementId> — use DB.ElementId directly (simpler, no type-identity issue here)
+    # Build List<ElementId> - use DB.ElementId directly (simpler, no type-identity issue here)
     id_list = NetList[DB.ElementId]()
     id_list.Add(sheet.Id)
 
@@ -548,7 +548,7 @@ def _try_native_pdf_export(current_doc, sheet, output_path):
     try:
         before = set(os.listdir(temp_export_dir))
 
-        # Invoke via MethodInfo.Invoke — bypasses IronPython type-system entirely
+        # Invoke via MethodInfo.Invoke - bypasses IronPython type-system entirely
         invoke_args = System.Array[System.Object]([temp_export_dir, id_list, options])
         result = export_method.Invoke(current_doc, invoke_args)
 

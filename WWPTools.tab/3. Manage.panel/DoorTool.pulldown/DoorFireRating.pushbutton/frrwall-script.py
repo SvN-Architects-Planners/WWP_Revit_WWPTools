@@ -161,10 +161,10 @@ def main():
 
     lines = ["Done. Updated {} door(s).".format(updated)]
     if skipped_no_host:
-        lines.append("{} door(s) skipped — no host wall.".format(skipped_no_host))
+        lines.append("{} door(s) skipped - no host wall.".format(skipped_no_host))
     if skipped_no_param:
         lines.append(
-            "{} door(s) — host wall missing '{}' parameter.".format(
+            "{} door(s) - host wall missing '{}' parameter.".format(
                 skipped_no_param, dialog.frr_param
             )
         )
