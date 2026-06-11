@@ -1,5 +1,4 @@
 title: "Wipe Data\nExchange Geo"
 tooltip: |
   Remove unused DirectShape geometry left behind by Autodesk Data Exchange or other data connectors. Elements are grouped by Application ID so you can target specific sources.
-  Version: 2.0.1
 author: "Jason Tian"

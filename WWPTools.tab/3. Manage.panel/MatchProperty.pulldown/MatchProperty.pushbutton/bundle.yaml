@@ -2,5 +2,4 @@ title: "Match\nProperty"
 tooltip: |
   Purpose: Copy instance parameter values from a source element to one or more target elements of the same category.
   Usage: Pre-select elements (first = source, rest = targets) before running, or use the pick prompts. A parameter list lets you choose which values to match. Read-only parameters are shown greyed out.
-  Version: 2.0.1
 author: "Jason Tian"

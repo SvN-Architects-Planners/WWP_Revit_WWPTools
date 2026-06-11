@@ -1,6 +1,5 @@
 title:  "Building Importer"
 tooltip: |
   Create context building based on OSM file.
-  Version: 2.0.1
 help_url: "https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.5-or-plugins/2.5.1-or-wwp-tools-toolbar/2-mass-context#building-importer"
 author: "Jason Tian"

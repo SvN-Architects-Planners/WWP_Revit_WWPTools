@@ -1,5 +1,4 @@
 title: "Fix Floor\nHeights"
 tooltip: |
   Update selected floor slab-shape point elevations from a CSV by matching existing vertices on XY and changing only the point height.
-  Version: 2.0.1
 author: "OpenAI Codex"
