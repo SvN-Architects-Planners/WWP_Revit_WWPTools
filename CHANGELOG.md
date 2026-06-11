@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - All tools: removed version number from tooltip text in all bundle.yaml files.
 
+### Fixed
+- Renamer (param_value_renamer_common.py): replaced em dash with ASCII hyphen on line 453 to fix IronPython SyntaxError (non-ASCII character '\xe2').
+
 ## [2.0.1] - 2026-06-08
 
 ### Added

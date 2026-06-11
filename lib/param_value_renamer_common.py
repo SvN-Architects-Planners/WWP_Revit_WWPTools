@@ -450,7 +450,7 @@ def run_selection(script_dir, lib_path):
     if not elements:
         msg = "No editable instance elements found in the current selection."
         if ignore_groups:
-            msg += "\n(Elements in groups are excluded — uncheck 'Ignore elements in groups' to include them.)"
+            msg += "\n(Elements in groups are excluded - uncheck 'Ignore elements in groups' to include them.)"
         ui.uiUtils_alert(msg, title=title)
         return
 
@@ -489,7 +489,7 @@ def run_category(script_dir, lib_path):
     if not elements:
         msg = "No editable instance elements found in category '{}'.".format(cat_name)
         if ignore_groups:
-            msg += "\n(Elements in groups are excluded — uncheck 'Ignore elements in groups' to include them.)"
+            msg += "\n(Elements in groups are excluded - uncheck 'Ignore elements in groups' to include them.)"
         ui.uiUtils_alert(msg, title=title)
         return
 
