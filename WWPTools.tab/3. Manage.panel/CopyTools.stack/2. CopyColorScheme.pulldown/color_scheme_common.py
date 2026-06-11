@@ -369,6 +369,37 @@ def _log(log, message):
             pass
 
 
+class SchemeStorageTypeMismatch(Exception):
+    """Raised when SetEntries rejects entries whose value type differs from the scheme."""
+
+
+_STORAGE_TYPE_MISMATCH_HINT = (
+    "The Excel file's entries have a different value type than the target color "
+    "scheme, so Revit will not merge them.\n\n"
+    "This usually means the Excel was exported from a scheme that colors by a "
+    "different parameter (for example a text value vs. an element id). Pick a "
+    "target scheme that colors by the same parameter, or use 'Create new' to "
+    "import into a fresh scheme instead of merging."
+)
+
+
+def _set_entries_checked(set_entries, collection):
+    """Call SetEntries, translating Revit's storage-type rejection into a clean error.
+
+    Revit raises a bare ArgumentException ("...whose storage type is different
+    with the scheme") when any entry's value type does not match the scheme's
+    color-by parameter. Surface that as SchemeStorageTypeMismatch so callers can
+    show a warning instead of an unhandled traceback. Any other failure re-raises
+    unchanged.
+    """
+    try:
+        set_entries(collection)
+    except Exception as ex:
+        if "storage type" in str(ex).lower():
+            raise SchemeStorageTypeMismatch(_STORAGE_TYPE_MISMATCH_HINT)
+        raise
+
+
 def export_payload_to_excel(payload, path, log=None):
     if Workbook is not None:
         _log(log, "Using openpyxl export path.")
@@ -1243,6 +1274,15 @@ def merge_payload_into_scheme(target, payload, log=None):
         return False, "Could not read existing entries from the target scheme."
 
     doc = getattr(target, "Document", None)
+    # Existing entries always carry the scheme's color-by storage type; new entries
+    # built from the payload must match it or SetEntries will reject the whole batch.
+    scheme_storage_type = None
+    for entry in entries:
+        st = getattr(entry, "StorageType", None)
+        if st is not None:
+            scheme_storage_type = st
+            break
+
     lookup = {}
     for idx, entry in enumerate(entries):
         for key in _existing_entry_match_keys(entry, doc=doc):
@@ -1251,6 +1291,7 @@ def merge_payload_into_scheme(target, payload, log=None):
 
     updated = 0
     added_entries = []
+    type_skipped = []
     desired_entries = list(entries)
 
     for item in payload.get("entries", []):
@@ -1273,21 +1314,44 @@ def merge_payload_into_scheme(target, payload, log=None):
                     _log(log, "Failed to set merged color for '{}': {}".format(item.get("caption", "") or item.get("value", ""), str(ex)))
             continue
 
+        label = item.get("caption", "") or item.get("value", "")
         try:
             new_entry = build_entry_from_payload(item)
-            desired_entries.append(new_entry)
-            added_entries.append(new_entry)
         except Exception as ex:
-            return False, "Failed to build a new entry for '{}': {}".format(item.get("caption", "") or item.get("value", ""), str(ex))
+            return False, "Failed to build a new entry for '{}': {}".format(label, str(ex))
+
+        entry_storage_type = getattr(new_entry, "StorageType", None)
+        if (scheme_storage_type is not None and entry_storage_type is not None
+                and entry_storage_type != scheme_storage_type):
+            type_skipped.append(label)
+            _log(log, "Skipped new entry '{}': its value type ({}) does not match the scheme's value type ({}).".format(
+                label or "<unnamed>", entry_storage_type, scheme_storage_type))
+            continue
+
+        desired_entries.append(new_entry)
+        added_entries.append(new_entry)
 
     if not updated and not added_entries:
+        if type_skipped:
+            return False, (
+                "Nothing was imported: no existing entries matched for recoloring, and the {} "
+                "new entr{} could not be added because their value type does not match the "
+                "target scheme.\n\n{}".format(
+                    len(type_skipped),
+                    "y" if len(type_skipped) == 1 else "ies",
+                    _STORAGE_TYPE_MISMATCH_HINT,
+                )
+            )
         return False, "No matching entries were updated and no new entries were added."
 
     set_entries = getattr(target, "SetEntries", None)
     if not callable(set_entries):
         return False, "Target scheme API does not support SetEntries."
 
-    set_entries(csu._to_entry_collection(desired_entries))
+    try:
+        _set_entries_checked(set_entries, csu._to_entry_collection(desired_entries))
+    except SchemeStorageTypeMismatch as ex:
+        return False, str(ex)
     csu._regenerate_scheme_document(target)
     refreshed = list(target.GetEntries())
     if refreshed:
@@ -1300,7 +1364,20 @@ def merge_payload_into_scheme(target, payload, log=None):
         csu._regenerate_scheme_document(target)
 
     _log(log, "Merged payload into scheme: {} existing entries recolored, {} new entries added.".format(updated, len(added_entries)))
-    return True, None
+    warning = None
+    if type_skipped:
+        named = [s for s in type_skipped[:10] if s]
+        warning = (
+            "{} entr{} from the Excel file {} skipped because their value type does not "
+            "match the target scheme:\n  {}{}".format(
+                len(type_skipped),
+                "y" if len(type_skipped) == 1 else "ies",
+                "was" if len(type_skipped) == 1 else "were",
+                ", ".join(named) if named else "<unnamed>",
+                "" if len(type_skipped) <= 10 else ", ...",
+            )
+        )
+    return True, warning
 
 
 def apply_payload_to_scheme(target, payload, log=None):
@@ -1314,7 +1391,10 @@ def apply_payload_to_scheme(target, payload, log=None):
     entries_to_set = [build_entry_from_payload(item) for item in payload.get("entries", [])]
     set_entries = getattr(target, "SetEntries", None)
     if callable(set_entries):
-        set_entries(csu._to_entry_collection(entries_to_set))
+        try:
+            _set_entries_checked(set_entries, csu._to_entry_collection(entries_to_set))
+        except SchemeStorageTypeMismatch as ex:
+            return False, str(ex)
         csu._regenerate_scheme_document(target)
         refreshed = list(target.GetEntries())
         if refreshed:

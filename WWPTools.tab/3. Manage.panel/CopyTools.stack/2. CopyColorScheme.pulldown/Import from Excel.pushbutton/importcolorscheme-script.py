@@ -709,7 +709,7 @@ def main():
                         ui.uiUtils_alert("Failed to create a new color scheme in the selected target scope.", title=TITLE)
                         transaction.RollBack()
                         return
-                ok, error = csc.merge_payload_into_scheme(target, payload, log=_log)
+                ok, message = csc.merge_payload_into_scheme(target, payload, log=_log)
                 if ok:
                     transaction.Commit()
                 else:
@@ -721,8 +721,11 @@ def main():
                     pass
                 raise
             if not ok:
-                ui.uiUtils_alert("Failed to import color scheme.\n\n{}".format(error or "Unknown error"), title=TITLE)
+                ui.uiUtils_alert("Failed to import color scheme.\n\n{}".format(message or "Unknown error"), title=TITLE)
                 return
+            # On success, message carries a non-fatal warning (e.g. skipped entries).
+            if message:
+                ui.uiUtils_alert("Imported with warnings.\n\n{}".format(message), title=TITLE)
 
     try:
         if uidoc is not None:
