@@ -564,6 +564,8 @@ def main():
         ui.uiUtils_alert("No active Revit document found.", title=TITLE)
         return
 
+    warning_note = None  # non-fatal warning folded into the final success alert
+
     path = ui.uiUtils_open_file_dialog(
         title="Import Color Scheme from Excel",
         filter_text="Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
@@ -723,9 +725,9 @@ def main():
             if not ok:
                 ui.uiUtils_alert("Failed to import color scheme.\n\n{}".format(message or "Unknown error"), title=TITLE)
                 return
-            # On success, message carries a non-fatal warning (e.g. skipped entries).
-            if message:
-                ui.uiUtils_alert("Imported with warnings.\n\n{}".format(message), title=TITLE)
+            # On success, message carries a non-fatal warning (e.g. skipped entries);
+            # fold it into the single final alert below instead of a second dialog.
+            warning_note = message
 
     try:
         if uidoc is not None:
@@ -735,7 +737,10 @@ def main():
     except Exception:
         pass
 
-    ui.uiUtils_alert("Imported scheme to '{}'.".format(getattr(target, "Name", "Color Scheme")), title=TITLE)
+    success_message = "Imported scheme to '{}'.".format(getattr(target, "Name", "Color Scheme"))
+    if warning_note:
+        success_message += "\n\n{}".format(warning_note)
+    ui.uiUtils_alert(success_message, title=TITLE)
 
 
 if __name__ == "__main__":

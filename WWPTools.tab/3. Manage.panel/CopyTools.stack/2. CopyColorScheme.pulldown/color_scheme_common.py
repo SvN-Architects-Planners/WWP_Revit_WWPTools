@@ -383,19 +383,34 @@ _STORAGE_TYPE_MISMATCH_HINT = (
 )
 
 
+def _is_storage_type_rejection(ex):
+    """True when a SetEntries exception is Revit's color-fill storage-type mismatch.
+
+    Revit raises an ArgumentException with ParamName == "colorFillData" for this
+    case. ParamName is part of the API contract and is NOT localized, so prefer it
+    over the message text (which is translated on non-English installs). Fall back
+    to message substrings only if ParamName is unavailable.
+    """
+    param_name = getattr(ex, "ParamName", None)
+    if param_name == "colorFillData":
+        return True
+    message = str(ex).lower()
+    return "storage type" in message or "colorfilldata" in message
+
+
 def _set_entries_checked(set_entries, collection):
     """Call SetEntries, translating Revit's storage-type rejection into a clean error.
 
-    Revit raises a bare ArgumentException ("...whose storage type is different
-    with the scheme") when any entry's value type does not match the scheme's
-    color-by parameter. Surface that as SchemeStorageTypeMismatch so callers can
-    show a warning instead of an unhandled traceback. Any other failure re-raises
-    unchanged.
+    Revit raises an ArgumentException ("...whose storage type is different with the
+    scheme", ParamName "colorFillData") when any entry's value type does not match
+    the scheme's color-by parameter. Surface that as SchemeStorageTypeMismatch so
+    callers can show a warning instead of an unhandled traceback. Any other failure
+    re-raises unchanged.
     """
     try:
         set_entries(collection)
     except Exception as ex:
-        if "storage type" in str(ex).lower():
+        if _is_storage_type_rejection(ex):
             raise SchemeStorageTypeMismatch(_STORAGE_TYPE_MISMATCH_HINT)
         raise
 
@@ -1360,7 +1375,10 @@ def merge_payload_into_scheme(target, payload, log=None):
                 csu._copy_entry_visuals(src, tgt)
         else:
             csu._patch_entry_colors(refreshed, desired_entries, log=log, stage="merge-post-set")
-        set_entries(csu._to_entry_collection(refreshed))
+        try:
+            _set_entries_checked(set_entries, csu._to_entry_collection(refreshed))
+        except SchemeStorageTypeMismatch as ex:
+            return False, str(ex)
         csu._regenerate_scheme_document(target)
 
     _log(log, "Merged payload into scheme: {} existing entries recolored, {} new entries added.".format(updated, len(added_entries)))
@@ -1399,7 +1417,10 @@ def apply_payload_to_scheme(target, payload, log=None):
         refreshed = list(target.GetEntries())
         if refreshed:
             csu._patch_entry_colors(refreshed, entries_to_set, log=log, stage="import-post-set")
-            set_entries(csu._to_entry_collection(refreshed))
+            try:
+                _set_entries_checked(set_entries, csu._to_entry_collection(refreshed))
+            except SchemeStorageTypeMismatch as ex:
+                return False, str(ex)
             csu._regenerate_scheme_document(target)
         return True, None
 
