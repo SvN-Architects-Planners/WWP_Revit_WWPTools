@@ -5,6 +5,12 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-12
+
+### Changed
+- Sheet Scale Updater: Target Parameter dropdown now groups parameters by titleblock family name, with a bold family header and separator between groups — prevents parameters from a different titleblock family appearing as if they apply to all sheets.
+- True North Updater: same grouping applied to the Target Parameter dropdown.
+
 ## [2.0.1] - 2026-06-11
 
 ### Changed

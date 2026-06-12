@@ -121,10 +121,17 @@ def _is_supported_scale_parameter(param):
         return False
 
 def _get_param_entries(titleblock_instances):
+    family_params = {}
     entries = {}
     for tb in titleblock_instances:
         if not tb:
             continue
+        try:
+            family_name = tb.Symbol.Family.Name
+        except Exception:
+            family_name = "Unknown"
+        if family_name not in family_params:
+            family_params[family_name] = {}
         try:
             for p in tb.Parameters:
                 if not p or not p.Definition:
@@ -134,9 +141,10 @@ def _get_param_entries(titleblock_instances):
                 name = p.Definition.Name
                 if name and "scale" in name.lower():
                     key = "{} [Instance]".format(name)
+                    family_params[family_name][key] = {"name": name, "scope": "instance"}
                     entries[key] = {"name": name, "scope": "instance"}
         except Exception:
-            continue
+            pass
         try:
             symbol = tb.Symbol if hasattr(tb, "Symbol") else None
             if symbol:
@@ -148,11 +156,16 @@ def _get_param_entries(titleblock_instances):
                     name = p.Definition.Name
                     if name and "scale" in name.lower():
                         key = "{} [Type]".format(name)
+                        family_params[family_name][key] = {"name": name, "scope": "type"}
                         entries[key] = {"name": name, "scope": "type"}
         except Exception:
-            continue
-    keys = sorted(entries.keys())
-    return keys, entries
+            pass
+    groups = [
+        (fname, sorted(fparams.keys()))
+        for fname, fparams in sorted(family_params.items())
+        if fparams
+    ]
+    return groups, entries
 
 def _get_yesno_param_entries(titleblock_instances):
     """Return sorted list of writable Yes/No instance parameter names."""
@@ -220,7 +233,7 @@ def _print_text(text=""):
 
 def _show_sheet_scale_dialog(
     sheet_items,
-    param_labels,
+    param_groups,
     title,
     prompt,
     prechecked_indices=None,
@@ -239,8 +252,8 @@ def _show_sheet_scale_dialog(
 
     from System.IO import File, StringReader
     from System import Uri
-    from System.Windows import Visibility
-    from System.Windows.Controls import ListBoxItem
+    from System.Windows import FontWeights, Thickness, Visibility
+    from System.Windows.Controls import ComboBoxItem, ListBoxItem, Separator
     from System.Windows.Interop import WindowInteropHelper
     from System.Windows.Markup import XamlReader
     from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
@@ -281,13 +294,35 @@ def _show_sheet_scale_dialog(
     prompt_text.Text = prompt or ""
     selected_indices = set(prechecked_indices or [])
 
-    for label in param_labels or []:
-        parameter_combo.Items.Add(label)
-    if default_label and default_label in (param_labels or []):
-        parameter_combo.SelectedItem = default_label
-        parameter_combo.Text = default_label
-    elif parameter_combo.Items.Count > 0:
-        parameter_combo.SelectedIndex = 0
+    param_labels = [key for _, keys in (param_groups or []) for key in keys]
+    for i, (family_name, keys) in enumerate(param_groups or []):
+        if not keys:
+            continue
+        if i > 0:
+            parameter_combo.Items.Add(Separator())
+        header = ComboBoxItem()
+        header.Content = family_name
+        header.IsEnabled = False
+        header.FontWeight = FontWeights.Bold
+        parameter_combo.Items.Add(header)
+        for key in keys:
+            ci = ComboBoxItem()
+            ci.Content = key
+            ci.Tag = key
+            ci.Padding = Thickness(24, 3, 8, 3)
+            parameter_combo.Items.Add(ci)
+    _default_set = [False]
+    if default_label:
+        for _item in parameter_combo.Items:
+            if hasattr(_item, 'Tag') and str(_item.Tag or '') == default_label:
+                parameter_combo.SelectedItem = _item
+                _default_set[0] = True
+                break
+    if not _default_set[0]:
+        for _item in parameter_combo.Items:
+            if hasattr(_item, 'Tag') and _item.Tag is not None:
+                parameter_combo.SelectedItem = _item
+                break
     if ignore_drafting_views_checkbox is not None:
         ignore_drafting_views_checkbox.IsChecked = bool(ignore_drafting_views_default)
     if all_sheets_checkbox is not None:
@@ -405,7 +440,11 @@ def _show_sheet_scale_dialog(
             _set_validation("")
 
     def _on_ok(sender, args):
-        selected_param = str(parameter_combo.Text or "").strip()
+        _sel = parameter_combo.SelectedItem
+        if _sel is not None and hasattr(_sel, 'Tag') and _sel.Tag is not None:
+            selected_param = str(_sel.Tag)
+        else:
+            selected_param = str(parameter_combo.Text or "").strip()
         use_all = all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked
         if use_all:
             selected_indices.clear()
@@ -441,7 +480,11 @@ def _show_sheet_scale_dialog(
     if window.ShowDialog() != True:
         return None
 
-    selected_param = str(parameter_combo.Text or "").strip()
+    _sel = parameter_combo.SelectedItem
+    if _sel is not None and hasattr(_sel, 'Tag') and _sel.Tag is not None:
+        selected_param = str(_sel.Tag)
+    else:
+        selected_param = str(parameter_combo.Text or "").strip()
     return {
         "selected_indices": sorted(selected_indices),
         "ignore_drafting_views": bool(
@@ -529,8 +572,8 @@ def main():
         UI.TaskDialog.Show("Sheet Scale Updater", "No titleblock found on any sheet.")
         return
 
-    param_labels, param_entries = _get_param_entries(titleblocks)
-    if not param_labels:
+    param_groups, param_entries = _get_param_entries(titleblocks)
+    if not param_groups:
         UI.TaskDialog.Show(
             "Sheet Scale Updater",
             "No parameters found on selected titleblock instances.",
@@ -549,7 +592,7 @@ def main():
     try:
         dialog_result = _show_sheet_scale_dialog(
             sheet_items,
-            param_labels,
+            param_groups,
             title="Sheet Scale Updater",
             prompt="Select sheets to update and choose the target parameter:",
             prechecked_indices=prechecked_indices,
