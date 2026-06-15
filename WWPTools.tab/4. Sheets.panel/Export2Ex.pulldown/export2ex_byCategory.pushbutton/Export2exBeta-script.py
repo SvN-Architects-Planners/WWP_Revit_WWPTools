@@ -1853,9 +1853,9 @@ def parameter_to_export_value(doc, param, use_project_units=True):
             raw = param.AsDouble()
             if use_project_units:
                 try:
-                    unit_type_id = param.GetUnitTypeId()
-                    if DB.UnitUtils.IsMeasurableSpec(unit_type_id):
-                        display_unit = doc.GetUnits().GetFormatOptions(unit_type_id).GetUnitTypeId()
+                    spec_type_id = param.Definition.GetSpecTypeId()
+                    if DB.UnitUtils.IsMeasurableSpec(spec_type_id):
+                        display_unit = doc.GetUnits().GetFormatOptions(spec_type_id).GetUnitTypeId()
                         return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
                 except Exception:
                     pass
