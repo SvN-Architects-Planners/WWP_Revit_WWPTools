@@ -141,7 +141,8 @@
                                       FontSize="12"
                                       SelectedIndex="0">
                                 <ComboBoxItem Content="Project units"/>
-                                <ComboBoxItem Content="Internal (feet)"/>
+                                <ComboBoxItem Content="Imperial"/>
+                                <ComboBoxItem Content="Metric"/>
                             </ComboBox>
                         </StackPanel>
                         <CheckBox Name="FromScheduleToggle"

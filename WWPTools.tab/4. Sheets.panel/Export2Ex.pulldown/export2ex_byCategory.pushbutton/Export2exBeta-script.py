@@ -176,7 +176,8 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                                       FontSize="12"
                                       SelectedIndex="0">
                                 <ComboBoxItem Content="Project units"/>
-                                <ComboBoxItem Content="Internal (feet)"/>
+                                <ComboBoxItem Content="Imperial"/>
+                                <ComboBoxItem Content="Metric"/>
                             </ComboBox>
                         </StackPanel>
                         <CheckBox Name="FromScheduleToggle"
@@ -1611,9 +1612,14 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         else:
             source_id = selected_item.id_value
             source_name = selected_item.view.Name
-    use_project_units = True
+    units_mode = "project"
     try:
-        use_project_units = (units_box is None or units_box.SelectedIndex == 0)
+        if units_box is not None:
+            idx = units_box.SelectedIndex
+            if idx == 1:
+                units_mode = "imperial"
+            elif idx == 2:
+                units_mode = "metric"
     except Exception:
         pass
     return {
@@ -1624,7 +1630,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "selected_param_names": list(selected_params_by_category.get(category_id, [])),
         "excel_path": excel_path.Text or "",
         "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
-        "use_project_units": use_project_units,
+        "units_mode": units_mode,
     }
 
 
@@ -1839,7 +1845,37 @@ def get_parameter_by_name(doc, element, param_name):
     return None
 
 
-def parameter_to_export_value(doc, param, use_project_units=True):
+def _pick_unit_for_spec(spec_type_id, prefer_imperial):
+    try:
+        valid = list(DB.UnitUtils.GetValidUnits(spec_type_id))
+        if not valid:
+            return None
+        def _uid_str(uid):
+            try:
+                return uid.TypeId.lower()
+            except Exception:
+                return str(uid).lower()
+        if prefer_imperial:
+            keywords = ["feet", "foot", "inch", "mile", "acre"]
+            for uid in valid:
+                if any(k in _uid_str(uid) for k in keywords):
+                    return uid
+        else:
+            seeks = ["meters", "metre"]
+            skip = ["milli", "centi", "kilo", "micro"]
+            for uid in valid:
+                s = _uid_str(uid)
+                if any(k in s for k in seeks) and not any(k in s for k in skip):
+                    return uid
+            for uid in valid:
+                if "milli" in _uid_str(uid):
+                    return uid
+        return None
+    except Exception:
+        return None
+
+
+def parameter_to_export_value(doc, param, units_mode="project"):
     if not param:
         return ""
     try:
@@ -1851,12 +1887,16 @@ def parameter_to_export_value(doc, param, use_project_units=True):
             return param.AsString() or ""
         if storage == DB.StorageType.Double:
             raw = param.AsDouble()
-            if use_project_units:
+            if units_mode in ("project", "imperial", "metric"):
                 try:
                     spec_type_id = param.Definition.GetSpecTypeId()
                     if DB.UnitUtils.IsMeasurableSpec(spec_type_id):
-                        display_unit = doc.GetUnits().GetFormatOptions(spec_type_id).GetUnitTypeId()
-                        return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
+                        if units_mode == "project":
+                            display_unit = doc.GetUnits().GetFormatOptions(spec_type_id).GetUnitTypeId()
+                        else:
+                            display_unit = _pick_unit_for_spec(spec_type_id, prefer_imperial=(units_mode == "imperial"))
+                        if display_unit is not None:
+                            return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
                 except Exception:
                     pass
             return raw
@@ -1890,7 +1930,7 @@ def parameter_to_export_value(doc, param, use_project_units=True):
     return ""
 
 
-def build_category_export_rows(doc, category_id, param_names, use_project_units=True):
+def build_category_export_rows(doc, category_id, param_names, units_mode="project"):
     elements = get_elements_by_category(doc, category_id)
     elements.sort(key=lambda item: element_id_value(item.Id))
     headers = ["Id"] + list(param_names or [])
@@ -1898,7 +1938,7 @@ def build_category_export_rows(doc, category_id, param_names, use_project_units=
     for element in elements:
         row = [element_id_value(element.Id)]
         for param_name in param_names or []:
-            row.append(parameter_to_export_value(doc, get_parameter_by_name(doc, element, param_name), use_project_units=use_project_units))
+            row.append(parameter_to_export_value(doc, get_parameter_by_name(doc, element, param_name), units_mode=units_mode))
         rows.append(row)
     return headers, rows, len(elements)
 
@@ -2114,7 +2154,7 @@ def make_unique_name(base, used):
         idx += 1
 
 
-def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None, use_project_units=True):
+def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None, units_mode="project"):
     add_lib_path()
     try:
         import WWP_xlsx as openpyxl
@@ -2141,7 +2181,7 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui,
     else:
         sheet = workbook.create_sheet(title=sheet_name)
 
-    headers, rows, elem_count = build_category_export_rows(doc, category_id, param_names, use_project_units=use_project_units)
+    headers, rows, elem_count = build_category_export_rows(doc, category_id, param_names, units_mode=units_mode)
     log_message(
         "Category '{}' resolved {} elements and {} export columns".format(
             category_name, elem_count, len(headers)
@@ -2220,7 +2260,7 @@ def main():
                 break
         category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
         sheet_name_raw = (result.get("sheet_name") or "").strip()
-        if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw, use_project_units=result.get("use_project_units", True)):
+        if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw, units_mode=result.get("units_mode", "project")):
             return
         config.last_mode = _normalize_mode(result.get("mode"))
         config.last_schedule_id = result.get("source_id") if config.last_mode == MODE_FROM_SCHEDULE else None
