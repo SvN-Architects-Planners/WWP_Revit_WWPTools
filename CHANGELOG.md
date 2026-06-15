@@ -9,14 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Export2Ex (by Category): categories and parameters from Revit linked files are now included — the category list and parameter sampling both scan all loaded linked documents in addition to the host model.
+- Export2Ex (by Category): Units selector ("Project units" / "Internal (feet)") — defaults to project units so length/area values now export in the document's display unit instead of always imperial feet.
+- Export2Ex (by Category): "Id -- always exported" shown as a permanent first entry in Selected Properties so it is always visible that the Id column will be present in the export.
 
 ### Changed
-- Export2Ex (by Category): tool pushbutton folder renamed from `export2ex_beta` to `export2ex_byCategory` to better reflect its purpose.
-- Export2Ex (by Category): mode switcher label renamed from "From Schedule" to "Category by Schedule".
+- Export2Ex (by Category): dialog layout redesigned — sheet name and file path moved to top, mode selector replaced with a "Category From Schedule" checkbox toggle (By Category is now the default), source list given its own full-width section, Available Parameters and Selected Properties are equal-width side-by-side panels, Move Up/Down buttons moved to the centre column alongside Add/Remove.
+- Export2Ex (by Category): "Linked properties" panel renamed to "Selected Properties".
+- Export2Ex (by Category): tool pushbutton folder renamed from `export2ex_beta` to `export2ex_byCategory`.
 
 ### Fixed
-- Export2Ex (by Category): categories and schedules in the source list were displaying as "IronPython.NewTypes.System.Object_1$1" instead of their names. Fixed by setting `DisplayMemberPath = "display_name"` on the ListBox so WPF binds to the Python property rather than calling `.ToString()`.
-- Export2Ex (by Category): read-only parameters no longer display in grey — they still show "(read-only)" in their label and tooltip, but the grey colour was confusing when the item was also highlighted/selected.
+- Export2Ex (by Category): categories and schedules in the source list were displaying as "IronPython.NewTypes.System.Object_1$1" instead of their names.
+- Export2Ex (by Category): read-only parameters no longer display in grey — label and tooltip still indicate read-only status.
 
 ## [2.0.1] - 2026-06-12
 

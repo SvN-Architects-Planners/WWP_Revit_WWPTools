@@ -35,11 +35,11 @@ MODE_FROM_SCHEDULE = "schedule"
 MODE_BY_CATEGORY = "category"
 EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Export2Ex Beta"
+        Title="Export2Ex - By Category"
         Height="820"
-        Width="1100"
+        Width="1000"
         MinHeight="640"
-        MinWidth="900"
+        MinWidth="800"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
@@ -82,13 +82,15 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Saved sets -->
+                <!-- Row 0: Saved sets -->
                 <Grid Grid.Row="0" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -126,140 +128,21 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                             Style="{StaticResource SecondaryButtonStyle}"/>
                 </Grid>
 
-                <!-- Main 3-column area -->
-                <Grid Grid.Row="1">
+                <!-- Row 1: Excel path + Browse -->
+                <Grid Grid.Row="1" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="340"/>
-                        <ColumnDefinition Width="130"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="90"/>
                     </Grid.ColumnDefinitions>
-
-                    <!-- LEFT: Available properties (stretches) + source selector at bottom -->
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0"
-                                   Text="Available properties:"
-                                   Foreground="#374151"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,4"/>
-
-                        <ListBox Name="ParameterList"
-                                 Grid.Row="1"
-                                 SelectionMode="Extended"
-                                 MinHeight="80"/>
-
-                        <Border Grid.Row="2"
-                                BorderBrush="#E2E8F0"
-                                BorderThickness="0,1,0,0"
-                                Margin="0,10,0,0"
-                                Padding="0,8,0,0">
-                            <StackPanel>
-                                <DockPanel Margin="0,0,0,4">
-                                    <TextBlock DockPanel.Dock="Left"
-                                               Text="Select from:"
-                                               Foreground="#6B7280"
-                                               FontSize="12"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,6,0"/>
-                                    <ComboBox Name="ModeBox" SelectedIndex="0">
-                                        <ComboBoxItem Content="Category by Schedule"/>
-                                        <ComboBoxItem Content="By Category"/>
-                                    </ComboBox>
-                                </DockPanel>
-                                <TextBlock Name="SourceLabel"
-                                           Text="Search schedules:"
-                                           Foreground="#6B7280"
-                                           FontSize="12"
-                                           Margin="0,0,0,2"/>
-                                <TextBox Name="SourceSearchBox" Margin="0,0,0,4"/>
-                                <TextBlock Name="SourceListLabel"
-                                           Text="Schedules"
-                                           Foreground="#6B7280"
-                                           FontSize="12"
-                                           Margin="0,0,0,2"/>
-                                <ListBox Name="SourceList"
-                                         Height="140"
-                                         SelectionMode="Single"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- MIDDLE: Add/Remove + Display filters + Search -->
-                    <StackPanel Grid.Column="1"
-                                Margin="10,28,10,0"
-                                VerticalAlignment="Top">
-                        <Button Name="AddParameterButton"
-                                Content="Add -->"
-                                Margin="0,0,0,6"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Button Name="RemoveParameterButton"
-                                Content="&lt;-- Remove"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-
-                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,14,0,10"/>
-
-                        <TextBlock Text="Display filters"
-                                   Foreground="#6B7280"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,6"/>
-                        <CheckBox Name="ShowReadOnlyFilter"
-                                  Content="Read-only"
-                                  IsChecked="True"
-                                  FontSize="12"
-                                  Foreground="#374151"/>
-
-                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,12,0,10"/>
-
-                        <TextBlock Text="Search:"
-                                   Foreground="#6B7280"
-                                   FontSize="12"
-                                   Margin="0,0,0,4"/>
-                        <TextBox Name="ParameterSearchBox"/>
-                    </StackPanel>
-
-                    <!-- RIGHT: Linked properties (stretches) + Move buttons at bottom -->
-                    <Grid Grid.Column="2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0"
-                                   Text="Linked properties:"
-                                   Foreground="#374151"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,4"/>
-
-                        <ListBox Name="SelectedParameterList"
-                                 Grid.Row="1"
-                                 SelectionMode="Extended"
-                                 MinHeight="80"/>
-
-                        <StackPanel Grid.Row="2"
-                                    Orientation="Horizontal"
-                                    Margin="0,8,0,0">
-                            <Button Name="MoveParameterUpButton"
-                                    Content="Move Up"
-                                    Width="110"
-                                    Style="{StaticResource SecondaryButtonStyle}"/>
-                            <Button Name="MoveParameterDownButton"
-                                    Content="Move Down"
-                                    Width="110"
-                                    Margin="8,0,0,0"
-                                    Style="{StaticResource SecondaryButtonStyle}"/>
-                        </StackPanel>
-                    </Grid>
+                    <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
+                    <Button Name="BrowseExcel"
+                            Grid.Column="1"
+                            Content="Browse"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
                 </Grid>
 
-                <!-- Sheet name -->
-                <Grid Grid.Row="2" Margin="0,10,0,0">
+                <!-- Row 2: Sheet name -->
+                <Grid Grid.Row="2" Margin="0,0,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -273,21 +156,138 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                     <TextBox Name="SheetNameBox" Grid.Column="1"/>
                 </Grid>
 
-                <!-- Excel path + Browse -->
-                <Grid Grid.Row="3" Margin="0,8,0,0">
+                <!-- Row 3: Mode toggle + Units selector -->
+                <Border Grid.Row="3"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="0,1,0,0"
+                        Margin="0,12,0,0"
+                        Padding="0,10,0,0">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Units:"
+                                       Foreground="#6B7280"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0"/>
+                            <ComboBox Name="UnitsBox"
+                                      Width="150"
+                                      FontSize="12"
+                                      SelectedIndex="0">
+                                <ComboBoxItem Content="Project units"/>
+                                <ComboBoxItem Content="Internal (feet)"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <CheckBox Name="FromScheduleToggle"
+                                  Content="Category From Schedule"
+                                  FontSize="13"
+                                  FontWeight="SemiBold"
+                                  Foreground="#374151"
+                                  VerticalAlignment="Center"/>
+                    </DockPanel>
+                </Border>
+
+                <!-- Row 4: Source search + list -->
+                <StackPanel Grid.Row="4" Margin="0,10,0,0">
+                    <TextBlock Name="SourceLabel"
+                               Text="Search categories:"
+                               Foreground="#6B7280"
+                               FontSize="12"
+                               Margin="0,0,0,2"/>
+                    <TextBox Name="SourceSearchBox" Margin="0,0,0,4"/>
+                    <TextBlock Name="SourceListLabel"
+                               Text="Categories"
+                               Foreground="#6B7280"
+                               FontSize="12"
+                               Margin="0,0,0,2"/>
+                    <ListBox Name="SourceList"
+                             Height="150"
+                             SelectionMode="Single"/>
+                </StackPanel>
+
+                <!-- Row 5: Available Parameters | buttons | Selected Properties -->
+                <Grid Grid.Row="5" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
-                    <Button Name="BrowseExcel"
-                            Grid.Column="1"
-                            Content="Browse"
-                            Style="{StaticResource SecondaryButtonStyle}"/>
+
+                    <!-- LEFT: Available Parameters -->
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="Available Parameters:"
+                                   Foreground="#374151"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+                        <WrapPanel Grid.Row="1" Margin="0,0,0,4">
+                            <CheckBox Name="ShowReadOnlyFilter"
+                                      Content="Show Read-Only"
+                                      IsChecked="True"
+                                      FontSize="12"
+                                      Foreground="#374151"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,12,0"/>
+                            <TextBlock Text="Search:"
+                                       Foreground="#6B7280"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                            <TextBox Name="ParameterSearchBox" Width="120" FontSize="12"/>
+                        </WrapPanel>
+                        <ListBox Name="ParameterList"
+                                 Grid.Row="2"
+                                 SelectionMode="Extended"
+                                 MinHeight="80"/>
+                    </Grid>
+
+                    <!-- MIDDLE: Add/Remove + Move buttons -->
+                    <StackPanel Grid.Column="1"
+                                Margin="6,30,6,0"
+                                VerticalAlignment="Top">
+                        <Button Name="AddParameterButton"
+                                Content="Add -->"
+                                Margin="0,0,0,6"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Name="RemoveParameterButton"
+                                Content="&lt;-- Remove"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,12,0,10"/>
+                        <Button Name="MoveParameterUpButton"
+                                Content="Move Up"
+                                Margin="0,0,0,6"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Name="MoveParameterDownButton"
+                                Content="Move Down"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+
+                    <!-- RIGHT: Selected Properties -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="Selected Properties:"
+                                   Foreground="#374151"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+                        <ListBox Name="SelectedParameterList"
+                                 Grid.Row="1"
+                                 SelectionMode="Extended"
+                                 MinHeight="80"/>
+                    </Grid>
                 </Grid>
 
-                <!-- Footer: logo + Export + Cancel -->
-                <DockPanel Grid.Row="4" Margin="0,16,0,0">
+                <!-- Row 6: Footer -->
+                <DockPanel Grid.Row="6" Margin="0,16,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="56"
@@ -1135,7 +1135,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     window = _load_export_window()
     apply_window_title(window, "Export2Ex Beta")
 
-    mode_box = window.FindName("ModeBox")
+    from_schedule_toggle = window.FindName("FromScheduleToggle")
+    units_box = window.FindName("UnitsBox")
     source_search_box = window.FindName("SourceSearchBox")
     source_label = window.FindName("SourceLabel")
     source_list_label = window.FindName("SourceListLabel")
@@ -1173,14 +1174,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
 
     def _current_mode():
         try:
-            return MODE_BY_CATEGORY if mode_box.SelectedIndex == 1 else MODE_FROM_SCHEDULE
+            return MODE_FROM_SCHEDULE if from_schedule_toggle.IsChecked else MODE_BY_CATEGORY
         except Exception:
-            return MODE_FROM_SCHEDULE
+            return MODE_BY_CATEGORY
 
-    if initial_mode == MODE_BY_CATEGORY:
-        mode_box.SelectedIndex = 1
-    else:
-        mode_box.SelectedIndex = 0
+    from_schedule_toggle.IsChecked = (initial_mode == MODE_FROM_SCHEDULE)
 
     def _get_source_items():
         return category_items if _current_mode() == MODE_BY_CATEGORY else schedule_items
@@ -1230,6 +1228,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _refresh_selected_parameter_list(category_id, preserve_selection=None):
         selected_names = _get_selected_parameter_names(category_id)
         selected_parameter_list.Items.Clear()
+        id_item = ListBoxItem()
+        id_item.Content = "Id  -- always exported"
+        id_item.Tag = {"name": "__id__", "editable": False, "__permanent__": True}
+        id_item.Foreground = Brushes.SteelBlue
+        selected_parameter_list.Items.Add(id_item)
         option_map = dict((option["name"], option) for option in _get_parameter_names(category_id))
         for name in selected_names:
             option = option_map.get(name, {"name": name, "editable": True})
@@ -1360,7 +1363,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if category_id is None:
             return
         selected_names = _get_selected_parameter_names(category_id)
-        removed = set(_get_parameter_name_from_item(item) for item in selected_parameter_list.SelectedItems)
+        removed = set(
+            _get_parameter_name_from_item(item)
+            for item in selected_parameter_list.SelectedItems
+            if not (isinstance(getattr(item, "Tag", None), dict) and item.Tag.get("__permanent__"))
+        )
         if not removed:
             return
         selected_params_by_category[category_id] = [name for name in selected_names if name not in removed]
@@ -1456,7 +1463,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _apply_saved_set(set_data):
         _initialized[0] = False
         try:
-            mode = set_data.get("mode", MODE_FROM_SCHEDULE)
+            mode = set_data.get("mode", MODE_BY_CATEGORY)
             source_id = _coerce_int(set_data.get("source_id"), None)
             category_id = _coerce_int(set_data.get("category_id"), None)
             param_names = set_data.get("param_names") or []
@@ -1464,7 +1471,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             saved_excel = (set_data.get("excel_path") or "").strip()
             if category_id is not None:
                 selected_params_by_category[category_id] = list(param_names)
-            mode_box.SelectedIndex = 1 if mode == MODE_BY_CATEGORY else 0
+            from_schedule_toggle.IsChecked = (mode == MODE_FROM_SCHEDULE)
             source_search_box.Text = ""
             for item in _get_source_items():
                 if item.id_value == source_id:
@@ -1550,7 +1557,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     except Exception:
         pass
 
-    mode_box.SelectionChanged += lambda _sender, _args: _refresh_source_list()
+    from_schedule_toggle.Checked += lambda _sender, _args: _refresh_source_list()
+    from_schedule_toggle.Unchecked += lambda _sender, _args: _refresh_source_list()
     source_search_box.TextChanged += lambda _sender, _args: _refresh_source_list()
     source_list.SelectionChanged += _source_selection_changed
     parameter_search_box.TextChanged += lambda _sender, _args: _refresh_parameter_list()
@@ -1605,6 +1613,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         else:
             source_id = selected_item.id_value
             source_name = selected_item.view.Name
+    use_project_units = True
+    try:
+        use_project_units = (units_box is None or units_box.SelectedIndex == 0)
+    except Exception:
+        pass
     return {
         "mode": _current_mode(),
         "source_id": source_id,
@@ -1613,6 +1626,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "selected_param_names": list(selected_params_by_category.get(category_id, [])),
         "excel_path": excel_path.Text or "",
         "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
+        "use_project_units": use_project_units,
     }
 
 
@@ -1827,7 +1841,7 @@ def get_parameter_by_name(doc, element, param_name):
     return None
 
 
-def parameter_to_export_value(doc, param):
+def parameter_to_export_value(doc, param, use_project_units=True):
     if not param:
         return ""
     try:
@@ -1838,7 +1852,16 @@ def parameter_to_export_value(doc, param):
         if storage == DB.StorageType.String:
             return param.AsString() or ""
         if storage == DB.StorageType.Double:
-            return param.AsDouble()
+            raw = param.AsDouble()
+            if use_project_units:
+                try:
+                    unit_type_id = param.GetUnitTypeId()
+                    if DB.UnitUtils.IsMeasurableSpec(unit_type_id):
+                        display_unit = doc.GetUnits().GetFormatOptions(unit_type_id).GetUnitTypeId()
+                        return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
+                except Exception:
+                    pass
+            return raw
         if storage == DB.StorageType.Integer:
             value_string = param.AsValueString()
             if value_string not in (None, "") and value_string not in ("0", "1"):
@@ -1869,7 +1892,7 @@ def parameter_to_export_value(doc, param):
     return ""
 
 
-def build_category_export_rows(doc, category_id, param_names):
+def build_category_export_rows(doc, category_id, param_names, use_project_units=True):
     elements = get_elements_by_category(doc, category_id)
     elements.sort(key=lambda item: element_id_value(item.Id))
     headers = ["Id"] + list(param_names or [])
@@ -1877,7 +1900,7 @@ def build_category_export_rows(doc, category_id, param_names):
     for element in elements:
         row = [element_id_value(element.Id)]
         for param_name in param_names or []:
-            row.append(parameter_to_export_value(doc, get_parameter_by_name(doc, element, param_name)))
+            row.append(parameter_to_export_value(doc, get_parameter_by_name(doc, element, param_name), use_project_units=use_project_units))
         rows.append(row)
     return headers, rows, len(elements)
 
@@ -2093,7 +2116,7 @@ def make_unique_name(base, used):
         idx += 1
 
 
-def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None):
+def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None, use_project_units=True):
     add_lib_path()
     try:
         import WWP_xlsx as openpyxl
@@ -2120,7 +2143,7 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui,
     else:
         sheet = workbook.create_sheet(title=sheet_name)
 
-    headers, rows, elem_count = build_category_export_rows(doc, category_id, param_names)
+    headers, rows, elem_count = build_category_export_rows(doc, category_id, param_names, use_project_units=use_project_units)
     log_message(
         "Category '{}' resolved {} elements and {} export columns".format(
             category_name, elem_count, len(headers)
@@ -2168,7 +2191,7 @@ def main():
     default_dir = get_default_dir(doc)
     last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
     init_excel_path = last_excel_path or os.path.join(default_dir, "CategoryExport.xlsx")
-    last_mode = _normalize_mode(config_get(config, CONFIG_LAST_MODE, MODE_FROM_SCHEDULE))
+    last_mode = _normalize_mode(config_get(config, CONFIG_LAST_MODE, MODE_BY_CATEGORY))
     last_source_id = config_get(
         config,
         CONFIG_LAST_CATEGORY_ID if last_mode == MODE_BY_CATEGORY else CONFIG_LAST_SCHEDULE_ID,
@@ -2199,7 +2222,7 @@ def main():
                 break
         category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
         sheet_name_raw = (result.get("sheet_name") or "").strip()
-        if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw):
+        if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw, use_project_units=result.get("use_project_units", True)):
             return
         config.last_mode = _normalize_mode(result.get("mode"))
         config.last_schedule_id = result.get("source_id") if config.last_mode == MODE_FROM_SCHEDULE else None
