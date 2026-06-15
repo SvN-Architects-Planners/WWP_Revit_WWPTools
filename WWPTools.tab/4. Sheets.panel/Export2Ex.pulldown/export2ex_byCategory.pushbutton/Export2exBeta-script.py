@@ -1887,18 +1887,33 @@ def parameter_to_export_value(doc, param, units_mode="project"):
             return param.AsString() or ""
         if storage == DB.StorageType.Double:
             raw = param.AsDouble()
-            if units_mode in ("project", "imperial", "metric"):
+            if units_mode == "project":
+                # param.GetUnitTypeId() returns the project's display unit for this param
                 try:
-                    spec_type_id = param.Definition.GetSpecTypeId()
-                    if DB.UnitUtils.IsMeasurableSpec(spec_type_id):
-                        if units_mode == "project":
-                            display_unit = doc.GetUnits().GetFormatOptions(spec_type_id).GetUnitTypeId()
-                        else:
-                            display_unit = _pick_unit_for_spec(spec_type_id, prefer_imperial=(units_mode == "imperial"))
-                        if display_unit is not None:
-                            return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
+                    unit_type_id = param.GetUnitTypeId()
+                    tid = ""
+                    try:
+                        tid = unit_type_id.TypeId or ""
+                    except Exception:
+                        pass
+                    if tid:
+                        return DB.UnitUtils.ConvertFromInternalUnits(raw, unit_type_id)
                 except Exception:
                     pass
+            elif units_mode in ("imperial", "metric"):
+                spec_type_id = None
+                try:
+                    spec_type_id = param.Definition.GetSpecTypeId()
+                except Exception:
+                    pass
+                if spec_type_id is not None:
+                    try:
+                        if DB.UnitUtils.IsMeasurableSpec(spec_type_id):
+                            display_unit = _pick_unit_for_spec(spec_type_id, prefer_imperial=(units_mode == "imperial"))
+                            if display_unit is not None:
+                                return DB.UnitUtils.ConvertFromInternalUnits(raw, display_unit)
+                    except Exception:
+                        pass
             return raw
         if storage == DB.StorageType.Integer:
             value_string = param.AsValueString()
