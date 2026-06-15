@@ -903,7 +903,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     outer.Children.Add(scroll)
 
     tbl = Grid()
-    for w in [28, 160, 150, -1, 34]:
+    for w in [28, 160, 150, -1, 34, 60]:
         cd = ColumnDefinition()
         cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
         tbl.ColumnDefinitions.Add(cd)
@@ -919,6 +919,14 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
         Grid.SetRow(tb, 0)
         Grid.SetColumn(tb, col)
         tbl.Children.Add(tb)
+
+    def _make_edit_row(sname_):
+        def _on_edit_row(_s, _e):
+            sdata = saved_sets.get(sname_) or {}
+            if edit_callback:
+                edit_callback(sname_, sdata)
+            _refresh_from_project()
+        return _on_edit_row
 
     def _make_browse(sname_):
         def _on_browse(_s, _e):
@@ -959,7 +967,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             empty_tb.Margin = Thickness(4, 16, 4, 4)
             empty_tb.HorizontalAlignment = HorizontalAlignment.Center
             Grid.SetRow(empty_tb, 1)
-            Grid.SetColumnSpan(empty_tb, 5)
+            Grid.SetColumnSpan(empty_tb, 6)
             tbl.Children.Add(empty_tb)
             data_row_elements.append([empty_tb])
             return
@@ -1024,6 +1032,15 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             btn.Click += _make_browse(sname)
             row_elems.append(btn)
 
+            edit_row_btn = Button()
+            edit_row_btn.Content = "Edit"
+            edit_row_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(edit_row_btn, row_idx)
+            Grid.SetColumn(edit_row_btn, 5)
+            tbl.Children.Add(edit_row_btn)
+            edit_row_btn.Click += _make_edit_row(sname)
+            row_elems.append(edit_row_btn)
+
             data_row_elements.append(row_elems)
 
     _rebuild_rows()
@@ -1039,11 +1056,6 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     add_btn.Content = "Add Set"
     add_btn.MinWidth = 80
     add_btn.Margin = Thickness(0, 0, 6, 0)
-
-    edit_btn = Button()
-    edit_btn.Content = "Edit"
-    edit_btn.MinWidth = 60
-    edit_btn.Margin = Thickness(0, 0, 6, 0)
 
     del_btn = Button()
     del_btn.Content = "Delete"
@@ -1070,18 +1082,6 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             add_callback()
         _refresh_from_project()
 
-    def _edit(_s, _e):
-        checked = [sname for sname, cb in list(checkboxes.items()) if cb.IsChecked]
-        if len(checked) != 1:
-            if ui:
-                ui.uiUtils_alert("Check exactly one set to edit.", title="Export2Ex Beta")
-            return
-        sname = checked[0]
-        sdata = saved_sets.get(sname) or {}
-        if edit_callback:
-            edit_callback(sname, sdata)
-        _refresh_from_project()
-
     def _delete(_s, _e):
         to_delete = [sname for sname, cb in list(checkboxes.items()) if cb.IsChecked]
         if not to_delete:
@@ -1104,13 +1104,11 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
         window.Close()
 
     add_btn.Click += _add
-    edit_btn.Click += _edit
     del_btn.Click += _delete
     ok_btn.Click += _ok
     cancel_btn.Click += _cancel
 
     btns.Children.Add(add_btn)
-    btns.Children.Add(edit_btn)
     btns.Children.Add(del_btn)
     btns.Children.Add(ok_btn)
     btns.Children.Add(cancel_btn)
