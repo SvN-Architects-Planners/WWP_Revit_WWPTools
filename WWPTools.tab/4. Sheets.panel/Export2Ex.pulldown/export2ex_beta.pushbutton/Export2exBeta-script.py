@@ -1244,6 +1244,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         items = _get_source_items()
         text = (source_search_box.Text or "").strip().lower()
         filtered = items if not text else [item for item in items if text in item.display_name.lower()]
+        source_list.DisplayMemberPath = "display_name"
         source_list.ItemsSource = _to_net_object_list(filtered)
         source_label.Text = "Search categories" if mode == MODE_BY_CATEGORY else "Search schedules"
         source_list_label.Text = "Categories" if mode == MODE_BY_CATEGORY else "Schedules"
