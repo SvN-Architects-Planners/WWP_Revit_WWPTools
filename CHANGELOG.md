@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.1] - 2026-06-15
 
 ### Added
-- Export2Ex Beta: categories and parameters from Revit linked files are now included — the category list and parameter sampling both scan all loaded linked documents in addition to the host model.
+- Export2Ex (by Category): categories and parameters from Revit linked files are now included — the category list and parameter sampling both scan all loaded linked documents in addition to the host model.
+
+### Changed
+- Export2Ex (by Category): tool pushbutton folder renamed from `export2ex_beta` to `export2ex_byCategory` to better reflect its purpose.
+- Export2Ex (by Category): mode switcher label renamed from "From Schedule" to "Category by Schedule".
 
 ### Fixed
-- Export2Ex Beta: categories and schedules in the source list were displaying as "IronPython.NewTypes.System.Object_1$1" instead of their names. Fixed by setting `DisplayMemberPath = "display_name"` on the ListBox so WPF binds to the Python property rather than calling `.ToString()`.
-- Export2Ex Beta: read-only parameters no longer display in grey — they still show "(read-only)" in their label and tooltip, but the grey colour was confusing when the item was also highlighted/selected.
+- Export2Ex (by Category): categories and schedules in the source list were displaying as "IronPython.NewTypes.System.Object_1$1" instead of their names. Fixed by setting `DisplayMemberPath = "display_name"` on the ListBox so WPF binds to the Python property rather than calling `.ToString()`.
+- Export2Ex (by Category): read-only parameters no longer display in grey — they still show "(read-only)" in their label and tooltip, but the grey colour was confusing when the item was also highlighted/selected.
 
 ## [2.0.1] - 2026-06-12
 

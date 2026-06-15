@@ -167,7 +167,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                                                VerticalAlignment="Center"
                                                Margin="0,0,6,0"/>
                                     <ComboBox Name="ModeBox" SelectedIndex="0">
-                                        <ComboBoxItem Content="From Schedule"/>
+                                        <ComboBoxItem Content="Category by Schedule"/>
                                         <ComboBoxItem Content="By Category"/>
                                     </ComboBox>
                                 </DockPanel>
