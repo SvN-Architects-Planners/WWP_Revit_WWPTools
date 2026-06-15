@@ -616,48 +616,72 @@ def collect_schedules(doc):
     return schedules
 
 
+def _get_linked_docs(doc):
+    result = []
+    try:
+        for link in DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkInstance):
+            link_doc = link.GetLinkDocument()
+            if link_doc is not None:
+                result.append(link_doc)
+    except Exception:
+        pass
+    return result
+
+
 def collect_category_records(doc):
     records = {}
-    collector = DB.FilteredElementCollector(doc).WhereElementIsNotElementType()
-    for element in collector:
-        try:
-            category = element.Category
-        except Exception:
-            category = None
-        if category is None:
-            continue
-        name = (category.Name or "").strip()
-        if not name:
-            continue
-        category_id = element_id_value(category.Id)
-        if category_id == -1:
-            continue
-        record = records.get(category_id)
-        if record is None:
-            record = {
-                "id": category.Id,
-                "id_value": category_id,
-                "name": name,
-                "count": 0,
-            }
-            records[category_id] = record
-        record["count"] += 1
+
+    def _scan_doc(scan_doc):
+        collector = DB.FilteredElementCollector(scan_doc).WhereElementIsNotElementType()
+        for element in collector:
+            try:
+                category = element.Category
+            except Exception:
+                category = None
+            if category is None:
+                continue
+            name = (category.Name or "").strip()
+            if not name:
+                continue
+            category_id = element_id_value(category.Id)
+            if category_id == -1:
+                continue
+            record = records.get(category_id)
+            if record is None:
+                record = {
+                    "id": category.Id,
+                    "id_value": category_id,
+                    "name": name,
+                    "count": 0,
+                }
+                records[category_id] = record
+            record["count"] += 1
+
+    _scan_doc(doc)
+    for link_doc in _get_linked_docs(doc):
+        _scan_doc(link_doc)
+
     result = list(records.values())
     result.sort(key=lambda item: item["name"].lower())
     return result
 
 
 def get_elements_by_category(doc, category_id):
-    try:
-        collector = (
-            DB.FilteredElementCollector(doc)
-            .WherePasses(DB.ElementCategoryFilter(category_id))
-            .WhereElementIsNotElementType()
-        )
-        elements = list(collector.ToElements())
-    except Exception:
-        elements = []
-    return [elem for elem in elements if elem is not None]
+    def _collect(src_doc):
+        try:
+            collector = (
+                DB.FilteredElementCollector(src_doc)
+                .WherePasses(DB.ElementCategoryFilter(category_id))
+                .WhereElementIsNotElementType()
+            )
+            return [e for e in collector.ToElements() if e is not None]
+        except Exception:
+            return []
+
+    elements = _collect(doc)
+    for link_doc in _get_linked_docs(doc):
+        elements.extend(_collect(link_doc))
+    return elements
 
 
 def get_schedule_category_id(schedule):
@@ -786,7 +810,6 @@ def _make_parameter_list_item(option):
     item.Content = _parameter_label(option)
     item.Tag = option
     if not option.get("editable", False):
-        item.Foreground = Brushes.Gray
         item.ToolTip = "This parameter is read-only in the sampled category elements/types."
     return item
 
