@@ -27,9 +27,6 @@ DEFAULT_SHEET_NAME = "Project Parameters"
 
 DEFAULT_SHARED_PARAMETERS_PATH = r"N:\Library\Design Software\Autodesk\Revit\Shared Parameters\SharedParameters.txt"
 
-PROMPT_FOR_EXCEL_PATH = True
-PROMPT_FOR_SHARED_PARAMETERS_PATH = True
-
 DATA_START_ROW = 2  # Header in row 1
 
 # Determine parameter group support (BuiltInParameterGroup vs GroupTypeId)
@@ -78,53 +75,122 @@ def _cancel_import(message):
     sys.exit()
 
 
-def _choose_existing_file(title, filter_text, default_path):
+def _is_url(path):
+    return bool(path) and path.startswith(("http://", "https://"))
+
+
+def _download_url_to_temp(url, suffix=".xlsx"):
+    import tempfile
+    import urllib.request
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    os.close(tmp_fd)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as response, open(tmp_path, "wb") as f:
+        f.write(response.read())
+    return tmp_path
+
+
+def _load_xaml_window(xaml_name):
+    try:
+        clr.AddReference('PresentationFramework')
+        clr.AddReference('PresentationCore')
+        clr.AddReference('WindowsBase')
+    except Exception:
+        pass
+    from System.Windows.Markup import XamlReader
+    from System.IO import StringReader
+    from System.Xml import XmlReader
+    xaml_path = os.path.join(SCRIPT_DIR, xaml_name)
+    with open(xaml_path, "r") as f:
+        xaml_text = f.read()
+    reader = XmlReader.Create(StringReader(xaml_text))
+    return XamlReader.Load(reader)
+
+
+def _browse_file(title, filter_text, initial_path=""):
+    from Microsoft.Win32 import OpenFileDialog
+    dlg = OpenFileDialog()
+    dlg.Title = title
+    dlg.Filter = filter_text
+    dlg.Multiselect = False
+    dlg.CheckFileExists = True
     initial_dir = ""
     try:
-        if default_path:
-            initial_dir = os.path.dirname(default_path)
+        if initial_path:
+            initial_dir = os.path.dirname(initial_path)
     except Exception:
-        initial_dir = ""
+        pass
+    if initial_dir and os.path.isdir(initial_dir):
+        dlg.InitialDirectory = initial_dir
+    if dlg.ShowDialog() == True:
+        return str(dlg.FileName or "")
+    return None
+
+
+def _show_import_dialog(default_xlsx, default_shared):
+    window = _load_xaml_window("ImportProjectParametersDialog.xaml")
 
     try:
-        try:
-            clr.AddReference('PresentationFramework')
-        except Exception:
-            pass
-        from Microsoft.Win32 import OpenFileDialog
-        dlg = OpenFileDialog()
-        dlg.Title = title
-        dlg.Filter = filter_text
-        dlg.Multiselect = False
-        dlg.CheckFileExists = True
-        if initial_dir and os.path.isdir(initial_dir):
-            dlg.InitialDirectory = initial_dir
-        if dlg.ShowDialog() == True:
-            return str(dlg.FileName or "")
-        return None
+        from System.Diagnostics import Process
+        from System.Windows.Interop import WindowInteropHelper
+        from System import IntPtr
+        hwnd = Process.GetCurrentProcess().MainWindowHandle
+        if hwnd and hwnd != IntPtr.Zero:
+            WindowInteropHelper(window).Owner = hwnd
     except Exception:
-        return ui.uiUtils_open_file_dialog(
-            title=title,
-            filter_text=filter_text,
-            multiselect=False,
-            initial_directory=initial_dir or "",
+        pass
+
+    excel_box = window.FindName("ExcelPathBox")
+    shared_box = window.FindName("SharedParamPathBox")
+    browse_excel_btn = window.FindName("BrowseExcelButton")
+    browse_shared_btn = window.FindName("BrowseSharedParamButton")
+    ok_btn = window.FindName("OkButton")
+    cancel_btn = window.FindName("CancelButton")
+
+    if excel_box is not None:
+        excel_box.Text = default_xlsx or ""
+    if shared_box is not None:
+        shared_box.Text = default_shared or ""
+
+    def on_browse_excel(sender, e):
+        path = _browse_file(
+            "Select Project Parameters Excel Workbook",
+            "Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
+            str(excel_box.Text or ""),
         )
+        if path:
+            excel_box.Text = path
 
+    def on_browse_shared(sender, e):
+        path = _browse_file(
+            "Select Shared Parameters File",
+            "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+            str(shared_box.Text or ""),
+        )
+        if path:
+            shared_box.Text = path
 
-def _choose_excel_workbook(default_path):
-    return _choose_existing_file(
-        title="Select Project Parameters Excel Workbook",
-        filter_text="Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
-        default_path=default_path,
-    )
+    def on_ok(sender, e):
+        window.DialogResult = True
 
+    def on_cancel(sender, e):
+        window.DialogResult = False
 
-def _choose_shared_parameter_file(default_path):
-    return _choose_existing_file(
-        title="Select Shared Parameters File",
-        filter_text="Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-        default_path=default_path,
-    )
+    if browse_excel_btn is not None:
+        browse_excel_btn.Click += on_browse_excel
+    if browse_shared_btn is not None:
+        browse_shared_btn.Click += on_browse_shared
+    if ok_btn is not None:
+        ok_btn.Click += on_ok
+    if cancel_btn is not None:
+        cancel_btn.Click += on_cancel
+
+    if window.ShowDialog() != True:
+        return None, None
+
+    xlsx = str(excel_box.Text or "").strip() if excel_box is not None else ""
+    shared = str(shared_box.Text or "").strip() if shared_box is not None else ""
+    return xlsx or None, shared or None
 
 
 def _iter_excel_rows(path, worksheet_name=None):
@@ -385,39 +451,38 @@ def _collect_existing_bindings(doc):
 # ============================================================
 # Main
 # ============================================================
-default_workbook = _pick_first_existing_path([DEFAULT_XLSX_PATH])
-selected_workbook = None
-if PROMPT_FOR_EXCEL_PATH:
-    selected_workbook = _choose_excel_workbook(default_workbook or DEFAULT_XLSX_PATH)
-    if not selected_workbook:
-        _cancel_import("Project parameter import cancelled. No Excel workbook was selected.")
-else:
-    selected_workbook = default_workbook
+default_workbook = _pick_first_existing_path([DEFAULT_XLSX_PATH]) or DEFAULT_XLSX_PATH
+default_shared = _pick_first_existing_path([DEFAULT_SHARED_PARAMETERS_PATH]) or DEFAULT_SHARED_PARAMETERS_PATH
 
-if not selected_workbook or not os.path.exists(selected_workbook):
+selected_workbook, selected_shared = _show_import_dialog(default_workbook, default_shared)
+
+if not selected_workbook and not selected_shared:
+    _cancel_import("Project parameter import cancelled.")
+
+if not selected_workbook:
+    TaskDialog.Show("Error", "No Excel workbook path was entered.")
+    raise Exception("Excel workbook not found")
+
+if not _is_url(selected_workbook) and not os.path.exists(selected_workbook):
     TaskDialog.Show(
         "Error",
-        "Excel workbook not found.\n\nDefault:\n{}".format(default_workbook or DEFAULT_XLSX_PATH),
+        "Excel workbook not found:\n{}".format(selected_workbook),
     )
     raise Exception("Excel workbook not found")
 
-# Resolve shared parameters file
-default_shared = _pick_first_existing_path([DEFAULT_SHARED_PARAMETERS_PATH])
-selected_shared = None
-if PROMPT_FOR_SHARED_PARAMETERS_PATH:
-    selected_shared = _choose_shared_parameter_file(default_shared or DEFAULT_SHARED_PARAMETERS_PATH)
-    if not selected_shared:
-        _cancel_import("Project parameter import cancelled. No Shared Parameters file was selected.")
-else:
-    selected_shared = default_shared
+if not selected_shared:
+    TaskDialog.Show("Error", "No Shared Parameters file path was entered.")
+    raise Exception("Shared Parameters file not found")
 
-if not selected_shared or not os.path.exists(selected_shared):
+if not _is_url(selected_shared) and not os.path.exists(selected_shared):
     TaskDialog.Show(
         "Error",
-        "Shared Parameters file not found.\n\nDefault:\n{}".format(default_shared or DEFAULT_SHARED_PARAMETERS_PATH),
+        "Shared Parameters file not found:\n{}".format(selected_shared),
     )
     raise Exception("Shared Parameters file not found")
 
+_tmp_workbook_path = None
+_tmp_shared_path = None
 try:
     print("Project Parameter Import - Starting...")
     print("Started: {}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -425,7 +490,37 @@ try:
     print("Worksheet: {}".format(DEFAULT_SHEET_NAME))
     print("Shared Parameters: {}".format(selected_shared))
 
-    rows = list(_iter_excel_rows(selected_workbook, worksheet_name=DEFAULT_SHEET_NAME))
+    workbook_path = selected_workbook
+    if _is_url(selected_workbook):
+        try:
+            print("Downloading Excel file from URL...")
+            _tmp_workbook_path = _download_url_to_temp(selected_workbook, suffix=".xlsx")
+            workbook_path = _tmp_workbook_path
+            print("Downloaded to: {}".format(workbook_path))
+        except Exception as dl_exc:
+            TaskDialog.Show(
+                "Error",
+                "Failed to download Excel file from URL.\n{}\n\n"
+                "Tip: use a direct download link. For SharePoint, try appending ?download=1 to the URL.".format(dl_exc),
+            )
+            raise Exception("URL download failed: {}".format(dl_exc))
+
+    shared_path = selected_shared
+    if _is_url(selected_shared):
+        try:
+            print("Downloading Shared Parameters file from URL...")
+            _tmp_shared_path = _download_url_to_temp(selected_shared, suffix=".txt")
+            shared_path = _tmp_shared_path
+            print("Downloaded to: {}".format(shared_path))
+        except Exception as dl_exc:
+            TaskDialog.Show(
+                "Error",
+                "Failed to download Shared Parameters file from URL.\n{}\n\n"
+                "Tip: use a direct download link. For SharePoint, try appending ?download=1 to the URL.".format(dl_exc),
+            )
+            raise Exception("URL download failed: {}".format(dl_exc))
+
+    rows = list(_iter_excel_rows(workbook_path, worksheet_name=DEFAULT_SHEET_NAME))
     if not rows:
         raise Exception("No data found in worksheet")
 
@@ -480,7 +575,7 @@ try:
         grouped.setdefault(key, {"paratype_revit": e["paratype_revit"], "categories": []})
         grouped[key]["categories"].append(e["category_api"])
 
-    app.SharedParametersFilename = selected_shared
+    app.SharedParametersFilename = shared_path
     def_file = app.OpenSharedParameterFile()
     if def_file is None:
         raise Exception("Revit could not open the Shared Parameters file.")
@@ -605,3 +700,14 @@ except Exception as e:
     except Exception:
         pass
     TaskDialog.Show("Error", "Failed to process source file:\n{}".format(str(e)))
+finally:
+    if _tmp_workbook_path:
+        try:
+            os.remove(_tmp_workbook_path)
+        except Exception:
+            pass
+    if _tmp_shared_path:
+        try:
+            os.remove(_tmp_shared_path)
+        except Exception:
+            pass

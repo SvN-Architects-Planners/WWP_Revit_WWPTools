@@ -10,10 +10,11 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import DB
 from System.IO import File
-from System.Windows import Visibility
-from System.Windows.Controls import ComboBoxItem
+from System.Windows import FontWeights, Thickness, Visibility
+from System.Windows.Controls import ComboBoxItem, ListBoxItem, TextBlock
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
+from System.Windows.Media import Color, SolidColorBrush
 
 import WWP_uiUtils as ui
 
@@ -22,13 +23,12 @@ uidoc = __revit__.ActiveUIDocument
 doc = uidoc.Document if uidoc else None
 
 
-
-
 def _elem_id_int(eid):
     try:
-        return int(eid.Value)      # Revit 2024+
+        return int(eid.Value)
     except AttributeError:
-        return int(eid.IntegerValue)  # Revit 2023-
+        return int(eid.IntegerValue)
+
 
 def _mode_config(mode):
     if mode == "selection":
@@ -359,21 +359,6 @@ def _collect_families_by_category(current_doc, cat_id):
     return targets
 
 
-def _get_string_parameter_names(elements):
-    names = set()
-    for element in elements:
-        try:
-            for param in element.Parameters:
-                try:
-                    if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
-                        names.add(param.Definition.Name)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-    return sorted(names)
-
-
 def _get_param_value(element, param_name):
     param = element.LookupParameter(param_name)
     if param is None or param.StorageType != DB.StorageType.String or param.IsReadOnly:
@@ -387,6 +372,180 @@ def _set_param_value(element, param_name, new_value):
     if param is None or param.StorageType != DB.StorageType.String or param.IsReadOnly:
         raise Exception("Parameter '{}' not found or read-only".format(param_name))
     param.Set(new_value)
+
+
+def _get_params_by_family(current_doc, scope_key, cat_id=None):
+    """Returns (all_params_sorted, [(family_name, param_names_sorted)]) including both instance and type params."""
+    all_params = set()
+    family_params = {}  # family_name -> set of param names
+
+    def _family_name_for_type(elem_type):
+        if elem_type is None:
+            return "(Unknown)"
+        try:
+            fn = elem_type.FamilyName
+            return fn if fn else "(Unknown)"
+        except Exception:
+            return "(Unknown)"
+
+    def _scan_element(element, family_name):
+        if family_name not in family_params:
+            family_params[family_name] = set()
+        try:
+            for param in element.Parameters:
+                try:
+                    if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
+                        pname = param.Definition.Name
+                        all_params.add(pname)
+                        family_params[family_name].add(pname)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if scope_key == "Current Selection":
+        try:
+            selected_ids = list(__revit__.ActiveUIDocument.Selection.GetElementIds())
+        except Exception:
+            selected_ids = []
+        seen_type_ids = set()
+        for eid in selected_ids:
+            elem = current_doc.GetElement(eid)
+            if elem is None:
+                continue
+            if isinstance(elem, DB.ElementType):
+                fname = _family_name_for_type(elem)
+                _scan_element(elem, fname)
+            else:
+                elem_type = _get_type_from_instance(current_doc, elem)
+                fname = _family_name_for_type(elem_type)
+                _scan_element(elem, fname)
+                if elem_type:
+                    tid = _elem_id_int(elem_type.Id)
+                    if tid not in seen_type_ids:
+                        seen_type_ids.add(tid)
+                        _scan_element(elem_type, fname)
+    else:
+        instances = _collect_instances_by_category(current_doc, cat_id, ignore_groups=False)
+        seen_type_ids = set()
+        for elem in instances:
+            elem_type = _get_type_from_instance(current_doc, elem)
+            fname = _family_name_for_type(elem_type)
+            _scan_element(elem, fname)
+            if elem_type:
+                tid = _elem_id_int(elem_type.Id)
+                if tid not in seen_type_ids:
+                    seen_type_ids.add(tid)
+                    _scan_element(elem_type, fname)
+        # Also scan types with no placed instances
+        try:
+            for et in (DB.FilteredElementCollector(current_doc)
+                       .OfCategoryId(cat_id)
+                       .WhereElementIsElementType()
+                       .ToElements()):
+                tid = _elem_id_int(et.Id)
+                if tid not in seen_type_ids:
+                    seen_type_ids.add(tid)
+                    fname = _family_name_for_type(et)
+                    _scan_element(et, fname)
+        except Exception:
+            pass
+
+    families_sorted = sorted(
+        (fname, sorted(pnames))
+        for fname, pnames in family_params.items()
+        if pnames
+    )
+    return sorted(all_params), families_sorted
+
+
+def _populate_param_list(lst, all_params, families):
+    """Build grouped ListBox: 'All Families' header + flat list, then per-family sections."""
+    lst.Items.Clear()
+
+    muted_brush = SolidColorBrush(Color.FromRgb(0x71, 0x71, 0x7A))   # zinc-500
+
+    def _add_header(text):
+        tb = TextBlock()
+        tb.Text = text.upper()
+        tb.FontSize = 10
+        tb.FontWeight = FontWeights.SemiBold
+        tb.Foreground = muted_brush
+        item = ListBoxItem()
+        item.Content = tb
+        item.IsEnabled = False
+        item.IsHitTestVisible = False
+        item.Padding = Thickness(8, 7, 8, 2)
+        item.Tag = None
+        lst.Items.Add(item)
+
+    def _add_param(name):
+        item = ListBoxItem()
+        item.Content = name
+        item.Tag = name
+        item.Padding = Thickness(16, 4, 8, 4)
+        lst.Items.Add(item)
+
+    if not all_params:
+        item = ListBoxItem()
+        item.Content = "(no editable text parameters found)"
+        item.IsEnabled = False
+        item.Padding = Thickness(10, 6, 10, 6)
+        lst.Items.Add(item)
+        return
+
+    multi_family = len(families) > 1
+    if multi_family:
+        _add_header("All Families  —  {} parameters".format(len(all_params)))
+    for name in all_params:
+        _add_param(name)
+
+    if multi_family:
+        for fname, pnames in families:
+            _add_header(fname)
+            for name in pnames:
+                _add_param(name)
+
+
+def collect_elements_with_param(current_doc, scope_key, cat_id, param_name, ignore_groups):
+    """Collect instances + types that have the given writable string param."""
+    candidates = []
+    seen_ids = set()
+
+    if scope_key == "Current Selection":
+        candidates = _get_selected_instances(current_doc, ignore_groups)
+        for t in _get_selected_types(current_doc):
+            try:
+                tid = _elem_id_int(t.Id)
+                if tid not in seen_ids:
+                    seen_ids.add(tid)
+                    candidates.append(t)
+            except Exception:
+                pass
+    else:
+        candidates = _collect_instances_by_category(current_doc, cat_id, ignore_groups)
+        for t in _collect_types_by_category(current_doc, cat_id):
+            try:
+                tid = _elem_id_int(t.Id)
+                if tid not in seen_ids:
+                    seen_ids.add(tid)
+                    candidates.append(t)
+            except Exception:
+                pass
+
+    result = []
+    final_seen = set()
+    for elem in candidates:
+        try:
+            eid = _elem_id_int(elem.Id)
+            if eid in final_seen:
+                continue
+            final_seen.add(eid)
+        except Exception:
+            continue
+        if _get_param_value(elem, param_name) is not None:
+            result.append(elem)
+    return result
 
 
 def collect_elements(current_doc, scope_key):
@@ -467,14 +626,17 @@ def collect_target_elements(current_doc, target_key, scope_key, cat_id=None, ign
     return []
 
 
-def plan_renames(elements, find_text, replace_text, prefix, suffix):
+def plan_renames(elements, find_text, replace_text, prefix, suffix, overwrite_value=None):
     existing_lower = {_get_name(e).lower() for e in elements if _get_name(e)}
     planned = []
     skipped = []
 
     for element in elements:
         old_name = _get_name(element)
-        new_name = _build_new_name(old_name, find_text, replace_text, prefix, suffix).strip()
+        if overwrite_value is not None:
+            new_name = overwrite_value.strip()
+        else:
+            new_name = _build_new_name(old_name, find_text, replace_text, prefix, suffix).strip()
 
         if new_name == old_name:
             continue
@@ -495,14 +657,17 @@ def plan_renames(elements, find_text, replace_text, prefix, suffix):
     return planned, skipped
 
 
-def plan_param_renames(elements, param_name, find_text, replace_text, prefix, suffix):
+def plan_param_renames(elements, param_name, find_text, replace_text, prefix, suffix, overwrite_value=None):
     planned = []
     skipped = []
     for element in elements:
         old_value = _get_param_value(element, param_name)
         if old_value is None:
             continue
-        new_value = _build_new_name(old_value, find_text, replace_text, prefix, suffix).strip()
+        if overwrite_value is not None:
+            new_value = overwrite_value
+        else:
+            new_value = _build_new_name(old_value, find_text, replace_text, prefix, suffix).strip()
         if new_value == old_value:
             continue
         if len(new_value) > 255:
@@ -593,48 +758,46 @@ def show_dialog(script_dir, lib_path, mode):
     window = XamlReader.Parse(File.ReadAllText(xaml_path))
     _set_owner(window)
 
-    lbl_selector = window.FindName("LblSelector")
-    lbl_target = window.FindName("LblTarget")
-    txt_header = window.FindName("TxtHeader")
-    txt_subtitle = window.FindName("TxtSubtitle")
-    cmb_target = window.FindName("CmbTarget")
-    cmb_category = window.FindName("CmbCategory")
-    row_parameter = window.FindName("RowParameter")
-    cmb_parameter = window.FindName("CmbParameter")
+    # --- find controls ---
+    lbl_selector      = window.FindName("LblSelector")
+    lbl_target        = window.FindName("LblTarget")
+    txt_header        = window.FindName("TxtHeader")
+    txt_subtitle      = window.FindName("TxtSubtitle")
+    cmb_target        = window.FindName("CmbTarget")
+    cmb_category      = window.FindName("CmbCategory")
+    btn_load          = window.FindName("BtnLoad")
+    pnl_parameters    = window.FindName("PnlParameters")
+    lst_parameters    = window.FindName("LstParameters")
+    txt_source        = window.FindName("TxtSource")
+    rb_transform      = window.FindName("RbTransform")
+    rb_overwrite      = window.FindName("RbOverwrite")
+    pnl_transform     = window.FindName("PnlTransform")
+    pnl_overwrite     = window.FindName("PnlOverwrite")
+    txt_overwrite     = window.FindName("TxtOverwrite")
+    txt_find          = window.FindName("TxtFind")
+    txt_replace       = window.FindName("TxtReplace")
+    txt_prefix        = window.FindName("TxtPrefix")
+    txt_suffix        = window.FindName("TxtSuffix")
     chk_ignore_groups = window.FindName("ChkIgnoreGroups")
-    row_ignore_groups = window.FindName("RowIgnoreGroups") or chk_ignore_groups
-    txt_source = window.FindName("TxtSource")
-    txt_find = window.FindName("TxtFind")
-    txt_replace = window.FindName("TxtReplace")
-    txt_prefix = window.FindName("TxtPrefix")
-    txt_suffix = window.FindName("TxtSuffix")
-    btn_cancel = window.FindName("BtnCancel")
-    btn_apply = window.FindName("BtnApply")
+    btn_cancel        = window.FindName("BtnCancel")
+    btn_apply         = window.FindName("BtnApply")
 
-    window.Title = config["title"]
-    txt_header.Text = config["header"]
-    txt_subtitle.Text = config["subtitle"]
+    window.Title       = config["title"]
+    txt_header.Text    = config["header"]
+    txt_subtitle.Text  = config["subtitle"]
     lbl_target.Content = "Rename:"
     lbl_selector.Content = config["selector_label"]
 
-    target_keys = []
-    for display_name, target_key in TARGET_OPTIONS:
-        item = ComboBoxItem()
-        item.Content = display_name
-        cmb_target.Items.Add(item)
-        target_keys.append(target_key)
-    cmb_target.SelectedIndex = 0
-
-    category_keys = []
-    category_ids = []
+    # --- state ---
+    target_keys    = []
+    category_keys  = []
+    category_ids   = []
     category_names = []
-    param_names = []
 
+    # --- helpers ---
     def _target_key():
         idx = cmb_target.SelectedIndex
-        if idx < 0 or idx >= len(target_keys):
-            return "element_names"
-        return target_keys[idx]
+        return target_keys[idx] if 0 <= idx < len(target_keys) else "element_names"
 
     def _target_display():
         item = cmb_target.SelectedItem
@@ -645,15 +808,11 @@ def show_dialog(script_dir, lib_path, mode):
 
     def _selected_key():
         idx = cmb_category.SelectedIndex
-        if idx < 0 or idx >= len(category_keys):
-            return ""
-        return category_keys[idx]
+        return category_keys[idx] if 0 <= idx < len(category_keys) else ""
 
     def _selected_category_id():
         idx = cmb_category.SelectedIndex
-        if idx < 0 or idx >= len(category_ids):
-            return None
-        return category_ids[idx]
+        return category_ids[idx] if 0 <= idx < len(category_ids) else None
 
     def _selected_display():
         item = cmb_category.SelectedItem
@@ -662,38 +821,24 @@ def show_dialog(script_dir, lib_path, mode):
         except Exception:
             return str(item or "")
 
-    def _populate_parameter_combo(elements):
-        cmb_parameter.Items.Clear()
-        del param_names[:]
-        names = _get_string_parameter_names(elements)
-        param_names.extend(names)
-        if not names:
-            item = ComboBoxItem()
-            item.Content = "(no editable text parameters)"
-            item.IsEnabled = False
-            cmb_parameter.Items.Add(item)
-            cmb_parameter.SelectedIndex = 0
-            return
-        for name in names:
-            item = ComboBoxItem()
-            item.Content = name
-            cmb_parameter.Items.Add(item)
-        cmb_parameter.SelectedIndex = 0
+    def _is_param_mode():
+        return _target_key() == "instance_params"
 
-    def _refresh_parameter_combo():
-        if _target_key() != "instance_params":
-            cmb_parameter.Items.Clear()
-            del param_names[:]
-            return
-        elements = collect_target_elements(
-            doc,
-            "instance_params",
-            _selected_key(),
-            _selected_category_id(),
-            chk_ignore_groups.IsChecked == True,
-        )
-        _populate_parameter_combo(elements)
+    def _reset_param_panel():
+        if pnl_parameters is not None:
+            pnl_parameters.Visibility = Visibility.Collapsed
+        if lst_parameters is not None:
+            lst_parameters.Items.Clear()
 
+    # --- populate target combo ---
+    for display_name, target_key in TARGET_OPTIONS:
+        item = ComboBoxItem()
+        item.Content = display_name
+        cmb_target.Items.Add(item)
+        target_keys.append(target_key)
+    cmb_target.SelectedIndex = 0
+
+    # --- populate category combo ---
     def _refresh_category_combo():
         cmb_category.Items.Clear()
         del category_keys[:]
@@ -729,51 +874,92 @@ def show_dialog(script_dir, lib_path, mode):
         if cmb_category.Items.Count > 0:
             cmb_category.SelectedIndex = 0
 
+    # --- show/hide Load button and param panel ---
     def _refresh_target_controls():
-        is_param = _target_key() == "instance_params"
-        if row_parameter is not None:
-            row_parameter.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
-        if row_ignore_groups is not None:
-            row_ignore_groups.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
+        is_param = _is_param_mode()
+        if btn_load is not None:
+            btn_load.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
+        _reset_param_panel()
         _refresh_category_combo()
         txt_source.Text = _source_label(_selected_key())
-        _refresh_parameter_combo()
+        # ignore-groups checkbox only relevant for param mode
+        if chk_ignore_groups is not None:
+            chk_ignore_groups.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
 
     _refresh_target_controls()
-    cmb_category.IsEnabled = config["selector_enabled"]
+
+    # --- mode toggle (Transform vs Overwrite) ---
+    def _refresh_mode_panels():
+        is_overwrite = (rb_overwrite is not None and rb_overwrite.IsChecked == True)
+        if pnl_transform is not None:
+            pnl_transform.Visibility = Visibility.Collapsed if is_overwrite else Visibility.Visible
+        if pnl_overwrite is not None:
+            pnl_overwrite.Visibility = Visibility.Visible if is_overwrite else Visibility.Collapsed
+
+    _refresh_mode_panels()
 
     result = [None]
 
-    def _on_selector_changed(sender, args):
-        txt_source.Text = _source_label(_selected_key())
-        _refresh_parameter_combo()
-
+    # --- event handlers ---
     def _on_target_changed(sender, args):
         _refresh_target_controls()
 
-    def _on_ignore_groups_changed(sender, args):
-        _refresh_parameter_combo()
+    def _on_selector_changed(sender, args):
+        txt_source.Text = _source_label(_selected_key())
+        _reset_param_panel()
+
+    def _on_load(sender, args):
+        all_params, families = _get_params_by_family(doc, _selected_key(), _selected_category_id())
+        _populate_param_list(lst_parameters, all_params, families)
+        if pnl_parameters is not None:
+            pnl_parameters.Visibility = Visibility.Visible
+
+    def _on_mode_changed(sender, args):
+        _refresh_mode_panels()
 
     def _on_apply(sender, args):
+        is_overwrite = (rb_overwrite is not None and rb_overwrite.IsChecked == True)
+        overwrite_value = None
+        if is_overwrite:
+            overwrite_value = txt_overwrite.Text if txt_overwrite else ""
+
         param_name = ""
-        if _target_key() == "instance_params":
-            param_idx = cmb_parameter.SelectedIndex
-            if param_idx < 0 or param_idx >= len(param_names):
-                ui.uiUtils_alert("No editable text parameters available for the current scope.", title=config["title"])
+        if _is_param_mode():
+            if pnl_parameters is None or pnl_parameters.Visibility != Visibility.Visible:
+                ui.uiUtils_alert(
+                    "Click 'Load Params' first to load parameters for the selected category.",
+                    title=config["title"],
+                )
                 return
-            param_name = param_names[param_idx]
+            selected_item = lst_parameters.SelectedItem if lst_parameters else None
+            if selected_item is None or selected_item.Tag is None:
+                ui.uiUtils_alert("Select a parameter from the list.", title=config["title"])
+                return
+            param_name = str(selected_item.Tag)
+
+        if not is_overwrite and not any([
+            txt_find.Text, txt_prefix.Text, txt_suffix.Text
+        ]):
+            ui.uiUtils_alert(
+                "Provide at least a Find text, Prefix, or Suffix — or switch to Overwrite mode.",
+                title=config["title"],
+            )
+            return
+
         result[0] = {
-            "target_key": _target_key(),
+            "target_key":     _target_key(),
             "target_display": _target_display(),
-            "scope_key": _selected_key(),
-            "scope_display": _selected_display(),
-            "cat_id": _selected_category_id(),
-            "param_name": param_name,
-            "find": txt_find.Text or "",
-            "replace": txt_replace.Text or "",
-            "prefix": txt_prefix.Text or "",
-            "suffix": txt_suffix.Text or "",
-            "ignore_groups": chk_ignore_groups.IsChecked == True,
+            "scope_key":      _selected_key(),
+            "scope_display":  _selected_display(),
+            "cat_id":         _selected_category_id(),
+            "param_name":     param_name,
+            "find":           txt_find.Text or "",
+            "replace":        txt_replace.Text or "",
+            "prefix":         txt_prefix.Text or "",
+            "suffix":         txt_suffix.Text or "",
+            "ignore_groups":  chk_ignore_groups.IsChecked == True,
+            "is_overwrite":   is_overwrite,
+            "overwrite_value": overwrite_value,
         }
         window.DialogResult = True
         window.Close()
@@ -782,12 +968,16 @@ def show_dialog(script_dir, lib_path, mode):
         window.DialogResult = False
         window.Close()
 
-    cmb_target.SelectionChanged += _on_target_changed
-    cmb_category.SelectionChanged += _on_selector_changed
-    chk_ignore_groups.Checked += _on_ignore_groups_changed
-    chk_ignore_groups.Unchecked += _on_ignore_groups_changed
-    btn_apply.Click += _on_apply
-    btn_cancel.Click += _on_cancel
+    cmb_target.SelectionChanged    += _on_target_changed
+    cmb_category.SelectionChanged  += _on_selector_changed
+    if btn_load is not None:
+        btn_load.Click             += _on_load
+    if rb_transform is not None:
+        rb_transform.Checked       += _on_mode_changed
+    if rb_overwrite is not None:
+        rb_overwrite.Checked       += _on_mode_changed
+    btn_apply.Click                += _on_apply
+    btn_cancel.Click               += _on_cancel
 
     if window.ShowDialog() != True:
         return None
@@ -800,23 +990,26 @@ def run(script_dir, lib_path, mode):
     if not inputs:
         return
 
-    scope_key = inputs["scope_key"]
-    scope_display = inputs["scope_display"]
-    target_key = inputs["target_key"]
+    scope_key      = inputs["scope_key"]
+    scope_display  = inputs["scope_display"]
+    target_key     = inputs["target_key"]
     target_display = inputs["target_display"]
-    cat_id = inputs["cat_id"]
-    param_name = inputs["param_name"]
-    find_text = inputs["find"]
-    replace_text = inputs["replace"]
-    prefix = inputs["prefix"]
-    suffix = inputs["suffix"]
-    ignore_groups = inputs["ignore_groups"]
+    cat_id         = inputs["cat_id"]
+    param_name     = inputs["param_name"]
+    find_text      = inputs["find"]
+    replace_text   = inputs["replace"]
+    prefix         = inputs["prefix"]
+    suffix         = inputs["suffix"]
+    ignore_groups  = inputs["ignore_groups"]
+    is_overwrite   = inputs.get("is_overwrite", False)
+    overwrite_value = inputs.get("overwrite_value", None)
 
-    if not any([find_text, prefix, suffix]):
-        ui.uiUtils_alert("Provide at least a Find text, Prefix, or Suffix value.", title=config["title"])
-        return
+    # Collect elements
+    if target_key == "instance_params":
+        elements = collect_elements_with_param(doc, scope_key, cat_id, param_name, ignore_groups)
+    else:
+        elements = collect_target_elements(doc, target_key, scope_key, cat_id, ignore_groups)
 
-    elements = collect_target_elements(doc, target_key, scope_key, cat_id, ignore_groups)
     if not elements:
         if scope_key in ("Current Selection", "Types (Selection)"):
             msg = "No renameable items found in the current selection."
@@ -826,11 +1019,21 @@ def run(script_dir, lib_path, mode):
         return
 
     if target_key == "instance_params":
-        planned, skipped = plan_param_renames(elements, param_name, find_text, replace_text, prefix, suffix)
+        planned, skipped = plan_param_renames(
+            elements, param_name, find_text, replace_text, prefix, suffix,
+            overwrite_value=overwrite_value if is_overwrite else None,
+        )
     else:
-        planned, skipped = plan_renames(elements, find_text, replace_text, prefix, suffix)
+        planned, skipped = plan_renames(
+            elements, find_text, replace_text, prefix, suffix,
+            overwrite_value=overwrite_value if is_overwrite else None,
+        )
+
     if not planned:
-        ui.uiUtils_alert("No values matched the criteria.\nSkipped: {}".format(len(skipped)), title=config["title"])
+        ui.uiUtils_alert(
+            "No values matched the criteria.\nSkipped: {}".format(len(skipped)),
+            title=config["title"],
+        )
         return
 
     lines = [
@@ -839,6 +1042,8 @@ def run(script_dir, lib_path, mode):
     ]
     if target_key == "instance_params":
         lines.append("Parameter: {}".format(param_name))
+    if is_overwrite:
+        lines.append("Mode:      Overwrite  ->  \"{}\"".format(overwrite_value))
     lines += [
         "To update: {}".format(len(planned)),
         "Skipped:   {}".format(len(skipped)),
@@ -866,7 +1071,9 @@ def run(script_dir, lib_path, mode):
         return
 
     if target_key == "instance_params":
-        renamed, failed = apply_param_renames(doc, planned, param_name, config["transaction_title"], scope_display)
+        renamed, failed = apply_param_renames(
+            doc, planned, param_name, config["transaction_title"], scope_display
+        )
     else:
         renamed, failed = apply_renames(doc, planned, config["transaction_title"], scope_display)
 
