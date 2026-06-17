@@ -3,3 +3,4 @@ tooltip: |
   Purpose: Copy instance parameter values from a source element to one or more target elements of the same category.
   Usage: Pre-select elements (first = source, rest = targets) before running, or use the pick prompts. A parameter list lets you choose which values to match. Read-only parameters are shown greyed out.
 author: "Jason Tian"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/match-property"

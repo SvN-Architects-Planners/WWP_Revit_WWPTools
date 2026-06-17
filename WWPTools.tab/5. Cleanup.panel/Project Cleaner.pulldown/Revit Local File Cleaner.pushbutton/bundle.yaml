@@ -1,6 +1,6 @@
 title:  "Delete\nLocal Files"
 tooltip: |
   Delete all Temp files, Local files and Caches. \nPlease close all your BIM360/ACC projects, and open an empty revit file before doing so.
-help_url: "https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.5-or-plugins/2.5.1-or-wwp-tools-toolbar/5-revit-cleanup#project-cleaner"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/5-cleanup/project-cleaner"
 author: "Jason Tian"
 context: zero-doc

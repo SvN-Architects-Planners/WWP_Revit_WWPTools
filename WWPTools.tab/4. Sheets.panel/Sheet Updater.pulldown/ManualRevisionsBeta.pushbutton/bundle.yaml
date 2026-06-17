@@ -3,3 +3,4 @@ tooltip: |
   Beta formatter for manual revision titleblocks using per-set width inputs.
   Automatically switches selected sheets to the chosen target titleblock only when the override is needed.
 author: "Jason Tian"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/4-sheets/sheet-updater/manual-revisions-beta"

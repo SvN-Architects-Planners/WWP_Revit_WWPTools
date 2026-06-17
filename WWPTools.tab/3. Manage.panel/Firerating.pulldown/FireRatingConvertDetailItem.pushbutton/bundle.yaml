@@ -1,5 +1,5 @@
 title:  "Convert Lines to Detail Items"
 tooltip: |
   Clear lines from fire rating for ALL walls on current view based on their center lines
-help_url: "https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.5-or-plugins/2.5.1-or-wwp-tools-toolbar/3-project-management#convert-lines-to-detail-items"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/fire-rating-tool/convert-lines-to-detail-items"
 author: "Jason Tian"

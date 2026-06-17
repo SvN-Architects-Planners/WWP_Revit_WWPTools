@@ -2,3 +2,4 @@ title: "Room?Area\nBoundaries"
 tooltip: |
   Convert Rooms on a selected level into an Area Plan: creates Area Boundary Lines from Room boundaries, places Areas at Room locations, and copies matching instance/shared parameters from Rooms to Areas (when the parameters exist on both categories).
 author: "GitHub Copilot"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/suite-plan-tool/room-to-area-boundary"

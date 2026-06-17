@@ -1,5 +1,5 @@
 title: "Sync Selected\nMass"
 tooltip: |
   Copy matching Mass instance parameter values to Mass Floors associated with the selected Mass or Mass Floor elements.
-help_url: "https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.5-or-plugins/2.5.1-or-wwp-tools-toolbar/2-mass-context#sync-mass-tool"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/2-context/sync-mass-tool/sync-selected-mass"
 author: "Jason Tian"
