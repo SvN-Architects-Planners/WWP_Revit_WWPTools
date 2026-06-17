@@ -428,19 +428,26 @@ def _merge_pdf_files(input_paths, output_path):
 
     # Prefer the compiled, engine-agnostic WWPTools.IO PDF merger (PdfSharp).
     # Fall back to the bundled pypdf if the DLL is unavailable.
+    io_error = None
     try:
         import WWP_xlsx
         from System import Array, String
         pdf_service = WWP_xlsx.load_pdf_service()
         pdf_service.MergePdfs(Array[String]([str(p) for p in paths]), output_path)
         return
-    except Exception:
-        pass
+    except Exception as exc:
+        io_error = exc
 
     try:
         from pypdf import PdfReader, PdfWriter
-    except Exception as exc:
-        raise Exception("The bundled pypdf library is unavailable: {}".format(exc))
+    except Exception as pypdf_exc:
+        if io_error is not None:
+            raise Exception(
+                "PDF merge failed.\n"
+                "WWPTools.IO error: {}\n"
+                "Fallback pypdf error: {}".format(io_error, pypdf_exc)
+            )
+        raise Exception("The bundled pypdf library is unavailable: {}".format(pypdf_exc))
 
     writer = PdfWriter()
     try:

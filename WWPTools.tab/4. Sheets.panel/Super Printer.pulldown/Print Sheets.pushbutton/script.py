@@ -936,7 +936,6 @@ class EditNamingFormatsWindow(forms.WPFWindow):
     def __init__(self, xaml_file_name, start_with=None, doc=None):
         forms.WPFWindow.__init__(self, xaml_file_name)
 
-        self._drop_pos = 0
         self._starting_item = start_with
         self._saved = False
         self._doc = doc
@@ -963,6 +962,91 @@ class EditNamingFormatsWindow(forms.WPFWindow):
                     name = None
                 if name and name not in names:
                     names.append(name)
+        except Exception:
+            pass
+        try:
+            names.sort(key=lambda x: x.lower())
+        except Exception:
+            pass
+        return names
+
+    @staticmethod
+    def _get_sheet_param_names(doc):
+        names = []
+        if not doc:
+            return names
+        try:
+            sheets = DB.FilteredElementCollector(doc)\
+                .OfClass(framework.get_type(DB.ViewSheet))\
+                .WhereElementIsNotElementType()\
+                .ToElements()
+            for sheet in sheets:
+                for p in sheet.Parameters:
+                    try:
+                        name = p.Definition.Name if p and p.Definition else None
+                    except Exception:
+                        name = None
+                    if name and name not in names:
+                        names.append(name)
+                break
+        except Exception:
+            pass
+        try:
+            names.sort(key=lambda x: x.lower())
+        except Exception:
+            pass
+        return names
+
+    @staticmethod
+    def _get_tblock_param_names(doc):
+        names = []
+        if not doc:
+            return names
+        try:
+            tblocks = DB.FilteredElementCollector(doc)\
+                .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)\
+                .WhereElementIsNotElementType()\
+                .ToElements()
+            for tblock in tblocks:
+                for p in tblock.Parameters:
+                    try:
+                        name = p.Definition.Name if p and p.Definition else None
+                    except Exception:
+                        name = None
+                    if name and name not in names:
+                        names.append(name)
+                try:
+                    tb_type = doc.GetElement(tblock.GetTypeId())
+                    if tb_type:
+                        for p in tb_type.Parameters:
+                            try:
+                                name = p.Definition.Name if p and p.Definition else None
+                            except Exception:
+                                name = None
+                            if name and name not in names:
+                                names.append(name)
+                except Exception:
+                    pass
+                break
+        except Exception:
+            pass
+        try:
+            names.sort(key=lambda x: x.lower())
+        except Exception:
+            pass
+        return names
+
+    @staticmethod
+    def _get_global_param_names(doc):
+        names = []
+        if not doc:
+            return names
+        try:
+            gp_ids = DB.GlobalParametersManager.GetAllGlobalParameters(doc)
+            for gp_id in gp_ids:
+                gp = doc.GetElement(gp_id)
+                if gp and gp.Name:
+                    names.append(gp.Name)
         except Exception:
             pass
         try:
@@ -1137,8 +1221,24 @@ class EditNamingFormatsWindow(forms.WPFWindow):
         self.namingformat_edit.DataContext = value
 
     def reset_formatters(self):
-        self.formatters_wp.ItemsSource = \
-            EditNamingFormatsWindow.get_default_formatters(self._doc)
+        sheet_params = EditNamingFormatsWindow._get_sheet_param_names(self._doc)
+        tblock_params = EditNamingFormatsWindow._get_tblock_param_names(self._doc)
+        proj_params = EditNamingFormatsWindow._get_project_param_names(self._doc)
+        glob_params = EditNamingFormatsWindow._get_global_param_names(self._doc)
+
+        self.sheet_param_cb.ItemsSource = sheet_params
+        self.tblock_param_cb.ItemsSource = tblock_params
+        self.proj_param_cb.ItemsSource = proj_params
+        self.glob_param_cb.ItemsSource = glob_params
+
+        if sheet_params:
+            self.sheet_param_cb.SelectedIndex = 0
+        if tblock_params:
+            self.tblock_param_cb.SelectedIndex = 0
+        if proj_params:
+            self.proj_param_cb.SelectedIndex = 0
+        if glob_params:
+            self.glob_param_cb.SelectedIndex = 0
 
     def reset_naming_formats(self):
         self.formats_lb.ItemsSource = \
@@ -1151,43 +1251,50 @@ class EditNamingFormatsWindow(forms.WPFWindow):
                     self.selected_naming_format = item
                     break
 
-    # https://www.wpftutorial.net/DragAndDrop.html
-    def start_drag(self, sender, args):
-        name_formatter = args.OriginalSource.DataContext
-        Windows.DragDrop.DoDragDrop(
-            self.formatters_wp,
-            Windows.DataObject("name_formatter", name_formatter),
-            Windows.DragDropEffects.Copy
-            )
-
-    # https://social.msdn.microsoft.com/Forums/vstudio/en-US/941f6bf2-a321-459e-85c9-501ec1e13204/how-do-you-get-a-drag-and-drop-event-for-a-wpf-textbox-hosted-in-a-windows-form
-    def preview_drag(self, sender, args):
-        mouse_pos = Forms.Cursor.Position
-        mouse_po_pt = Windows.Point(mouse_pos.X, mouse_pos.Y)
-        self._drop_pos = \
-            self.template_tb.GetCharacterIndexFromPoint(
-                point=self.template_tb.PointFromScreen(mouse_po_pt),
-                snapToText=True
-                )
-        self.template_tb.SelectionStart = self._drop_pos
+    def _insert_tag(self, tag):
+        pos = self.template_tb.SelectionStart
+        text = str(self.template_tb.Text or '')
+        self.template_tb.Text = text[:pos] + tag + text[pos:]
+        self.template_tb.SelectionStart = pos + len(tag)
         self.template_tb.SelectionLength = 0
         self.template_tb.Focus()
-        args.Effects = Windows.DragDropEffects.Copy
-        args.Handled = True
 
-    def stop_drag(self, sender, args):
-        name_formatter = args.Data.GetData("name_formatter")
-        if name_formatter:
-            new_template = \
-                str(self.template_tb.Text)[:self._drop_pos] \
-                + name_formatter.template \
-                + str(self.template_tb.Text)[self._drop_pos:]
-            self.template_tb.Text = new_template
-            self.template_tb.Focus()
+    def insert_formatter(self, sender, args):
+        tag = str(sender.Tag) if sender.Tag is not None else ''
+        if tag:
+            self._insert_tag(tag)
+
+    def insert_sheet_param(self, sender, args):
+        item = self.sheet_param_cb.SelectedItem or self.sheet_param_cb.Text
+        if item:
+            self._insert_tag('{sheet_param:%s}' % item)
+
+    def insert_tblock_param(self, sender, args):
+        item = self.tblock_param_cb.SelectedItem or self.tblock_param_cb.Text
+        if item:
+            self._insert_tag('{tblock_param:%s}' % item)
+
+    def insert_proj_param(self, sender, args):
+        item = self.proj_param_cb.SelectedItem or self.proj_param_cb.Text
+        if item:
+            self._insert_tag('{proj_param:%s}' % item)
+
+    def insert_glob_param(self, sender, args):
+        item = self.glob_param_cb.SelectedItem or self.glob_param_cb.Text
+        if item:
+            self._insert_tag('{glob_param:%s}' % item)
 
     def namingformat_changed(self, sender, args):
         naming_format = self.selected_naming_format
         self.namingformat_edit.DataContext = naming_format
+
+    def create_namingformat(self, sender, args):
+        new_naming_format = NamingFormat(
+            name='<new format>',
+            template='{index} {number} {name}.pdf'
+        )
+        self.naming_formats.Add(new_naming_format)
+        self.selected_naming_format = new_naming_format
 
     def duplicate_namingformat(self, sender, args):
         naming_format = self.selected_naming_format

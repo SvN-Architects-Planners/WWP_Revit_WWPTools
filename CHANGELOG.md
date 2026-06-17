@@ -5,6 +5,15 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-17
+
+### Changed
+- Print Sheets: Naming Format editor replaced drag-and-drop tag panel with categorised clickable tag buttons (Sheet, Revision, Project, System) and dropdown pickers for Sheet, TitleBlock, Project Info, and Global parameters — dropdowns are populated from the open model at dialog load time and are also editable for custom parameter names.
+- Print Sheets: Naming Format editor now has a "Create" button (alongside Duplicate and Delete) to start a new blank format from scratch.
+
+### Fixed
+- Combined Print Set: PDF merge error now reports the actual WWPTools.IO failure reason alongside the fallback pypdf error instead of only showing "invalid syntax".
+
 ## [2.0.1] - 2026-06-15
 
 ### Added

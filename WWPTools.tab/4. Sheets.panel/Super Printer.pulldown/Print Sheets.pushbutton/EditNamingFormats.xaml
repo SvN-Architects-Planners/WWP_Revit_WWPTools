@@ -3,7 +3,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
         HorizontalContentAlignment="Center"
-        ResizeMode="CanResizeWithGrip" SizeToContent="Height" Width="950" MinHeight="500"
+        ResizeMode="CanResizeWithGrip" SizeToContent="Height" Width="1000" MinHeight="500"
         Title="Naming Formats" Closing="cancelled">
     <Window.Resources>
         <Style x:Key="FormatterTextBox" TargetType="{x:Type TextBox}">
@@ -21,14 +21,90 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="TagButton" TargetType="{x:Type Button}">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="7,0"/>
+            <Setter Property="Margin" Value="3,2,0,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="4"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SectionLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="Margin" Value="0,9,0,3"/>
+        </Style>
+
+        <Style x:Key="HintText" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="DimGray"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+        </Style>
+
+        <Style x:Key="InsertButton" TargetType="{x:Type Button}">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="3"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#555555"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#111111"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
+
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition MinWidth="200" Width="1*" />
             <ColumnDefinition Width="4" />
-            <ColumnDefinition MinWidth="450" Width="2*" />
+            <ColumnDefinition MinWidth="530" Width="2*" />
         </Grid.ColumnDefinitions>
 
+        <!-- LEFT: saved format list -->
         <DockPanel Grid.Column="0" Margin="0,0,5,0">
             <TextBlock Text="Naming Formats" FontWeight="Medium" DockPanel.Dock="Top" />
             <Button Content="Save" Height="30" Margin="0,5,0,0" Click="save_formats" DockPanel.Dock="Bottom"/>
@@ -36,16 +112,17 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition />
                     <ColumnDefinition />
+                    <ColumnDefinition />
                 </Grid.ColumnDefinitions>
-                <Button Grid.Column="0" Content="Duplicate" Height="30" Margin="0,0,3,0" DockPanel.Dock="Left" Click="duplicate_namingformat"/>
-                <Button Grid.Column="1" Content="Delete" Height="30" Margin="2,0,0,0" DockPanel.Dock="Right" Click="delete_namingformat"/>
+                <Button Grid.Column="0" Content="Create"    Height="30" Margin="0,0,3,0" Click="create_namingformat"/>
+                <Button Grid.Column="1" Content="Duplicate" Height="30" Margin="2,0,3,0" Click="duplicate_namingformat"/>
+                <Button Grid.Column="2" Content="Delete"    Height="30" Margin="2,0,0,0" Click="delete_namingformat"/>
             </Grid>
-            <ListBox x:Name="formats_lb" FontFamily="Consolas" Margin="0,5,0,0" SelectionChanged="namingformat_changed" SelectionMode="Single" SelectedIndex="0">
+            <ListBox x:Name="formats_lb" FontFamily="Consolas" Margin="0,5,0,0"
+                     SelectionChanged="namingformat_changed" SelectionMode="Single" SelectedIndex="0">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Orientation="Horizontal" >
-                            <ContentPresenter Content="{Binding name}" RecognizesAccessKey="False"/>
-                        </StackPanel>
+                        <ContentPresenter Content="{Binding name}" RecognizesAccessKey="False"/>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
@@ -53,95 +130,154 @@
 
         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Width="4" />
 
-        <StackPanel x:Name="namingformat_edit" Grid.Column="2" Margin="5,0,0,0">
-            <TextBlock Text="Format Title" FontWeight="Medium" />
-            <TextBlock TextWrapping="Wrap" Foreground="DimGray">
-                This is the name of this specific naming format. Give the format a descriptive
-                name that is easy to understand and find. For example: "City of Portland ePermit"
-            </TextBlock>
-            <TextBox x:Name="template_name_tb"
-                     Text="{Binding name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     Style="{StaticResource FormatterTextBox}"/>
+        <!-- RIGHT: format editor -->
+        <DockPanel x:Name="namingformat_edit" Grid.Column="2" Margin="5,0,0,0">
 
-            <TextBlock Text="Template" FontWeight="Medium" Margin="0,10,0,0" />
-            <TextBlock TextWrapping="Wrap" Foreground="DimGray">
-                This is the actual naming format template. Each "{}" (tag) represents a value that will be
-                filled when creating the name for a PDF file. Pick an choose from the tags listed
-                below and drag them to this box.
-            </TextBlock>
-            <TextBox x:Name="template_tb"
-                     Text="{Binding template, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     Style="{StaticResource FormatterTextBox}"
-                     AllowDrop="True" PreviewDrop="stop_drag" PreviewDragOver="preview_drag"/>
+            <!-- Title + template fields (fixed at top) -->
+            <StackPanel DockPanel.Dock="Top">
+                <TextBlock Text="Format Title" FontWeight="Medium" />
+                <TextBlock TextWrapping="Wrap" Foreground="DimGray">
+                    Give this format a descriptive name, e.g. "City of Portland ePermit"
+                </TextBlock>
+                <TextBox x:Name="template_name_tb"
+                         Text="{Binding name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormatterTextBox}"/>
 
-            <TextBlock Text="Drag and drop from formatters below. Hover over the formatter for description" Foreground="DimGray" Margin="0,5,0,0"/>
-            <ItemsControl x:Name="formatters_wp" Margin="0,5,0,0">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel IsItemsHost="True" PreviewMouseLeftButtonDown="start_drag"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border x:Name="formatter_box" Height="20" Margin="5,5,0,0" Background="DarkGray" BorderThickness="0" CornerRadius="5" ToolTip="{Binding desc}">
-                            <TextBlock Text="{Binding template}" FontFamily="Consolas" Foreground="White" VerticalAlignment="Center" Margin="5,0,5,0" Padding="0,0,0,1" />
-                        </Border>
-                        <DataTemplate.Triggers>
-                            <DataTrigger Binding="{Binding template}" Value="{}{index}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="{DynamicResource pyRevitAccentBrush}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{name}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="{DynamicResource pyRevitDarkBrush}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{name_dash}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="{DynamicResource pyRevitDarkBrush}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{name_underline}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="{DynamicResource pyRevitDarkBrush}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{rev_number}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#d84936" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{rev_desc}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#d84936" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{rev_date}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#d84936" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_name}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_number}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_building_name}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_issue_date}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_org_name}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_status}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="#665dba" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{sheet_param:PARAM_NAME}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{tblock_param:PARAM_NAME}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{proj_param:PARAM_NAME}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding template}" Value="{}{glob_param:PARAM_NAME}">
-                                <Setter TargetName="formatter_box" Property="Background" Value="Black" />
-                            </DataTrigger>
-                        </DataTemplate.Triggers>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+                <TextBlock Text="Template" FontWeight="Medium" Margin="0,10,0,0" />
+                <TextBlock TextWrapping="Wrap" Foreground="DimGray">
+                    Click a tag below to insert it at the cursor position in this box.
+                </TextBlock>
+                <TextBox x:Name="template_tb"
+                         Text="{Binding template, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormatterTextBox}"/>
+            </StackPanel>
+
+            <!-- Scrollable tag/picker panel -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                <StackPanel>
+
+                    <!-- SHEET -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="SHEET"/>
+                    <WrapPanel>
+                        <Button Style="{StaticResource TagButton}" Background="{DynamicResource pyRevitAccentBrush}"
+                                Tag="{}{index}" Content="{}{index}"
+                                ToolTip="Print Index Number e.g. 0001" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="{DynamicResource pyRevitDarkBrush}"
+                                Tag="{}{number}" Content="{}{number}"
+                                ToolTip="Sheet Number e.g. A1.00" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="{DynamicResource pyRevitDarkBrush}"
+                                Tag="{}{name}" Content="{}{name}"
+                                ToolTip="Sheet Name e.g. 1ST FLOOR PLAN" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="{DynamicResource pyRevitDarkBrush}"
+                                Tag="{}{name_dash}" Content="{}{name_dash}"
+                                ToolTip="Sheet Name with hyphens for spaces" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="{DynamicResource pyRevitDarkBrush}"
+                                Tag="{}{name_underline}" Content="{}{name_underline}"
+                                ToolTip="Sheet Name with underscores for spaces" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="SlateGray"
+                                Tag="{}{issue_date}" Content="{}{issue_date}"
+                                ToolTip="Sheet Issue Date e.g. 2019-10-12" Click="insert_formatter"/>
+                    </WrapPanel>
+
+                    <!-- REVISION -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="REVISION"/>
+                    <WrapPanel>
+                        <Button Style="{StaticResource TagButton}" Background="#d84936"
+                                Tag="{}{rev_number}" Content="{}{rev_number}"
+                                ToolTip="Current Revision Number e.g. 01" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#d84936"
+                                Tag="{}{rev_desc}" Content="{}{rev_desc}"
+                                ToolTip="Current Revision Description e.g. ASI01" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#d84936"
+                                Tag="{}{rev_date}" Content="{}{rev_date}"
+                                ToolTip="Current Revision Date e.g. 2019-10-12" Click="insert_formatter"/>
+                    </WrapPanel>
+
+                    <!-- PROJECT -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="PROJECT"/>
+                    <WrapPanel>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_name}" Content="{}{proj_name}"
+                                ToolTip="Project Name" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_number}" Content="{}{proj_number}"
+                                ToolTip="Project Number e.g. PR2019.12" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_building_name}" Content="{}{proj_building_name}"
+                                ToolTip="Project Building Name" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_issue_date}" Content="{}{proj_issue_date}"
+                                ToolTip="Project Issue Date" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_org_name}" Content="{}{proj_org_name}"
+                                ToolTip="Project Organization Name" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="#665dba"
+                                Tag="{}{proj_status}" Content="{}{proj_status}"
+                                ToolTip="Project Status" Click="insert_formatter"/>
+                    </WrapPanel>
+
+                    <!-- SYSTEM -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="SYSTEM"/>
+                    <WrapPanel>
+                        <Button Style="{StaticResource TagButton}" Background="DimGray"
+                                Tag="{}{current_date}" Content="{}{current_date}"
+                                ToolTip="Today's Date e.g. 2019-10-12" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="DimGray"
+                                Tag="{}{username}" Content="{}{username}"
+                                ToolTip="Active Revit Username" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="DimGray"
+                                Tag="{}{revit_version}" Content="{}{revit_version}"
+                                ToolTip="Active Revit Version e.g. 2024" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="DimGray"
+                                Tag="{}{excel_name}" Content="{}{excel_name}"
+                                ToolTip="Excel/CSV Drawing Name (Column B)" Click="insert_formatter"/>
+                        <Button Style="{StaticResource TagButton}" Background="DimGray"
+                                Tag="{}{excel_number}" Content="{}{excel_number}"
+                                ToolTip="Excel/CSV Drawing Number (Column C)" Click="insert_formatter"/>
+                    </WrapPanel>
+
+                    <!-- SHEET PARAMETER -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="SHEET PARAMETER"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="sheet_param_cb" Width="310" Height="26"
+                                  VerticalContentAlignment="Center" IsEditable="True"/>
+                        <Button Content="+ Insert" Style="{StaticResource InsertButton}"
+                                Click="insert_sheet_param"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource HintText}">Inserts as {sheet_param:PARAM_NAME}. Populated from the first sheet in the model.</TextBlock>
+
+                    <!-- TITLEBLOCK PARAMETER -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="TITLEBLOCK PARAMETER"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="tblock_param_cb" Width="310" Height="26"
+                                  VerticalContentAlignment="Center" IsEditable="True"/>
+                        <Button Content="+ Insert" Style="{StaticResource InsertButton}"
+                                Click="insert_tblock_param"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource HintText}">Inserts as {tblock_param:PARAM_NAME}. Populated from title block parameters in the model.</TextBlock>
+
+                    <!-- PROJECT PARAMETER -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="PROJECT PARAMETER"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="proj_param_cb" Width="310" Height="26"
+                                  VerticalContentAlignment="Center" IsEditable="True"/>
+                        <Button Content="+ Insert" Style="{StaticResource InsertButton}"
+                                Click="insert_proj_param"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource HintText}">Inserts as {proj_param:PARAM_NAME}. Populated from Project Information parameters.</TextBlock>
+
+                    <!-- GLOBAL PARAMETER -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="GLOBAL PARAMETER"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="glob_param_cb" Width="310" Height="26"
+                                  VerticalContentAlignment="Center" IsEditable="True"/>
+                        <Button Content="+ Insert" Style="{StaticResource InsertButton}"
+                                Click="insert_glob_param"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource HintText}" Margin="0,2,0,10">Inserts as {glob_param:PARAM_NAME}. Populated from Global Parameters in the model.</TextBlock>
+
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Grid>
 </Window>
