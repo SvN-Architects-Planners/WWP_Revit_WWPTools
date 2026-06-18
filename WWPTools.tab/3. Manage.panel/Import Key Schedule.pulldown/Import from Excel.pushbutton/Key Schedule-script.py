@@ -462,6 +462,15 @@ def _show_area_keyplan_import_dialog(
         dlg.Title = "Select Excel File"
         dlg.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
         dlg.CheckFileExists = True
+        current = os.path.expandvars(str(file_path_box.Text or "") if file_path_box is not None else "")
+        init_dir = os.path.dirname(current) if current else ""
+        if not init_dir or not os.path.isdir(init_dir):
+            try:
+                from System import Environment
+                init_dir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            except Exception:
+                init_dir = os.path.expanduser("~")
+        dlg.InitialDirectory = init_dir
         if dlg.ShowDialog() == True:
             file_path_box.Text = dlg.FileName or ""
 
@@ -504,7 +513,7 @@ def _show_area_keyplan_import_dialog(
         return None
 
     result_target_type = str(target_combo.SelectedItem or "") if target_combo is not None else ""
-    result_file_path = str(file_path_box.Text or "") if file_path_box is not None else ""
+    result_file_path = os.path.expandvars(str(file_path_box.Text or "") if file_path_box is not None else "")
     selected_options = []
     column_names_out = []
 

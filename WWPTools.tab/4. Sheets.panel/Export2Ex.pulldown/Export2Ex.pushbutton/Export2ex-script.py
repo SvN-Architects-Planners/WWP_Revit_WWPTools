@@ -128,6 +128,8 @@ def _pick_save_file(title, filter_text, default_extension, initial_directory, fi
     if default_extension:
         dialog.DefaultExt = default_extension
         dialog.AddExtension = True
+    if initial_directory:
+        initial_directory = os.path.expandvars(initial_directory)
     if initial_directory and os.path.isdir(initial_directory):
         dialog.InitialDirectory = initial_directory
     if file_name:
@@ -144,6 +146,8 @@ def _pick_folder(title, initial_directory):
 
     dialog = FolderBrowserDialog()
     dialog.Description = title or "Select Folder"
+    if initial_directory:
+        initial_directory = os.path.expandvars(initial_directory)
     if initial_directory and os.path.isdir(initial_directory):
         dialog.SelectedPath = initial_directory
     result = dialog.ShowDialog()
@@ -460,17 +464,36 @@ def config_get(config, name, default=None):
     return default if value is None else value
 
 
+def _is_cloud_path(path):
+    if not path:
+        return False
+    lower = path.lower()
+    return (lower.startswith("bim 360://")
+            or lower.startswith("autodesk docs://")
+            or lower.startswith("autodesk forma://"))
+
+
+def _docs_folder():
+    try:
+        from System import Environment
+        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+    except Exception:
+        return os.path.expanduser("~")
+
+
 def get_default_dir(doc):
     if doc.IsWorkshared:
         try:
             central = doc.GetWorksharingCentralModelPath()
             if central:
-                return os.path.dirname(DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central))
+                path = DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)
+                if not _is_cloud_path(path):
+                    return os.path.dirname(path)
         except Exception:
             pass
-    if doc.PathName:
+    if doc.PathName and not _is_cloud_path(doc.PathName):
         return os.path.dirname(doc.PathName)
-    return os.path.expanduser("~")
+    return _docs_folder()
 
 
 def ensure_existing_dir(path, fallback=""):
