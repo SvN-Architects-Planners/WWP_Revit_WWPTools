@@ -1161,6 +1161,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     move_parameter_down_button = window.FindName("MoveParameterDownButton")
     excel_path = window.FindName("ExcelPath")
     browse_excel = window.FindName("BrowseExcel")
+    query_excel_button = window.FindName("QueryExcelFields")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     batch_export_button = window.FindName("BatchExportButton")
@@ -1447,6 +1448,95 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if file_path:
             excel_path.Text = file_path
 
+    def _query_excel_fields(_sender, _args):
+        path = os.path.expandvars((excel_path.Text or "").strip())
+        if not path or not os.path.isfile(path):
+            ui.uiUtils_alert(
+                "No existing Excel file found at the current path.\n\n"
+                "Browse to an existing exported file first, then click Query Fields.",
+                title="Query Fields from Excel",
+            )
+            return
+
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        if category_id is None:
+            ui.uiUtils_alert(
+                "Select a category or schedule first.",
+                title="Query Fields from Excel",
+            )
+            return
+
+        target_sheet = (sheet_name_box.Text or "").strip() if sheet_name_box else ""
+
+        try:
+            add_lib_path()
+            import WWP_xlsx as _xlsx
+        except Exception:
+            try:
+                import openpyxl as _xlsx
+            except Exception as exc:
+                ui.uiUtils_alert(
+                    "Excel reader not available:\n{}".format(exc),
+                    title="Query Fields from Excel",
+                )
+                return
+
+        try:
+            wb = _xlsx.load_workbook(path)
+            if target_sheet and target_sheet in wb.sheetnames:
+                ws = wb[target_sheet]
+            elif wb.sheetnames:
+                ws = wb[wb.sheetnames[0]]
+            else:
+                ui.uiUtils_alert("The Excel file contains no sheets.", title="Query Fields from Excel")
+                return
+            headers = []
+            col = 1
+            while True:
+                val = ws.cell(row=1, column=col).value
+                if val is None:
+                    break
+                headers.append(str(val).strip())
+                col += 1
+        except Exception as exc:
+            ui.uiUtils_alert(
+                "Could not read the Excel file:\n{}".format(exc),
+                title="Query Fields from Excel",
+            )
+            return
+
+        if not headers:
+            ui.uiUtils_alert(
+                "No column headers found in row 1 of the Excel file.",
+                title="Query Fields from Excel",
+            )
+            return
+
+        available = set(opt["name"] for opt in _get_parameter_names(category_id))
+        found = []
+        missing = []
+        for h in headers:
+            if h == "Id":
+                continue
+            if h in available:
+                found.append(h)
+            else:
+                missing.append(h)
+
+        selected_params_by_category[category_id] = found
+        _refresh_parameter_list()
+
+        if missing:
+            ui.uiUtils_alert(
+                "{} column(s) from the Excel file have no matching Revit parameter "
+                "and were skipped:\n\n{}".format(
+                    len(missing),
+                    "\n".join("  - {}".format(m) for m in missing),
+                ),
+                title="Query Fields - Missing Parameters",
+            )
+
     saved_sets = read_saved_sets(doc)
 
     def _refresh_saved_set_dropdown():
@@ -1580,6 +1670,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     move_parameter_up_button.Click += _move_up
     move_parameter_down_button.Click += _move_down
     browse_excel.Click += _browse_excel
+    if query_excel_button is not None:
+        query_excel_button.Click += _query_excel_fields
     ok_button.Click += _ok
     cancel_button.Click += _cancel
     if load_set_button is not None:

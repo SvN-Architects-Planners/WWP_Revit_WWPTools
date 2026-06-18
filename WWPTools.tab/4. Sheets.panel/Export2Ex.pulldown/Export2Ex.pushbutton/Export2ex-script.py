@@ -282,7 +282,7 @@ def _ensure_saved_sets_param(doc, config, ui, save_config):
             "Parameter '{}' was not found in Project Information and no other "
             "writable text parameters exist.\n\n"
             "Add a text parameter to Project Information to enable saved sets.".format(PARAM_SAVED_SETS),
-            title="Export Schedules — Saved Sets",
+            title="Export Schedules - Saved Sets",
         )
         return None
 

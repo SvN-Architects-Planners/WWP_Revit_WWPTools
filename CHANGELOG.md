@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import Key Schedule, Export to Excel/CSV: file paths saved to config now store `%USERPROFILE%` in place of `C:\Users\<username>` so settings are portable across user accounts. Paths are expanded back via `%USERPROFILE%` when the dialog reopens.
 - Export to Excel/CSV: if `! P_STATS_Export_Text` is absent from Project Information, the tool now prompts the user to select any existing writable text parameter as the saved-sets store instead. The chosen parameter is remembered per project. Previously, the tool silently returned empty sets on read and attempted to auto-create the parameter on write.
 - Export2Ex Beta: moved the Delete button from the bottom toolbar into each row, next to the Edit button. Each set can now be deleted directly without checking a checkbox first.
+- Export2Ex Beta: added **Query Fields** button next to Browse. Reads column headers from an existing exported Excel file and auto-populates Selected Properties to match. Any header that has no matching Revit parameter is reported by name.
 
 ### Added
 - Update WWPTools: converted the updater into a pulldown with three commands: **Update WWPTools**, **Generate Updater Manually**, and **Force Updater**.

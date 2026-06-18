@@ -93,16 +93,22 @@
                             Style="{StaticResource SecondaryButtonStyle}"/>
                 </Grid>
 
-                <!-- Row 1: Excel path + Browse -->
+                <!-- Row 1: Excel path + Browse + Query Fields -->
                 <Grid Grid.Row="1" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="120"/>
                     </Grid.ColumnDefinitions>
                     <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
                     <Button Name="BrowseExcel"
                             Grid.Column="1"
                             Content="Browse"
+                            Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button Name="QueryExcelFields"
+                            Grid.Column="2"
+                            Content="Query Fields"
                             Style="{StaticResource SecondaryButtonStyle}"/>
                 </Grid>
 
