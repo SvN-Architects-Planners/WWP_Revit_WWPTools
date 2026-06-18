@@ -1,0 +1,6 @@
+title: "Force\nUpdater"
+tooltip: |
+  Create and launch a force updater that recreates WWPTools as a fresh git clone.
+author: "Jason Tian"
+context: zero-doc
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/5-cleanup/update-wwptools/force-updater"

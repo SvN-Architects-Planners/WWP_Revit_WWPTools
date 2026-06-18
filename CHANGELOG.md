@@ -5,6 +5,23 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-18
+
+### Added
+- Update WWPTools: converted the updater into a pulldown with three commands: **Update WWPTools**, **Generate Updater Manually**, and **Force Updater**.
+- Update WWPTools: added **Generate Updater Manually** to create and launch the external updater batch file regardless of the detected update condition.
+- Update WWPTools: added **Force Updater** to prepare a fresh git clone with pyRevit's bundled git support, launch a visible batch window, wait for Revit to close, delete the installed extension folder, move the prepared clone into place, verify `.git`, and clean temporary marker files.
+- GitBook: added Update WWPTools subpages for the normal updater, manual updater generation, and force updater workflows.
+
+### Changed
+- Update WWPTools: normal updates now classify incoming changes before updating. Existing non-DLL file edits update without reloading pyRevit; file/folder structure changes update then reload pyRevit; DLL changes generate and launch a batch updater that waits for all Revit processes to close.
+- Update WWPTools: no-Git machines now use a PowerShell GitHub ZIP fallback for standard installs and updates instead of relying on `pyrevit.exe extend`.
+- Force Updater: the batch window now appears before clone preparation, shows preparation status while pyRevit downloads the fresh clone, and only asks users to close Revit after the temp clone is ready.
+
+### Fixed
+- Update WWPTools: repair flow now detects when `WWP_Revit_WWPTools.extension` exists as a file instead of a folder and replaces it cleanly.
+- Force Updater: no longer requires Git for Windows; the real git clone is created by pyRevit before Revit closes, then moved into place by the batch.
+
 ## [2.0.1] - 2026-06-17
 
 ### Changed

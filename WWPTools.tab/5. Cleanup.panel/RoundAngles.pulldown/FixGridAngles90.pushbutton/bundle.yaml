@@ -2,4 +2,4 @@ title: "Fix Grid\nAngles"
 tooltip: |
   Rounds all linear grid world angles to 2 decimals and snaps near-perpendicular pairs to exact 90 degrees.
 author: "Jason Tian"
-help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/5-cleanup/roundangles/fix-grid-angles-to-90"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/5-cleanup/roundangles/fix-grid-angles"

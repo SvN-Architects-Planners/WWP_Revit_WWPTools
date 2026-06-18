@@ -1,5 +1,5 @@
 title:  "Create Fire Rating Lines for ALL walls in Current View"
 tooltip: |
   Create lines from fire rating for ALL walls on current view based on their center lines; Parameter will be set on 'FRR Walls', and Parameter should be formated as Number+HR, such as 0HR,1.5HR,3/4HR,2HR,3HR,1HR
-help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/fire-rating-tool/create-fire-rating-lines-for-all-walls"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/fire-rating-tool/create-fire-rating-lines-for-all-walls-in-current-view"
 author: "Jason Tian"

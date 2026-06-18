@@ -1,5 +1,5 @@
 title:  "Create Fire Rating Lines for All walls in views with FRR indicator"
 tooltip: |
   Clear lines from fire rating for ALL walls on current view based on their center lines
-help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/fire-rating-tool/create-fire-rating-lines-for-frr-views"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/fire-rating-tool/create-fire-rating-lines-for-all-walls-in-views-with-frr-indicator"
 author: "Jason Tian"

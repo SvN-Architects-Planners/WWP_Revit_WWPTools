@@ -3,4 +3,4 @@ tooltip: |
   Rename instance parameter values across a category in the project.
   Select a category, choose a text parameter, then apply find/replace, prefix, or suffix to all matching values.
 author: "Jason Tian"
-help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/renamer/rename-by-category"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/renamer/rename-param-value-by-category"

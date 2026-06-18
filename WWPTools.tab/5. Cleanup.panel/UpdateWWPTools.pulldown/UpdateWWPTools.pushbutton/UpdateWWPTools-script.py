@@ -1,6 +1,7 @@
 __context__ = "zero-doc"
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,13 +12,30 @@ from pyrevit.coreutils import git as pygit  # type: ignore
 
 
 script_dir = os.path.dirname(__file__)
-lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+
+
+def _find_extension_root(start_dir):
+    path = os.path.abspath(start_dir)
+    while path and path != os.path.dirname(path):
+        if path.lower().endswith(".extension"):
+            return path
+        path = os.path.dirname(path)
+    return os.path.abspath(os.path.join(start_dir, "..", "..", ".."))
+
+
+EXTENSION_ROOT = _find_extension_root(script_dir)
+MANUAL_GENERATE_UPDATER = bool(globals().get("MANUAL_GENERATE_UPDATER", False))
+FORCE_GENERATE_UPDATER = bool(globals().get("FORCE_GENERATE_UPDATER", False))
+
+lib_path = os.path.abspath(os.path.join(EXTENSION_ROOT, "lib"))
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 
 
 TITLE = "Update WWPTools"
 RELEASES_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest"
+REPO_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools.git"
+DEFAULT_UPDATE_BRANCH = "main"
 SUPPORTED_UPDATE_BRANCHES = ("main", "pyrevit-6.1", "pyrevit-6.4")
 
 # Windows process-creation flags (safe fallback for IronPython)
@@ -152,7 +170,7 @@ def _powershell_toast_command(title, message, appid="WWP Architects + Planners")
 
 
 def _extension_root():
-    return os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
+    return os.path.normpath(EXTENSION_ROOT)
 
 
 def _latest_tag(repo_root):
@@ -198,25 +216,55 @@ def _incoming_log(repo_root, target_branch, max_lines=10):
         return ""
 
 
-def _incoming_changed_files(repo_root, target_branch):
+def _incoming_name_status(repo_root, target_branch):
     if not _git_cli_available():
         return []
     try:
         output = _git_output(
             repo_root,
-            ["diff", "--name-only", "HEAD..{}".format(_remote_branch(target_branch))]
+            ["diff", "--name-status", "HEAD..{}".format(_remote_branch(target_branch))]
         ).strip()
-        return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
+        changes = []
+        for line in output.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 2:
+                parts = line.split(None)
+            if len(parts) < 2:
+                continue
+            status = parts[0].strip().upper()
+            paths = [p.strip().replace("\\", "/") for p in parts[1:] if p.strip()]
+            changes.append((status, paths))
+        return changes
     except Exception:
         return []
 
 
-def _update_needs_revit_close(changed_files):
-    for path in changed_files or []:
-        lower_path = path.lower()
-        if lower_path.endswith(".dll"):
-            return True
-    return False
+def _path_is_dll(path):
+    return str(path or "").lower().endswith(".dll")
+
+
+def _classify_incoming_changes(repo_root, target_branch):
+    changes = _incoming_name_status(repo_root, target_branch)
+    has_dll = False
+    has_structural = False
+    modified_non_dll = []
+
+    for status, paths in changes:
+        status_code = status[:1]
+        if any(_path_is_dll(path) for path in paths):
+            has_dll = True
+        if status_code == "M" and len(paths) == 1:
+            if not _path_is_dll(paths[0]):
+                modified_non_dll.append(paths[0])
+            continue
+        has_structural = True
+
+    return {
+        "changes": changes,
+        "has_dll": has_dll,
+        "has_structural": has_structural,
+        "modified_non_dll": modified_non_dll,
+    }
 
 
 def _working_tree_dirty(repo_root):
@@ -282,10 +330,7 @@ def _git_output(repo_root, args):
 
 def _sync_to_github(repo_root, target_branch):
     if not _git_cli_available():
-        raise Exception(
-            "Git CLI is required to update WWPTools.\n\n"
-            "Close Revit, install Git, then run Update WWPTools again."
-        )
+        raise Exception("Git CLI is not available.")
     _run_git(repo_root, ["fetch", "origin", target_branch])
     _run_git(repo_root, ["reset", "--hard", _remote_branch(target_branch)])
     _run_git(repo_root, ["clean", "-ffdx"])
@@ -371,15 +416,14 @@ def _open_latest_release():
 
 
 def _show_not_repo_message():
-    open_release = _confirm(
-        "This installation is not a Git clone, so WWPTools can not update it with built-in Git.\n\n"
-        "Future installs and updates should be done through pyRevit Extension Manager using:\n"
-        "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools\n\n"
-        "Open the latest GitHub release?",
+    update_now = _confirm(
+        "This installation is not a Git clone.\n\n"
+        "WWPTools can still update by downloading the latest GitHub ZIP after Revit closes.\n\n"
+        "Prepare that update now?",
         TITLE,
     )
-    if open_release:
-        _open_latest_release()
+    if update_now:
+        _prepare_full_zip_update(_extension_root(), DEFAULT_UPDATE_BRANCH)
 
 
 # ---------------------------------------------------------------------------
@@ -405,53 +449,143 @@ def _github_archive_url(repo_root, target_branch):
     return "{}/archive/refs/heads/{}.zip".format(url, target_branch)
 
 
-def _incoming_modified_non_dll_files(repo_root, target_branch):
-    """Return files that are MODIFIED (not added/deleted/renamed) in the incoming
-    commits, excluding DLLs. These can be updated in-place without closing Revit."""
-    if not _git_cli_available():
-        return []
+def _write_full_zip_update_bat(extension_root, target_branch):
+    """Write a .bat that replaces the full extension folder from GitHub after Revit closes."""
+    base_dir = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    out_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "PendingUpdates"))
     try:
-        output = _git_output(
-            repo_root,
-            ["diff", "--name-status", "HEAD..origin/{}".format(target_branch)]
-        )
-        result = []
-        for line in output.splitlines():
-            parts = line.split(None, 1)
-            if len(parts) < 2:
-                continue
-            status = parts[0].strip().upper()
-            path = parts[1].strip().replace("\\", "/")
-            if status == "M" and not path.lower().endswith(".dll"):
-                result.append(path)
-        return result
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
     except Exception:
-        return []
+        out_dir = tempfile.gettempdir()
+
+    bat_path = os.path.normpath(os.path.join(out_dir, "UpdateWWPTools-Zip.bat"))
+    extension_norm = os.path.normpath(extension_root)
+    zip_url = _github_archive_url(extension_root, target_branch) or ""
+
+    if not zip_url:
+        return None
+
+    ps_update = (
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \""
+        "$ErrorActionPreference = 'Stop'; "
+        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
+        "$url = '{zip}'; "
+        "$ext = '{ext}'; "
+        "$tmpRoot = Join-Path $env:TEMP ('WWPTools_Update_' + [guid]::NewGuid().ToString('N')); "
+        "$zipPath = Join-Path $tmpRoot 'wwptools.zip'; "
+        "$extract = Join-Path $tmpRoot 'extract'; "
+        "New-Item -ItemType Directory -Force -Path $tmpRoot,$extract | Out-Null; "
+        "try {{ "
+        "  Write-Host '  Downloading from GitHub...'; "
+        "  Invoke-WebRequest -Uri $url -OutFile $zipPath; "
+        "  Expand-Archive -LiteralPath $zipPath -DestinationPath $extract -Force; "
+        "  $src = Get-ChildItem -LiteralPath $extract -Directory | Select-Object -First 1; "
+        "  if (-not $src) {{ throw 'Downloaded ZIP did not contain a folder.' }}; "
+        "  if (Test-Path -LiteralPath $ext) {{ Remove-Item -LiteralPath $ext -Recurse -Force }}; "
+        "  Move-Item -LiteralPath $src.FullName -Destination $ext; "
+        "  if (-not (Test-Path -LiteralPath $ext -PathType Container)) {{ throw 'Extension folder was not created.' }}; "
+        "  Write-Host '  Extension folder replaced from GitHub ZIP.'; "
+        "}} finally {{ "
+        "  if (Test-Path -LiteralPath $tmpRoot) {{ Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }} "
+        "}}\""
+    ).format(
+        zip=zip_url.replace("'", "''"),
+        ext=extension_norm.replace("'", "''"),
+    )
+
+    lines = [
+        "@echo off",
+        "setlocal",
+        "title WWPTools Update",
+        "echo.",
+        "echo  WWPTools Update",
+        "echo  ================",
+        "echo.",
+        ":waitrevit",
+        'tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul 2>&1',
+        "if not errorlevel 1 (",
+        "  echo  Revit is still running.",
+        "  echo.",
+        "  echo  Close all Revit windows, then press any key to check again.",
+        "  pause >nul",
+        "  cls",
+        "  echo.",
+        "  echo  WWPTools Update",
+        "  echo  ================",
+        "  echo.",
+        "  goto :waitrevit",
+        ")",
+        "echo  Revit has closed. Starting ZIP update...",
+        "echo.",
+        ps_update,
+        "if errorlevel 1 goto :fail",
+        "echo.",
+        "echo  WWPTools updated successfully.",
+        "echo  Start Revit to use the new version.",
+        "echo.",
+        "goto :done",
+        "",
+        ":fail",
+        "echo.",
+        "echo  Update FAILED. See the error above.",
+        "echo.",
+        "",
+        ":done",
+        "pause",
+        "(goto) 2>nul & del /f /q \"%~f0\"",
+    ]
+
+    try:
+        with open(bat_path, "w") as fh:
+            fh.write("\r\n".join(lines) + "\r\n")
+        return bat_path
+    except Exception:
+        return None
 
 
-def _partial_update_non_dll(repo_root, target_branch, files):
-    """Check out modified non-DLL files from origin in-place (no Revit close needed).
-    Returns the count of successfully updated files."""
-    if not files or not _git_cli_available():
-        return 0
-    remote = "origin/{}".format(target_branch)
-    updated = 0
-    for f in files:
+def _prepare_full_zip_update(extension_root, target_branch):
+    bat_path = _write_full_zip_update_bat(extension_root, target_branch)
+    if not bat_path:
+        _alert(
+            "Could not prepare the ZIP updater.\n\n"
+            "Open the latest GitHub release and install WWPTools manually.",
+            TITLE,
+        )
+        _open_latest_release()
+        return
+
+    launched = _launch_bat_in_console(bat_path)
+    if launched:
+        _alert(
+            "A console window is now waiting for Revit to close.\n\n"
+            "Close Revit - WWPTools will update from the latest GitHub ZIP automatically.\n\n"
+            "Script location (if the window was blocked):\n"
+            "{}".format(bat_path),
+            TITLE,
+        )
+    else:
+        _alert(
+            "Close Revit, then double-click this update script:\n"
+            "{}".format(bat_path),
+            TITLE,
+        )
         try:
-            _run_git(repo_root, ["checkout", remote, "--", f])
-            updated += 1
+            subprocess.Popen(
+                ["explorer", "/select,", bat_path],
+                shell=False,
+                creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            )
         except Exception:
             pass
-    return updated
 
 
 def _write_deferred_update_bat(repo_root, target_branch):
     """Write a self-contained .bat that applies the full update after Revit is closed.
 
     Primary path: uses git CLI (fetch + reset --hard + clean) - proper update, HEAD advances.
-    Fallback (no git CLI): PowerShell downloads the GitHub archive zip and copies only the
-    DLL files. The .git HEAD stays at the old commit, but the DLLs are correct; the NEXT
-    run of Update WWPTools will see 0 commits behind (or reconcile cleanly via reset --hard).
+    Fallback (no git CLI): PowerShell downloads the GitHub archive zip and replaces the
+    full extension folder.
 
     Returns the path to the written .bat, or None on failure.
     """
@@ -467,31 +601,37 @@ def _write_deferred_update_bat(repo_root, target_branch):
     repo_norm = os.path.normpath(repo_root)
     remote    = "origin/{}".format(target_branch)
     zip_url   = _github_archive_url(repo_root, target_branch) or ""
-    lib_dst   = os.path.join(repo_norm, "WWPTools.extension", "lib")
 
-    # PowerShell command: download zip, copy DLLs only, note about re-running Update
+    # PowerShell command: download zip and replace the full extension folder.
     if zip_url:
         ps_fallback = (
             "powershell -NoProfile -ExecutionPolicy Bypass -Command \""
+            "$ErrorActionPreference = 'Stop'; "
+            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
             "$url = '{zip}'; "
-            "$tmp = [IO.Path]::Combine($env:TEMP, 'wwptools_update.zip'); "
-            "$dst = [IO.Path]::Combine($env:TEMP, 'wwptools_extracted'); "
+            "$ext = '{ext}'; "
+            "$tmpRoot = Join-Path $env:TEMP ('WWPTools_Update_' + [guid]::NewGuid().ToString('N')); "
+            "$zipPath = Join-Path $tmpRoot 'wwptools.zip'; "
+            "$extract = Join-Path $tmpRoot 'extract'; "
+            "New-Item -ItemType Directory -Force -Path $tmpRoot,$extract | Out-Null; "
             "try {{ "
             "  Write-Host '  Downloading from GitHub...'; "
-            "  Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing; "
-            "  if (Test-Path $dst) {{ Remove-Item $dst -Recurse -Force }}; "
-            "  Expand-Archive $tmp -DestinationPath $dst -Force; "
-            "  $src = (Get-ChildItem $dst -Directory | Select-Object -First 1).FullName; "
-            "  Copy-Item \"$src\\WWPTools.extension\\lib\\*.dll\" '{lib}\\' -Force; "
-            "  Remove-Item $tmp, $dst -Recurse -Force -ErrorAction SilentlyContinue; "
-            "  Write-Host '  DLLs copied from GitHub archive.'; "
-            "  Write-Host '  NOTE: Run Update WWPTools once more inside Revit to sync the git record.'; "
+            "  Invoke-WebRequest -Uri $url -OutFile $zipPath; "
+            "  Expand-Archive -LiteralPath $zipPath -DestinationPath $extract -Force; "
+            "  $src = Get-ChildItem -LiteralPath $extract -Directory | Select-Object -First 1; "
+            "  if (-not $src) {{ throw 'Downloaded ZIP did not contain a folder.' }}; "
+            "  if (Test-Path -LiteralPath $ext) {{ Remove-Item -LiteralPath $ext -Recurse -Force }}; "
+            "  Move-Item -LiteralPath $src.FullName -Destination $ext; "
+            "  if (-not (Test-Path -LiteralPath $ext -PathType Container)) {{ throw 'Extension folder was not created.' }}; "
+            "  Write-Host '  Extension folder replaced from GitHub ZIP.'; "
             "}} catch {{ "
             "  Write-Host ('  Download failed: ' + $_.Exception.Message); exit 1 "
+            "}} finally {{ "
+            "  if (Test-Path -LiteralPath $tmpRoot) {{ Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }} "
             "}}\""
         ).format(
             zip=zip_url.replace("'", "''"),
-            lib=lib_dst.replace("\\", "\\\\").replace("'", "''"),
+            ext=repo_norm.replace("'", "''"),
         )
     else:
         ps_fallback = (
@@ -512,8 +652,10 @@ def _write_deferred_update_bat(repo_root, target_branch):
         ":waitrevit",
         'tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul 2>&1',
         "if not errorlevel 1 (",
-        "  echo  Revit is still running. Close Revit to continue...",
-        "  timeout /t 5 /nobreak >nul",
+        "  echo  Revit is still running.",
+        "  echo.",
+        "  echo  Close all Revit windows, then press any key to check again.",
+        "  pause >nul",
         "  cls",
         "  echo.",
         "  echo  WWPTools Update",
@@ -537,9 +679,9 @@ def _write_deferred_update_bat(repo_root, target_branch):
         "if errorlevel 1 goto :fail",
         "goto :success",
         "",
-        ":: -- no-git path: PowerShell zip download (DLLs only) --",
+        ":: -- no-git path: PowerShell zip download (full extension folder) --",
         ":nogit",
-        "echo  Git not found on PATH. Using PowerShell download (DLLs only)...",
+        "echo  Git not found on PATH. Using PowerShell ZIP download...",
         ps_fallback,
         "if errorlevel 1 goto :fail",
         "goto :success",
@@ -569,9 +711,185 @@ def _write_deferred_update_bat(repo_root, target_branch):
         return None
 
 
+def _force_extension_path():
+    appdata = os.environ.get("APPDATA") or ""
+    if appdata:
+        return os.path.normpath(
+            os.path.join(appdata, "pyRevit", "Extensions", "WWP_Revit_WWPTools.extension")
+        )
+    return os.path.normpath(_extension_root())
+
+
+def _force_pending_dir():
+    base_dir = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+    out_dir = os.path.normpath(os.path.join(base_dir, "WWPTools", "PendingUpdates"))
+    try:
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
+    except Exception:
+        out_dir = tempfile.gettempdir()
+    return out_dir
+
+
+def _force_temp_clone_path():
+    return os.path.normpath(os.path.join(_force_pending_dir(), "ForceClone"))
+
+
+def _write_text_file(path, text):
+    with open(path, "w") as fh:
+        fh.write(str(text or ""))
+
+
+def _delete_file_if_exists(path):
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def _prepare_force_git_clone(temp_clone, ready_file, fail_file, status_file):
+    """Create a fresh git clone using pyRevit's bundled git support before Revit closes."""
+    try:
+        _write_text_file(status_file, "Downloading fresh WWPTools git clone from GitHub...")
+        if os.path.exists(temp_clone):
+            shutil.rmtree(temp_clone)
+        pygit.git_clone(REPO_URL, temp_clone)
+        _write_text_file(status_file, "Verifying prepared git clone...")
+        if not os.path.isdir(os.path.join(temp_clone, ".git")):
+            raise Exception("Prepared clone does not contain a .git folder.")
+        _write_text_file(ready_file, "ready")
+        _write_text_file(status_file, "Prepared clone is ready.")
+        return temp_clone
+    except Exception as clone_err:
+        _write_text_file(fail_file, str(clone_err))
+        _write_text_file(status_file, "Force Updater failed while preparing the clone.")
+        raise
+
+
+def _write_force_git_update_bat(prepared_clone, ready_file, fail_file, status_file):
+    """Write a .bat that deletes the installed extension and moves in the prepared git clone."""
+    out_dir = _force_pending_dir()
+    bat_path = os.path.normpath(os.path.join(out_dir, "ForceUpdateWWPTools.bat"))
+    ext_path = _force_extension_path()
+    ext_parent = os.path.dirname(ext_path)
+    temp_clone = os.path.normpath(prepared_clone)
+
+    lines = [
+        "@echo off",
+        "setlocal",
+        "title Force WWPTools Update",
+        "echo.",
+        "echo  Force WWPTools Update",
+        "echo  =====================",
+        "echo.",
+        "echo  Preparing a fresh WWPTools git clone first.",
+        "echo  Keep Revit open until this window says the clone is ready.",
+        "echo.",
+        "echo  Target extension folder:",
+        'echo  "{ext}"'.format(ext=ext_path),
+        "echo.",
+        ":waitclone",
+        "if exist \"{fail}\" (".format(fail=fail_file),
+        "  echo.",
+        "  echo  Force Updater failed while preparing the clone:",
+        "  type \"{fail}\"".format(fail=fail_file),
+        "  goto :fail",
+        ")",
+        "if not exist \"{ready}\" (".format(ready=ready_file),
+        "  echo  Clone is not ready yet.",
+        "  if exist \"{status}\" type \"{status}\"".format(status=status_file),
+        "  echo.",
+        "  echo  Waiting for pyRevit to finish downloading...",
+        "  timeout /t 2 /nobreak >nul",
+        "  cls",
+        "  echo.",
+        "  echo  Force WWPTools Update",
+        "  echo  =====================",
+        "  echo.",
+        "  echo  Preparing a fresh WWPTools git clone first.",
+        "  echo  Keep Revit open until this window says the clone is ready.",
+        "  echo.",
+        "  goto :waitclone",
+        ")",
+        "echo  Prepared clone is ready:",
+        'echo  "{tmp}"'.format(tmp=temp_clone),
+        "echo.",
+        "echo  Now close all Revit windows, then press any key to continue.",
+        "pause >nul",
+        "echo.",
+        ":waitrevit",
+        'tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul 2>&1',
+        "if not errorlevel 1 (",
+        "  echo  Revit is still running.",
+        "  echo.",
+        "  echo  Close all Revit windows, then press any key to check again.",
+        "  pause >nul",
+        "  cls",
+        "  echo.",
+        "  echo  Force WWPTools Update",
+        "  echo  =====================",
+        "  echo.",
+        "  goto :waitrevit",
+        ")",
+        "echo  Revit has closed. Starting force update...",
+        "echo.",
+        "if not exist \"{tmp}\\.git\" (".format(tmp=temp_clone),
+        "  echo  ERROR: Prepared git clone was not found.",
+        "  echo.",
+        "  echo  Run Force Updater again from Revit to regenerate it.",
+        "  goto :fail",
+        ")",
+        "if not exist \"{parent}\" mkdir \"{parent}\"".format(parent=ext_parent),
+        "echo  Removing old WWPTools extension...",
+        "if exist \"{ext}\" if not exist \"{ext}\\*\" del /f /q \"{ext}\"".format(ext=ext_path),
+        "if exist \"{ext}\" rd /s /q \"{ext}\"".format(ext=ext_path),
+        "if exist \"{ext}\" goto :fail".format(ext=ext_path),
+        "echo  Installing fresh git clone...",
+        'move "{tmp}" "{ext}" >nul'.format(tmp=temp_clone, ext=ext_path),
+        "if errorlevel 1 goto :fail",
+        "if not exist \"{ext}\\.git\" goto :fail".format(ext=ext_path),
+        "echo  Cleaning up temporary files...",
+        "if exist \"{tmp}\" rd /s /q \"{tmp}\"".format(tmp=temp_clone),
+        "if exist \"{ready}\" del /f /q \"{ready}\"".format(ready=ready_file),
+        "if exist \"{fail}\" del /f /q \"{fail}\"".format(fail=fail_file),
+        "if exist \"{status}\" del /f /q \"{status}\"".format(status=status_file),
+        "goto :success",
+        "",
+        ":success",
+        "echo.",
+        "echo  WWPTools was force-updated successfully.",
+        "echo  The extension now contains a .git folder for future updates.",
+        "echo  Start Revit to use the new version.",
+        "echo.",
+        "goto :done",
+        "",
+        ":fail",
+        "echo.",
+        "echo  Force update FAILED. See the error above.",
+        "echo.",
+        "",
+        ":done",
+        "pause",
+        "(goto) 2>nul & del /f /q \"%~f0\"",
+    ]
+
+    try:
+        with open(bat_path, "w") as fh:
+            fh.write("\r\n".join(lines) + "\r\n")
+        return bat_path
+    except Exception:
+        return None
+
+
 def _launch_bat_in_console(bat_path):
     """Spawn the bat file in a new visible console window, detached from Revit.
     Returns True if the process launched successfully."""
+    try:
+        os.startfile(bat_path)
+        return True
+    except Exception:
+        pass
     try:
         subprocess.Popen(
             ["cmd", "/c", bat_path],
@@ -580,6 +898,117 @@ def _launch_bat_in_console(bat_path):
         return True
     except Exception:
         return False
+
+
+def _launch_manual_deferred_update(repo_info, repo_root):
+    target_branch = DEFAULT_UPDATE_BRANCH
+    if repo_info is not None:
+        current_branch = str(getattr(repo_info, "branch", "") or "").strip()
+        if current_branch:
+            target_branch = current_branch
+
+    if repo_info is None:
+        _prepare_full_zip_update(repo_root, target_branch)
+        return
+
+    bat_path = _write_deferred_update_bat(repo_root, target_branch)
+    if not bat_path:
+        _alert(
+            "Could not create the external updater batch file.\n\n"
+            "Please close Revit completely, then run Update WWPTools again.",
+            TITLE,
+        )
+        return
+
+    launched = _launch_bat_in_console(bat_path)
+    if launched:
+        _alert(
+            "The external WWPTools updater was created and launched.\n\n"
+            "Close all Revit windows, then press any key in the console.\n"
+            "If Revit is still running, it will ask again.\n\n"
+            "Script location:\n"
+            "{}".format(bat_path),
+            TITLE,
+        )
+    else:
+        _alert(
+            "The external WWPTools updater was created, but Windows did not launch it automatically.\n\n"
+            "Close Revit, then double-click this script:\n"
+            "{}".format(bat_path),
+            TITLE,
+        )
+        try:
+            subprocess.Popen(
+                ["explorer", "/select,", bat_path],
+                shell=False,
+                creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            )
+        except Exception:
+            pass
+
+
+def _launch_force_git_update():
+    pending_dir = _force_pending_dir()
+    prepared_clone = _force_temp_clone_path()
+    ready_file = os.path.normpath(os.path.join(pending_dir, "ForceClone.ready"))
+    fail_file = os.path.normpath(os.path.join(pending_dir, "ForceClone.failed.txt"))
+    status_file = os.path.normpath(os.path.join(pending_dir, "ForceClone.status.txt"))
+
+    _delete_file_if_exists(ready_file)
+    _delete_file_if_exists(fail_file)
+    _write_text_file(status_file, "Starting Force Updater...")
+
+    bat_path = _write_force_git_update_bat(prepared_clone, ready_file, fail_file, status_file)
+    if not bat_path:
+        _alert(
+            "Could not create the Force Updater batch file.",
+            TITLE,
+        )
+        return
+
+    launched = _launch_bat_in_console(bat_path)
+    if not launched:
+        _alert(
+            "Force Updater was created, but Windows did not launch it automatically.\n\n"
+            "Double-click this script to watch the preparation and update process:\n"
+            "{}".format(bat_path),
+            TITLE,
+        )
+        try:
+            subprocess.Popen(
+                ["explorer", "/select,", bat_path],
+                shell=False,
+                creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
+            )
+        except Exception:
+            pass
+
+    try:
+        _prepare_force_git_clone(prepared_clone, ready_file, fail_file, status_file)
+    except Exception as clone_err:
+        _alert(
+            "Could not prepare a fresh git clone for Force Updater.\n\n"
+            "{}\n\n"
+            "Check the internet connection, then run Force Updater again.".format(clone_err),
+            TITLE,
+        )
+        return
+
+    if launched:
+        _alert(
+            "Force Updater finished preparing the fresh clone.\n\n"
+            "The console window will now ask users to close all Revit windows,\n"
+            "then press any key.\n"
+            "If Revit is still running, it will ask again.\n\n"
+            "After Revit closes, it will delete and recreate:\n"
+            "{}\n\n"
+            "The replacement clone is already prepared here:\n"
+            "{}".format(
+                _force_extension_path(),
+                prepared_clone,
+            ),
+            TITLE,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +1082,16 @@ def _update_repo(repo_info, repo_root):
     target_branch = _select_update_branch(repo_info, repo_root)
     if not target_branch:
         return
+    if not _git_cli_available():
+        if _confirm(
+            "Git for Windows is not available on this machine.\n\n"
+            "WWPTools can still update by downloading the '{}' branch from GitHub as a ZIP.\n"
+            "The update will run after Revit closes and will replace the local extension folder.\n\n"
+            "Prepare that update now?".format(target_branch),
+            TITLE,
+        ):
+            _prepare_full_zip_update(repo_root, target_branch)
+        return
     repo_info = _ensure_target_branch(repo_info, repo_root, target_branch)
     if repo_info is None:
         return
@@ -675,8 +1114,9 @@ def _update_repo(repo_info, repo_root):
     remote_tag = _remote_tag(repo_root, target_branch)
     remote_label = "{} ({})".format(remote_tag, "incoming") if remote_tag else "{} commit(s)".format(behind)
     changelog = _incoming_log(repo_root, target_branch)
-    changed_files = _incoming_changed_files(repo_root, target_branch)
-    needs_revit_close = _update_needs_revit_close(changed_files)
+    update_changes = _classify_incoming_changes(repo_root, target_branch)
+    has_dll_changes = update_changes["has_dll"]
+    has_structural_changes = update_changes["has_structural"]
 
     confirm_msg = (
         "Updates are available for WWPTools.\n\n"
@@ -695,47 +1135,47 @@ def _update_repo(repo_info, repo_root):
         target_branch,
         changelog if changelog else "  (commit log unavailable)",
     )
-    if needs_revit_close:
+    if has_dll_changes:
         confirm_msg = (
             confirm_msg +
             "\n\nThis update includes DLL files that require Revit to be closed.\n"
-            "Python/config files will be updated now. A one-click script will be\n"
-            "prepared for the DLL update - run it after closing Revit."
+            "A console updater will open. Close all Revit windows, then press any key\n"
+            "in that console. If Revit is still running, it will ask again."
+        )
+    elif has_structural_changes:
+        confirm_msg = (
+            confirm_msg +
+            "\n\nThis update changes folder structure, file names, or created/deleted files.\n"
+            "WWPTools will update now, then pyRevit will reload automatically."
+        )
+    else:
+        confirm_msg = (
+            confirm_msg +
+            "\n\nThis update only changes existing non-DLL files.\n"
+            "WWPTools will replace those files without reloading pyRevit."
         )
     if not _confirm(confirm_msg, TITLE):
         return
 
-    if needs_revit_close:
-        # Step 1 - update Python/config files in-place now (no Revit close needed).
-        # Only M (modified) non-DLL files are safe to update without a full reset.
-        modified_non_dll = _incoming_modified_non_dll_files(repo_root, target_branch)
-        python_updated   = _partial_update_non_dll(repo_root, target_branch, modified_non_dll)
-
-        # Step 2 - write deferred bat for the DLL update.
+    if has_dll_changes:
         bat_path = _write_deferred_update_bat(repo_root, target_branch)
-
-        python_note = (
-            "{} Python/config file(s) updated now.\n\n".format(python_updated)
-            if python_updated > 0 else ""
-        )
-
         if bat_path:
             launched = _launch_bat_in_console(bat_path)
             if launched:
                 _alert(
-                    "{}A console window is now waiting for Revit to close.\n\n"
-                    "Close Revit - the update will start automatically.\n\n"
+                    "A console window is waiting to finish the WWPTools update.\n\n"
+                    "Close all Revit windows, then press any key in that console.\n"
+                    "If Revit is still running, it will ask again.\n\n"
                     "Script location (if the window was blocked):\n"
-                    "{}".format(python_note, bat_path),
+                    "{}".format(bat_path),
                     TITLE,
                 )
             else:
                 _alert(
-                    "{}DLL files require Revit to be closed before they can be replaced.\n\n"
+                    "DLL files require Revit to be closed before they can be replaced.\n\n"
                     "Double-click this script after closing Revit:\n"
                     "{}\n\n"
-                    "(No git CLI? The script will download the DLLs from GitHub instead.)".format(
-                        python_note, bat_path),
+                    "It will check whether Revit is closed before updating.".format(bat_path),
                     TITLE,
                 )
                 try:
@@ -748,53 +1188,33 @@ def _update_repo(repo_info, repo_root):
                     pass
         else:
             _alert(
-                "{}DLL files require Revit to be closed before they can be replaced.\n\n"
-                "Please close Revit completely, then run Update WWPTools again.".format(python_note),
+                "DLL files require Revit to be closed before they can be replaced.\n\n"
+                "Please close Revit completely, then run Update WWPTools again.",
                 TITLE,
             )
-
-        # Step 3 - if Python files were updated, offer a pyRevit reload now.
-        if python_updated > 0:
-            if _confirm(
-                "{} Python/config file(s) updated successfully.\n\n"
-                "Reload pyRevit now to activate the changes?\n"
-                "(Choose No if you want to restart Revit manually later.)".format(python_updated),
-                TITLE,
-            ):
-                if not _reload_pyrevit():
-                    _alert(
-                        "Could not reload pyRevit automatically.\n\nPlease restart Revit.",
-                        TITLE,
-                    )
         return
 
     try:
         updated_repo = _sync_to_github(repo_root, target_branch)
     except Exception as sync_err:
         if _is_revit_locked_update_error(sync_err):
-            modified_non_dll = _incoming_modified_non_dll_files(repo_root, target_branch)
-            python_updated   = _partial_update_non_dll(repo_root, target_branch, modified_non_dll)
             bat_path = _write_deferred_update_bat(repo_root, target_branch)
-            python_note = (
-                "{} Python/config file(s) updated now.\n\n".format(python_updated)
-                if python_updated > 0 else ""
-            )
             if bat_path:
                 launched = _launch_bat_in_console(bat_path)
                 if launched:
                     _alert(
-                        "{}A WWPTools DLL is locked by Revit.\n\n"
-                        "A console window is now waiting for Revit to close.\n"
-                        "Close Revit - the update will finish automatically.\n\n"
+                        "A WWPTools DLL is locked by Revit.\n\n"
+                        "A console window is waiting to finish the update.\n"
+                        "Close all Revit windows, then press any key in that console.\n\n"
                         "Script location (if the window was blocked):\n"
-                        "{}".format(python_note, bat_path),
+                        "{}".format(bat_path),
                         TITLE,
                     )
                 else:
                     _alert(
-                        "{}A WWPTools DLL is locked by Revit.\n\n"
+                        "A WWPTools DLL is locked by Revit.\n\n"
                         "Double-click this script after closing Revit:\n"
-                        "{}".format(python_note, bat_path),
+                        "{}".format(bat_path),
                         TITLE,
                     )
                     try:
@@ -807,17 +1227,10 @@ def _update_repo(repo_info, repo_root):
                         pass
             else:
                 _alert(
-                    "{}A WWPTools DLL is locked by Revit.\n\n"
-                    "Please close Revit completely, then run Update WWPTools again.".format(
-                        python_note),
+                    "A WWPTools DLL is locked by Revit.\n\n"
+                    "Please close Revit completely, then run Update WWPTools again.",
                     TITLE,
                 )
-            if python_updated > 0:
-                if _confirm(
-                    "{} Python/config file(s) updated. Reload pyRevit now?".format(python_updated),
-                    TITLE,
-                ):
-                    _reload_pyrevit()
             return
         raise
 
@@ -825,28 +1238,42 @@ def _update_repo(repo_info, repo_root):
     new_tag = _latest_tag(repo_root)
     after_label = "{} ({})".format(new_tag, after_hash) if new_tag else after_hash
 
-    reload_offered = _confirm(
-        "WWPTools updated successfully.\n\n"
-        "Previous version: {}\n"
-        "New version:      {}\n\n"
-        "Reload pyRevit now to apply the changes?\n"
-        "(Choosing No means you'll need to restart Revit manually.)".format(
-            current_label,
-            after_label,
-        ),
-        TITLE,
-    )
-    if reload_offered:
+    if has_structural_changes:
+        _alert(
+            "WWPTools updated successfully.\n\n"
+            "Previous version: {}\n"
+            "New version:      {}\n\n"
+            "pyRevit will reload because this update changed folder structure, file names,\n"
+            "or created/deleted files.".format(current_label, after_label),
+            TITLE,
+        )
         if not _reload_pyrevit():
             _alert(
                 "Could not reload pyRevit automatically.\n\nPlease restart Revit to apply the update.",
                 TITLE,
             )
+    else:
+        _alert(
+            "WWPTools updated successfully.\n\n"
+            "Previous version: {}\n"
+            "New version:      {}\n\n"
+            "Only existing non-DLL files changed, so pyRevit was not reloaded.".format(
+                current_label,
+                after_label,
+            ),
+            TITLE,
+        )
 
 
 def main():
     repo_root = _extension_root()
     repo_info = _discover_repo(repo_root)
+    if FORCE_GENERATE_UPDATER:
+        _launch_force_git_update()
+        return
+    if MANUAL_GENERATE_UPDATER:
+        _launch_manual_deferred_update(repo_info, repo_root)
+        return
     if not repo_info:
         _show_not_repo_message()
         return
