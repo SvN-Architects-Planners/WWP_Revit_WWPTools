@@ -600,6 +600,16 @@ def _safe_config_get(config, key, default=None):
         return default
 
 
+def _normalize_path(path):
+    """Store paths with %USERPROFILE% prefix so configs are portable across user accounts."""
+    if not path:
+        return path
+    userprofile = os.environ.get("USERPROFILE", "")
+    if userprofile and path.lower().startswith(userprofile.lower()):
+        return "%USERPROFILE%" + path[len(userprofile):]
+    return path
+
+
 def _safe_config_set(config, key, value):
     if config is None:
         return
@@ -1980,7 +1990,7 @@ def main():
             _safe_config_set(config, _mapping_signature_key(category_key), _header_signature(state.get("headers", [])))
             _safe_config_set(config, _mapping_selection_key(category_key), current_selections)
         _safe_config_set(config, "area_key_import_target", selected_target_type)
-        _safe_config_set(config, "area_key_import_file_path", file_path)
+        _safe_config_set(config, "area_key_import_file_path", _normalize_path(file_path))
         _save_config()
 
         if result.get("load_requested"):
@@ -2209,7 +2219,7 @@ def main():
 
         # Persist latest choices for the next run.
         _safe_config_set(config, "area_key_import_target", state.get("selected_target_type", TARGET_OPTIONS[0]))
-        _safe_config_set(config, "area_key_import_file_path", state.get("file_path", ""))
+        _safe_config_set(config, "area_key_import_file_path", _normalize_path(state.get("file_path", "")))
         _safe_config_set(config, "area_key_import_headers_signature", _header_signature(state.get("headers", [])))
         _safe_config_set(config, "area_key_import_selected_options", selections)
         _safe_config_set(config, _mapping_signature_key(category_key), _header_signature(state.get("headers", [])))

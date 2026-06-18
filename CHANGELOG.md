@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.1] - 2026-06-18
 
 ### Changed
-- Import Key Schedule: file browser now opens to the current path's directory, falling back to the user's Documents folder (respects relocated Documents on non-standard setups). Paths typed with `%VARIABLE%` syntax (e.g. `%USERPROFILE%\Documents\...`) are now expanded before use.
-- Export to Excel/CSV: default save/folder dialogs now open to the user's Documents folder when no project path is available, using the Windows shell API so relocated Documents folders are detected correctly. Paths with `%VARIABLE%` syntax in initial directory inputs are now expanded. Cloud-hosted models (Autodesk Docs, BIM 360, Autodesk Forma) are detected by their `Autodesk Docs://` / `BIM 360://` URI prefix and correctly fall back to Documents instead of passing a cloud URI as a local directory.
+- Import Key Schedule, Export to Excel/CSV: file paths saved to config now store `%USERPROFILE%` in place of `C:\Users\<username>` so settings are portable across user accounts. Paths are expanded back via `%USERPROFILE%` when the dialog reopens.
+- Export to Excel/CSV: if `! P_STATS_Export_Text` is absent from Project Information, the tool now prompts the user to select any existing writable text parameter as the saved-sets store instead. The chosen parameter is remembered per project. Previously, the tool silently returned empty sets on read and attempted to auto-create the parameter on write.
+- Export2Ex Beta: moved the Delete button from the bottom toolbar into each row, next to the Edit button. Each set can now be deleted directly without checking a checkbox first.
 
 ### Added
 - Update WWPTools: converted the updater into a pulldown with three commands: **Update WWPTools**, **Generate Updater Manually**, and **Force Updater**.

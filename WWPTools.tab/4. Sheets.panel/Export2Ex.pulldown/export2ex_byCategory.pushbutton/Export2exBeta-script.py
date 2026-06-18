@@ -904,7 +904,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     outer.Children.Add(scroll)
 
     tbl = Grid()
-    for w in [28, 160, 150, -1, 34, 60]:
+    for w in [28, 160, 150, -1, 34, 60, 60]:
         cd = ColumnDefinition()
         cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
         tbl.ColumnDefinitions.Add(cd)
@@ -948,6 +948,16 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
                 path_labels[sname_].Text = new_path
         return _on_browse
 
+    def _make_delete_row(sname_):
+        def _on_delete_row(_s, _e):
+            if sname_ in saved_sets:
+                del saved_sets[sname_]
+            if sname_ in paths:
+                del paths[sname_]
+            write_saved_sets(doc, saved_sets)
+            _rebuild_rows()
+        return _on_delete_row
+
     def _rebuild_rows():
         for elems in data_row_elements:
             for elem in elems:
@@ -968,7 +978,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             empty_tb.Margin = Thickness(4, 16, 4, 4)
             empty_tb.HorizontalAlignment = HorizontalAlignment.Center
             Grid.SetRow(empty_tb, 1)
-            Grid.SetColumnSpan(empty_tb, 6)
+            Grid.SetColumnSpan(empty_tb, 7)
             tbl.Children.Add(empty_tb)
             data_row_elements.append([empty_tb])
             return
@@ -1042,6 +1052,15 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             edit_row_btn.Click += _make_edit_row(sname)
             row_elems.append(edit_row_btn)
 
+            del_row_btn = Button()
+            del_row_btn.Content = "Delete"
+            del_row_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(del_row_btn, row_idx)
+            Grid.SetColumn(del_row_btn, 6)
+            tbl.Children.Add(del_row_btn)
+            del_row_btn.Click += _make_delete_row(sname)
+            row_elems.append(del_row_btn)
+
             data_row_elements.append(row_elems)
 
     _rebuild_rows()
@@ -1056,12 +1075,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     add_btn = Button()
     add_btn.Content = "Add Set"
     add_btn.MinWidth = 80
-    add_btn.Margin = Thickness(0, 0, 6, 0)
-
-    del_btn = Button()
-    del_btn.Content = "Delete"
-    del_btn.MinWidth = 70
-    del_btn.Margin = Thickness(0, 0, 20, 0)
+    add_btn.Margin = Thickness(0, 0, 20, 0)
 
     ok_btn = Button()
     ok_btn.Content = "Export Selected"
@@ -1105,12 +1119,10 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
         window.Close()
 
     add_btn.Click += _add
-    del_btn.Click += _delete
     ok_btn.Click += _ok
     cancel_btn.Click += _cancel
 
     btns.Children.Add(add_btn)
-    btns.Children.Add(del_btn)
     btns.Children.Add(ok_btn)
     btns.Children.Add(cancel_btn)
 

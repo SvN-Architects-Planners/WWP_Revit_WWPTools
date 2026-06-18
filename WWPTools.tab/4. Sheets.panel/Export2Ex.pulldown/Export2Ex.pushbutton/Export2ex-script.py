@@ -167,12 +167,12 @@ def get_active_doc():
     return None
 
 
-def read_saved_sets(doc):
+def read_saved_sets(doc, param_name=None):
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
             return {}
-        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        param = proj_info.LookupParameter(param_name or PARAM_SAVED_SETS)
         if param is None:
             return {}
         raw = (param.AsString() or "").strip()
@@ -201,31 +201,15 @@ def _looks_like_legacy_saved_sets(data):
     return all(isinstance(v, dict) for v in data.values())
 
 
-def write_saved_sets(doc, sets_dict):
+def write_saved_sets(doc, sets_dict, param_name=None):
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
             return False
-        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        param = proj_info.LookupParameter(param_name or PARAM_SAVED_SETS)
         t = DB.Transaction(doc, "Save Export2Ex Settings")
         t.Start()
         try:
-            if param is None:
-                app = doc.Application
-                cat_set = app.Create.NewCategorySet()
-                pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
-                if pi_cat is None:
-                    t.RollBack()
-                    return False
-                cat_set.Insert(pi_cat)
-                binding = app.Create.NewInstanceBinding(cat_set)
-                from Autodesk.Revit.DB import GroupTypeId
-                opts = DB.InternalDefinitionCreationOptions(PARAM_SAVED_SETS, DB.SpecTypeId.String.Text)
-                opts.Visible = True
-                doc.ParameterBindings.Insert(opts, binding, GroupTypeId.Data)
-                doc.Regenerate()
-                proj_info = doc.ProjectInformation
-                param = proj_info.LookupParameter(PARAM_SAVED_SETS)
             if param is None or param.IsReadOnly:
                 t.RollBack()
                 return False
@@ -252,6 +236,73 @@ def write_saved_sets(doc, sets_dict):
     except Exception as exc:
         log_exception("write_saved_sets", exc)
         return False
+
+
+def _get_proj_info_text_params(doc):
+    """Return sorted names of writable text parameters on Project Information."""
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return []
+        names = []
+        for param in proj_info.Parameters:
+            try:
+                if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
+                    names.append(param.Definition.Name)
+            except Exception:
+                continue
+        return sorted(set(names))
+    except Exception:
+        return []
+
+
+def _ensure_saved_sets_param(doc, config, ui, save_config):
+    """Return the Project Information param name to use for saved sets.
+
+    Priority: canonical param -> config-stored override -> user prompt.
+    Saves the user's choice to per-project config. Returns None if unavailable.
+    """
+    try:
+        proj_info = doc.ProjectInformation
+    except Exception:
+        return None
+    if proj_info is None:
+        return None
+
+    if proj_info.LookupParameter(PARAM_SAVED_SETS) is not None:
+        return PARAM_SAVED_SETS
+
+    stored = config_get(config, "saved_sets_param_name", "") or ""
+    if stored and proj_info.LookupParameter(stored) is not None:
+        return stored
+
+    text_params = _get_proj_info_text_params(doc)
+    if not text_params:
+        ui.uiUtils_alert(
+            "Parameter '{}' was not found in Project Information and no other "
+            "writable text parameters exist.\n\n"
+            "Add a text parameter to Project Information to enable saved sets.".format(PARAM_SAVED_SETS),
+            title="Export Schedules — Saved Sets",
+        )
+        return None
+
+    indices = ui.uiUtils_select_indices(
+        text_params,
+        title="Select Parameter for Saved Sets",
+        prompt=(
+            "'{}' was not found in this project's Project Information.\n\n"
+            "Select an existing text parameter to store saved sets:"
+        ).format(PARAM_SAVED_SETS),
+        multiselect=False,
+    )
+    if not indices:
+        return None
+
+    chosen = text_params[indices[0]]
+    config.saved_sets_param_name = chosen
+    if save_config:
+        save_config()
+    return chosen
 
 
 def _normalize_namespace_data(data):
@@ -462,6 +513,16 @@ def config_get(config, name, default=None):
     except Exception:
         return default
     return default if value is None else value
+
+
+def _normalize_path(path):
+    """Store paths with %USERPROFILE% prefix so configs are portable across user accounts."""
+    if not path:
+        return path
+    userprofile = os.environ.get("USERPROFILE", "")
+    if userprofile and path.lower().startswith(userprofile.lower()):
+        return "%USERPROFILE%" + path[len(userprofile):]
+    return path
 
 
 def _is_cloud_path(path):
@@ -797,6 +858,7 @@ def _show_export_form(
     saved_sets,
     doc,
     last_use_category_sheet_name=False,
+    saved_sets_param_name=None,
 ):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -983,13 +1045,15 @@ def _show_export_form(
         }
 
     def _save_sets_to_project():
-        proj_data = _normalize_namespace_data(read_saved_sets(doc))
+        proj_data = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param_name))
         proj_data["settings"] = proj_data.get("settings", {})
         proj_data["sets"] = saved_sets
-        if not write_saved_sets(doc, proj_data):
+        if not write_saved_sets(doc, proj_data, saved_sets_param_name):
             ui.uiUtils_alert(
-                "Could not save to '{}' on Project Information.\n"
-                "Check the parameter exists and the project is not read-only.".format(PARAM_SAVED_SETS),
+                "Could not save sets to '{}' on Project Information.\n"
+                "Check the parameter is not read-only.".format(
+                    saved_sets_param_name or PARAM_SAVED_SETS
+                ),
                 title="Export Schedules",
             )
 
@@ -1794,7 +1858,8 @@ def main():
         return
     config, save_config = get_config_and_saver()
     ui = load_uiutils()
-    proj_data = _normalize_namespace_data(read_saved_sets(doc))
+    saved_sets_param = _ensure_saved_sets_param(doc, config, ui, save_config)
+    proj_data = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
     project_settings = proj_data.get("settings", {}) if isinstance(proj_data, dict) else {}
     if not isinstance(project_settings, dict):
         project_settings = {}
@@ -1851,6 +1916,7 @@ def main():
         saved_sets,
         doc,
         last_use_category_sheet_name=last_use_category_sheet_name,
+        saved_sets_param_name=saved_sets_param,
     )
     if inputs is not False:
         if not inputs:
@@ -1939,9 +2005,9 @@ def main():
                         sdata["csv_folder"] = new_path
                         paths_changed = True
             if paths_changed:
-                proj_data_back = _normalize_namespace_data(read_saved_sets(doc))
+                proj_data_back = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param_name))
                 proj_data_back["sets"] = saved_sets
-                write_saved_sets(doc, proj_data_back)
+                write_saved_sets(doc, proj_data_back, saved_sets_param_name)
 
             msg = "{} of {} set(s) exported successfully.".format(success_count, len(batch_set_names))
             if warnings:
@@ -1989,7 +2055,7 @@ def main():
             )
             if not success:
                 return
-            config.last_excel_path = file_path
+            config.last_excel_path = _normalize_path(file_path)
             try:
                 os.startfile(file_path)
             except Exception:
@@ -2011,7 +2077,7 @@ def main():
                 export_grouped_column_headers=export_grouped_column_headers,
                 text_qualifier=csv_text_qualifier,
             )
-            config.last_csv_dir = folder
+            config.last_csv_dir = _normalize_path(folder)
         config.last_export_mode = mode
         config.last_csv_mode = 1 if quote_all else 0
         config.last_csv_delim = csv_delim
@@ -2021,7 +2087,7 @@ def main():
         config.last_csv_group_headers = export_group_headers
         config.last_csv_grouped_column_headers = export_grouped_column_headers
         config.last_use_category_sheet_name = use_category
-        proj_data = _normalize_namespace_data(read_saved_sets(doc))
+        proj_data = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
         proj_data["settings"] = {
             CONFIG_LAST_SCHEDULE_IDS: [element_id_value(v.Id) for v in selected_views],
             CONFIG_LAST_EXPORT_MODE: mode,
@@ -2035,7 +2101,7 @@ def main():
             CONFIG_LAST_USE_CATEGORY_SHEET_NAME: use_category,
         }
         proj_data["sets"] = proj_data.get("sets", {})
-        write_saved_sets(doc, proj_data)
+        write_saved_sets(doc, proj_data, saved_sets_param)
         log_message("main saving config after modern dialog")
         save_config()
         ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
@@ -2105,7 +2171,7 @@ def main():
         success = export_to_excel(doc, selected_views, file_path, ui)
         if not success:
             return
-        config.last_excel_path = file_path
+        config.last_excel_path = _normalize_path(file_path)
         try:
             os.startfile(file_path)
         except Exception:
@@ -2125,12 +2191,12 @@ def main():
         if not folder:
             return
         export_to_csv(doc, selected_views, folder, quote_all=(csv_mode == 1), delimiter=csv_delim)
-        config.last_csv_dir = folder
+        config.last_csv_dir = _normalize_path(folder)
         config.last_csv_mode = csv_mode
         config.last_csv_delim = csv_delim
 
     log_message("main saving config after legacy dialog")
-    proj_data = _normalize_namespace_data(read_saved_sets(doc))
+    proj_data = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
     proj_data["settings"] = {
         CONFIG_LAST_SCHEDULE_IDS: [element_id_value(v.Id) for v in selected_views],
         CONFIG_LAST_EXPORT_MODE: mode,
@@ -2143,7 +2209,7 @@ def main():
         CONFIG_LAST_CSV_TEXT_QUALIFIER: config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, ""),
     }
     proj_data["sets"] = proj_data.get("sets", {})
-    write_saved_sets(doc, proj_data)
+    write_saved_sets(doc, proj_data, saved_sets_param)
     save_config()
     ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
 
