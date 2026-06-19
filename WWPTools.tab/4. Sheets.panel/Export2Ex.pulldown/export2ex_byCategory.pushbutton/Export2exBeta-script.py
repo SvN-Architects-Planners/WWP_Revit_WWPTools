@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import os
 import re
@@ -31,7 +32,14 @@ PARAM_SAVED_SETS = "! P_STATS_Export_Text"
 SAVED_SET_NAMESPACE = "export2ex_beta"
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
+_last_write_error = ""
 MODE_FROM_SCHEDULE = "schedule"
+
+class _JsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if type(obj).__name__ in ('long', 'Int64', 'Int32'):
+            return int(obj)
+        return super(_JsonEncoder, self).default(obj)
 MODE_BY_CATEGORY = "category"
 EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -424,9 +432,12 @@ def _looks_like_legacy_saved_sets(data):
 
 
 def write_saved_sets(doc, sets_dict):
+    global _last_write_error
+    _last_write_error = ""
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
+            _last_write_error = "ProjectInformation is None"
             return False
         param = proj_info.LookupParameter(PARAM_SAVED_SETS)
         t = DB.Transaction(doc, "Save Export2Ex Settings")
@@ -438,6 +449,7 @@ def write_saved_sets(doc, sets_dict):
                 pi_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_ProjectInformation)
                 if pi_cat is None:
                     t.RollBack()
+                    _last_write_error = "Could not find Project Information category in document settings"
                     return False
                 cat_set.Insert(pi_cat)
                 binding = app.Create.NewInstanceBinding(cat_set)
@@ -450,6 +462,7 @@ def write_saved_sets(doc, sets_dict):
                 param = proj_info.LookupParameter(PARAM_SAVED_SETS)
             if param is None:
                 t.RollBack()
+                _last_write_error = "Parameter '{}' not found after creation attempt - it may already exist as a read-only shared parameter".format(PARAM_SAVED_SETS)
                 return False
             raw = (param.AsString() or "").strip()
             try:
@@ -461,7 +474,7 @@ def write_saved_sets(doc, sets_dict):
             if _looks_like_legacy_saved_sets(payload):
                 payload = {SAVED_SET_NAMESPACE: payload}
             payload[SAVED_SET_NAMESPACE] = sets_dict
-            param.Set(json.dumps(payload, ensure_ascii=False, indent=2))
+            param.Set(json.dumps(payload, ensure_ascii=False, indent=2, cls=_JsonEncoder))
             t.Commit()
             return True
         except Exception as inner:
@@ -469,9 +482,11 @@ def write_saved_sets(doc, sets_dict):
                 t.RollBack()
             except Exception:
                 pass
+            _last_write_error = str(inner)
             log_exception("write_saved_sets transaction", inner)
             return False
     except Exception as exc:
+        _last_write_error = str(exc)
         log_exception("write_saved_sets", exc)
         return False
 
@@ -1554,8 +1569,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         source_id = selected_item.id_value if selected_item is not None else None
         return {
             "mode": _current_mode(),
-            "source_id": source_id,
-            "category_id": category_id,
+            "source_id": int(source_id) if source_id is not None else None,
+            "category_id": int(category_id) if category_id is not None else None,
             "param_names": list(selected_params_by_category.get(category_id, [])),
             "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
             "excel_path": (excel_path.Text or "").strip() if excel_path is not None else "",
@@ -1604,8 +1619,9 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             return
         saved_sets[name] = _get_current_set_data()
         if not write_saved_sets(doc, saved_sets):
+            detail = "\n\n{}".format(_last_write_error) if _last_write_error else ""
             ui.uiUtils_alert(
-                "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.".format(PARAM_SAVED_SETS),
+                "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.{}".format(PARAM_SAVED_SETS, detail),
                 title="Export2Ex Beta",
             )
             return
@@ -1620,8 +1636,9 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             return
         del saved_sets[name]
         if not write_saved_sets(doc, saved_sets):
+            detail = "\n\n{}".format(_last_write_error) if _last_write_error else ""
             ui.uiUtils_alert(
-                "Could not update '{}' on Project Information.".format(PARAM_SAVED_SETS),
+                "Could not update '{}' on Project Information.{}".format(PARAM_SAVED_SETS, detail),
                 title="Export2Ex Beta",
             )
             return

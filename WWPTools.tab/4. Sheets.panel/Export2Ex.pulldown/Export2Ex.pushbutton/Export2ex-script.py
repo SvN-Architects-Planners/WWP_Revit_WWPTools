@@ -635,9 +635,6 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                                           CheckBox, TextBlock, ColumnDefinition,
                                           RowDefinition, Orientation, ScrollBarVisibility)
 
-    if not saved_sets:
-        return None
-
     all_schedules_by_name = {v.Name: v for v in collect_schedules(doc)}
 
     paths = {}
@@ -1222,7 +1219,7 @@ def _show_export_form(
         result = _show_batch_dialog(
             saved_sets, doc,
             ui=ui,
-            saved_sets_param=saved_sets_param,
+            saved_sets_param=saved_sets_param_name,
             edit_callback=_edit_set,
             add_callback=_add_set,
         )
@@ -1984,26 +1981,53 @@ def main():
 
     init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
     init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
-    inputs = _show_export_form(
-        ui,
-        [item.display_name for item in items],
-        [item.view.Name for item in items],
-        prechecked_indices,
-        init_excel_path,
-        init_csv_dir,
-        last_csv_delim,
-        last_csv_mode,
-        last_export_mode,
-        last_export_title,
-        last_column_headers,
-        last_group_headers,
-        last_grouped_column_headers,
-        last_text_qualifier,
-        saved_sets,
-        doc,
-        last_use_category_sheet_name=last_use_category_sheet_name,
-        saved_sets_param_name=saved_sets_param,
+
+    def _open_export_form(preselect_names=None):
+        if preselect_names:
+            all_names = [item.view.Name for item in items]
+            pre_idx = [i for i, n in enumerate(all_names) if n in set(preselect_names)]
+        else:
+            pre_idx = prechecked_indices
+        _show_export_form(
+            ui,
+            [item.display_name for item in items],
+            [item.view.Name for item in items],
+            pre_idx,
+            init_excel_path,
+            init_csv_dir,
+            last_csv_delim,
+            last_csv_mode,
+            last_export_mode,
+            last_export_title,
+            last_column_headers,
+            last_group_headers,
+            last_grouped_column_headers,
+            last_text_qualifier,
+            saved_sets,
+            doc,
+            last_use_category_sheet_name=last_use_category_sheet_name,
+            saved_sets_param_name=saved_sets_param,
+        )
+        refreshed = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
+        new_sets = refreshed.get("sets", {})
+        if isinstance(new_sets, dict):
+            saved_sets.clear()
+            saved_sets.update(new_sets)
+
+    batch_result = _show_batch_dialog(
+        saved_sets, doc,
+        ui=ui,
+        saved_sets_param=saved_sets_param,
+        edit_callback=lambda sname, sdata: _open_export_form(sdata.get("schedule_names")),
+        add_callback=lambda: _open_export_form(),
     )
+    if batch_result is None:
+        return
+    selected_batch_names, batch_override_paths = batch_result
+    if not selected_batch_names:
+        ui.uiUtils_alert("Select at least one set to export.", title="Multiple Schedules Exporter")
+        return
+    inputs = {"batch_sets": selected_batch_names, "batch_paths": batch_override_paths}
     if inputs is not False:
         if not inputs:
             return
