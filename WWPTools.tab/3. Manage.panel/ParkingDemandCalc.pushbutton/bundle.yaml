@@ -1,0 +1,7 @@
+title: "Parking\nDemand\nCalc"
+tooltip: |
+  Calculate parking demand from building room areas grouped by Department/function type.
+  Enter demand ratios (m2 of GFA per parking space) for each function, set stall
+  dimensions, and compare total calculated demand against actual parking elements in model.
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/parking-demand-calculator"
+author: "Jason Tian"

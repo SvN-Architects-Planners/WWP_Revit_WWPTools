@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to Excel/CSV: if `! P_STATS_Export_Text` is absent from Project Information, the tool now prompts the user to select any existing writable text parameter as the saved-sets store instead. The chosen parameter is remembered per project. Previously, the tool silently returned empty sets on read and attempted to auto-create the parameter on write.
 - Export2Ex Beta: moved the Delete button from the bottom toolbar into each row, next to the Edit button. Each set can now be deleted directly without checking a checkbox first.
 - Export2Ex Beta: added **Query Fields** button next to Browse. Reads column headers from an existing exported Excel file and auto-populates Selected Properties to match. Any header that has no matching Revit parameter is reported by name.
+- Export to Excel (by schedule): Batch Export dialog redesigned to match the by-category interface — rows now show Set Name, Sheet Name, File Path with inline **Edit** and **Delete** buttons. Added **Add Set** to the footer. Delete removes the set immediately and persists to the project. Edit reloads the set into the main form for modification.
 
 ### Added
 - Update WWPTools: converted the updater into a pulldown with three commands: **Update WWPTools**, **Generate Updater Manually**, and **Force Updater**.

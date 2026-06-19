@@ -622,8 +622,9 @@ def load_uiutils():
     return ui
 
 
-def _show_batch_dialog(saved_sets, doc):
-    """Batch export dialog: checkbox | schedule name | sheet name | file path | ..."""
+def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
+                       edit_callback=None, add_callback=None):
+    """Batch export dialog: checkbox | set name | sheet name | file path | ... | Edit | Delete"""
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
@@ -634,54 +635,49 @@ def _show_batch_dialog(saved_sets, doc):
                                           CheckBox, TextBlock, ColumnDefinition,
                                           RowDefinition, Orientation, ScrollBarVisibility)
 
-    set_names = sorted(saved_sets.keys())
-    if not set_names:
+    if not saved_sets:
         return None
 
     all_schedules_by_name = {v.Name: v for v in collect_schedules(doc)}
 
     paths = {}
     set_modes = {}
-    sheet_name_labels = {}
-    for sname in set_names:
+
+    def _build_sheet_label(sname):
         sdata = saved_sets.get(sname) or {}
         mode = int(sdata.get("export_mode", 0))
         set_modes[sname] = mode
         raw = sdata.get("excel_path") if mode == 0 else sdata.get("csv_folder")
-        paths[sname] = (raw or "").strip()
+        if sname not in paths:
+            paths[sname] = (raw or "").strip()
         sched_names = sdata.get("schedule_names") or []
         use_cat = bool(sdata.get("use_category_sheet_name", False))
         if not sched_names:
-            sheet_name_labels[sname] = "(no schedules)"
-        elif len(sched_names) == 1:
+            return "(no schedules)"
+        if len(sched_names) == 1:
             view = all_schedules_by_name.get(sched_names[0])
             if view is None:
-                sheet_name_labels[sname] = sanitize_sheet_name(sched_names[0])
-            elif use_cat:
-                sheet_name_labels[sname] = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view)))
-            else:
-                sheet_name_labels[sname] = sanitize_sheet_name(view.Name)
-        else:
+                return sanitize_sheet_name(sched_names[0])
             if use_cat:
-                first = all_schedules_by_name.get(sched_names[0])
-                if first:
-                    first_label = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, first)))
-                else:
-                    first_label = sched_names[0]
-                sheet_name_labels[sname] = "{}, ... ({})".format(first_label, len(sched_names))
-            else:
-                sheet_name_labels[sname] = "{} sheets".format(len(sched_names))
+                return sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view)))
+            return sanitize_sheet_name(view.Name)
+        if use_cat:
+            first = all_schedules_by_name.get(sched_names[0])
+            first_label = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, first))) if first else sched_names[0]
+            return "{}, ... ({})".format(first_label, len(sched_names))
+        return "{} sheets".format(len(sched_names))
 
     _ok_clicked = [False]
     checkboxes = {}
     path_labels = {}
+    data_row_elements = []
 
     window = Window()
     window.Title = "Batch Export"
-    window.Width = 760
-    window.MinWidth = 520
-    window.Height = min(180 + len(set_names) * 30, 560)
-    window.MinHeight = 200
+    window.Width = 900
+    window.MinWidth = 640
+    window.Height = min(220 + len(saved_sets) * 34, 600)
+    window.MinHeight = 240
     window.WindowStartupLocation = WindowStartupLocation.CenterScreen
 
     outer = Grid()
@@ -695,7 +691,7 @@ def _show_batch_dialog(saved_sets, doc):
     window.Content = outer
 
     prompt = TextBlock()
-    prompt.Text = "Select sets to export. Click ... to choose or change the output file path."
+    prompt.Text = "Manage export sets below. Select sets and click Export Selected to run."
     prompt.Margin = Thickness(0, 0, 0, 8)
     Grid.SetRow(prompt, 0)
     outer.Children.Add(prompt)
@@ -706,9 +702,9 @@ def _show_batch_dialog(saved_sets, doc):
     Grid.SetRow(scroll, 1)
     outer.Children.Add(scroll)
 
+    # checkbox | set name | sheet name | file path | ... | Edit | Delete
     tbl = Grid()
-    # checkbox | schedule name | sheet name | file path | ...
-    for w in [28, 150, 120, -1, 34]:
+    for w in [28, 160, 130, -1, 34, 60, 60]:
         cd = ColumnDefinition()
         cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
         tbl.ColumnDefinitions.Add(cd)
@@ -716,7 +712,7 @@ def _show_batch_dialog(saved_sets, doc):
 
     hrd = RowDefinition(); hrd.Height = GridLength.Auto
     tbl.RowDefinitions.Add(hrd)
-    for col, text in [(1, "Schedule Name"), (2, "Sheet Name"), (3, "File Path")]:
+    for col, text in [(1, "Set Name"), (2, "Sheet Name"), (3, "File Path")]:
         tb = TextBlock()
         tb.Text = text
         tb.FontWeight = FontWeights.Bold
@@ -725,83 +721,145 @@ def _show_batch_dialog(saved_sets, doc):
         Grid.SetColumn(tb, col)
         tbl.Children.Add(tb)
 
-    for row_idx, sname in enumerate(set_names, 1):
-        mode = set_modes[sname]
+    def _make_browse(sname_, mode_):
+        def _on_browse(_s, _e):
+            cur = paths.get(sname_) or ""
+            if mode_ == 0:
+                init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
+                fname = os.path.basename(cur) if cur else "{}.xlsx".format(sanitize_file_name(sname_))
+                new_path = _pick_save_file(
+                    title="'{}' -- Choose Output File".format(sname_),
+                    filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                    default_extension="xlsx",
+                    initial_directory=init_dir,
+                    file_name=fname,
+                )
+                new_path = normalize_excel_output_path(new_path or "")
+            else:
+                init_dir = cur if cur and os.path.isdir(cur) else get_default_dir(doc)
+                new_path = _pick_folder(
+                    title="'{}' -- Choose CSV Folder".format(sname_),
+                    initial_directory=init_dir,
+                )
+                new_path = (new_path or "").strip()
+            if new_path:
+                paths[sname_] = new_path
+                path_labels[sname_].Text = new_path
+        return _on_browse
 
-        rd = RowDefinition(); rd.Height = GridLength(30)
-        tbl.RowDefinitions.Add(rd)
+    def _make_edit_row(sname_):
+        def _on_edit(_s, _e):
+            if edit_callback:
+                edit_callback(sname_, saved_sets.get(sname_) or {})
+                _rebuild_rows()
+        return _on_edit
 
-        cb = CheckBox()
-        cb.IsChecked = True
-        cb.VerticalAlignment = VerticalAlignment.Center
-        cb.HorizontalAlignment = HorizontalAlignment.Center
-        Grid.SetRow(cb, row_idx)
-        Grid.SetColumn(cb, 0)
-        tbl.Children.Add(cb)
-        checkboxes[sname] = cb
+    def _make_delete_row(sname_):
+        def _on_delete(_s, _e):
+            if sname_ in saved_sets:
+                del saved_sets[sname_]
+            if sname_ in paths:
+                del paths[sname_]
+            write_saved_sets(doc, saved_sets, saved_sets_param)
+            _rebuild_rows()
+        return _on_delete
 
-        name_tb = TextBlock()
-        name_tb.Text = sname
-        name_tb.VerticalAlignment = VerticalAlignment.Center
-        name_tb.Margin = Thickness(4, 0, 8, 0)
-        name_tb.TextTrimming = TextTrimming.CharacterEllipsis
-        Grid.SetRow(name_tb, row_idx)
-        Grid.SetColumn(name_tb, 1)
-        tbl.Children.Add(name_tb)
+    def _rebuild_rows():
+        for elems in data_row_elements:
+            for elem in elems:
+                tbl.Children.Remove(elem)
+        data_row_elements[:] = []
+        while tbl.RowDefinitions.Count > 1:
+            tbl.RowDefinitions.RemoveAt(1)
+        checkboxes.clear()
+        path_labels.clear()
 
-        sheet_tb = TextBlock()
-        sheet_tb.Text = sheet_name_labels.get(sname, "")
-        sheet_tb.VerticalAlignment = VerticalAlignment.Center
-        sheet_tb.Margin = Thickness(4, 0, 8, 0)
-        sheet_tb.TextTrimming = TextTrimming.CharacterEllipsis
-        Grid.SetRow(sheet_tb, row_idx)
-        Grid.SetColumn(sheet_tb, 2)
-        tbl.Children.Add(sheet_tb)
+        current_names = sorted(saved_sets.keys())
+        if not current_names:
+            rd = RowDefinition(); rd.Height = GridLength.Auto
+            tbl.RowDefinitions.Add(rd)
+            empty_tb = TextBlock()
+            empty_tb.Text = "No saved sets. Click 'Add Set' to create one."
+            empty_tb.Margin = Thickness(4, 16, 4, 4)
+            empty_tb.HorizontalAlignment = HorizontalAlignment.Center
+            Grid.SetRow(empty_tb, 1)
+            Grid.SetColumnSpan(empty_tb, 7)
+            tbl.Children.Add(empty_tb)
+            data_row_elements.append([empty_tb])
+            return
 
-        path_tb = TextBlock()
-        path_tb.Text = paths[sname] or "(no path)"
-        path_tb.VerticalAlignment = VerticalAlignment.Center
-        path_tb.Margin = Thickness(4, 0, 4, 0)
-        path_tb.TextTrimming = TextTrimming.CharacterEllipsis
-        Grid.SetRow(path_tb, row_idx)
-        Grid.SetColumn(path_tb, 3)
-        tbl.Children.Add(path_tb)
-        path_labels[sname] = path_tb
+        for row_idx, sname in enumerate(current_names, 1):
+            sheet_label = _build_sheet_label(sname)
+            mode = set_modes.get(sname, 0)
 
-        btn = Button()
-        btn.Content = "..."
-        btn.Margin = Thickness(2, 3, 2, 3)
-        Grid.SetRow(btn, row_idx)
-        Grid.SetColumn(btn, 4)
-        tbl.Children.Add(btn)
+            rd = RowDefinition(); rd.Height = GridLength(34)
+            tbl.RowDefinitions.Add(rd)
+            row_elems = []
 
-        def _make_browse(sname_, mode_):
-            def _on_browse(_s, _e):
-                cur = paths.get(sname_) or ""
-                if mode_ == 0:
-                    init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
-                    fname = os.path.basename(cur) if cur else "{}.xlsx".format(sanitize_file_name(sname_))
-                    new_path = _pick_save_file(
-                        title="'{}' -- Choose Output File".format(sname_),
-                        filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                        default_extension="xlsx",
-                        initial_directory=init_dir,
-                        file_name=fname,
-                    )
-                    new_path = normalize_excel_output_path(new_path or "")
-                else:
-                    init_dir = cur if cur and os.path.isdir(cur) else get_default_dir(doc)
-                    new_path = _pick_folder(
-                        title="'{}' -- Choose CSV Folder".format(sname_),
-                        initial_directory=init_dir,
-                    )
-                    new_path = (new_path or "").strip()
-                if new_path:
-                    paths[sname_] = new_path
-                    path_labels[sname_].Text = new_path
-            return _on_browse
+            cb = CheckBox()
+            cb.IsChecked = True
+            cb.VerticalAlignment = VerticalAlignment.Center
+            cb.HorizontalAlignment = HorizontalAlignment.Center
+            Grid.SetRow(cb, row_idx); Grid.SetColumn(cb, 0)
+            tbl.Children.Add(cb)
+            checkboxes[sname] = cb
+            row_elems.append(cb)
 
-        btn.Click += _make_browse(sname, mode)
+            name_tb = TextBlock()
+            name_tb.Text = sname
+            name_tb.VerticalAlignment = VerticalAlignment.Center
+            name_tb.Margin = Thickness(4, 0, 8, 0)
+            name_tb.TextTrimming = TextTrimming.CharacterEllipsis
+            Grid.SetRow(name_tb, row_idx); Grid.SetColumn(name_tb, 1)
+            tbl.Children.Add(name_tb)
+            row_elems.append(name_tb)
+
+            sheet_tb = TextBlock()
+            sheet_tb.Text = sheet_label
+            sheet_tb.VerticalAlignment = VerticalAlignment.Center
+            sheet_tb.Margin = Thickness(4, 0, 8, 0)
+            sheet_tb.TextTrimming = TextTrimming.CharacterEllipsis
+            Grid.SetRow(sheet_tb, row_idx); Grid.SetColumn(sheet_tb, 2)
+            tbl.Children.Add(sheet_tb)
+            row_elems.append(sheet_tb)
+
+            path_tb = TextBlock()
+            path_tb.Text = paths.get(sname) or "(no path)"
+            path_tb.VerticalAlignment = VerticalAlignment.Center
+            path_tb.Margin = Thickness(4, 0, 4, 0)
+            path_tb.TextTrimming = TextTrimming.CharacterEllipsis
+            Grid.SetRow(path_tb, row_idx); Grid.SetColumn(path_tb, 3)
+            tbl.Children.Add(path_tb)
+            path_labels[sname] = path_tb
+            row_elems.append(path_tb)
+
+            browse_btn = Button()
+            browse_btn.Content = "..."
+            browse_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(browse_btn, row_idx); Grid.SetColumn(browse_btn, 4)
+            tbl.Children.Add(browse_btn)
+            browse_btn.Click += _make_browse(sname, mode)
+            row_elems.append(browse_btn)
+
+            edit_btn = Button()
+            edit_btn.Content = "Edit"
+            edit_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(edit_btn, row_idx); Grid.SetColumn(edit_btn, 5)
+            tbl.Children.Add(edit_btn)
+            edit_btn.Click += _make_edit_row(sname)
+            row_elems.append(edit_btn)
+
+            del_btn = Button()
+            del_btn.Content = "Delete"
+            del_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(del_btn, row_idx); Grid.SetColumn(del_btn, 6)
+            tbl.Children.Add(del_btn)
+            del_btn.Click += _make_delete_row(sname)
+            row_elems.append(del_btn)
+
+            data_row_elements.append(row_elems)
+
+    _rebuild_rows()
 
     btns = StackPanel()
     btns.Orientation = Orientation.Horizontal
@@ -809,6 +867,11 @@ def _show_batch_dialog(saved_sets, doc):
     btns.Margin = Thickness(0, 10, 0, 0)
     Grid.SetRow(btns, 2)
     outer.Children.Add(btns)
+
+    add_btn = Button()
+    add_btn.Content = "Add Set"
+    add_btn.MinWidth = 80
+    add_btn.Margin = Thickness(0, 0, 20, 0)
 
     ok_btn = Button()
     ok_btn.Content = "Export Selected"
@@ -819,6 +882,11 @@ def _show_batch_dialog(saved_sets, doc):
     cancel_btn.Content = "Cancel"
     cancel_btn.MinWidth = 70
 
+    def _add(_s, _e):
+        if add_callback:
+            add_callback()
+            _rebuild_rows()
+
     def _ok(_s, _e):
         _ok_clicked[0] = True
         window.Close()
@@ -826,8 +894,10 @@ def _show_batch_dialog(saved_sets, doc):
     def _cancel(_s, _e):
         window.Close()
 
+    add_btn.Click += _add
     ok_btn.Click += _ok
     cancel_btn.Click += _cancel
+    btns.Children.Add(add_btn)
     btns.Children.Add(ok_btn)
     btns.Children.Add(cancel_btn)
 
@@ -836,7 +906,8 @@ def _show_batch_dialog(saved_sets, doc):
     if not _ok_clicked[0]:
         return None
 
-    selected = [sname for sname in set_names if checkboxes[sname].IsChecked]
+    current_names = sorted(saved_sets.keys())
+    selected = [sname for sname in current_names if checkboxes.get(sname) and checkboxes[sname].IsChecked]
     return selected, dict(paths)
 
 
@@ -1139,7 +1210,22 @@ def _show_export_form(
         if not saved_sets:
             ui.uiUtils_alert("No saved sets available. Save a set first.", title="Multiple Schedules Exporter")
             return
-        result = _show_batch_dialog(saved_sets, doc)
+
+        def _edit_set(sname, sdata):
+            _apply_saved_set(sdata)
+            saved_set_box.Text = sname
+
+        def _add_set():
+            saved_set_box.Text = ""
+            _apply_saved_set({})
+
+        result = _show_batch_dialog(
+            saved_sets, doc,
+            ui=ui,
+            saved_sets_param=saved_sets_param,
+            edit_callback=_edit_set,
+            add_callback=_add_set,
+        )
         if not result:
             return
         chosen, override_paths = result
