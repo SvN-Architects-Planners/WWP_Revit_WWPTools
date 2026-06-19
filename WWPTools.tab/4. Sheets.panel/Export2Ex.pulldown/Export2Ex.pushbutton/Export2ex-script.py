@@ -210,7 +210,7 @@ def write_saved_sets(doc, sets_dict, param_name=None):
         t = DB.Transaction(doc, "Save Export2Ex Settings")
         t.Start()
         try:
-            if param is None or param.IsReadOnly:
+            if param is None:
                 t.RollBack()
                 return False
             raw = (param.AsString() or "").strip()
@@ -247,7 +247,7 @@ def _get_proj_info_text_params(doc):
         names = []
         for param in proj_info.Parameters:
             try:
-                if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
+                if param.StorageType == DB.StorageType.String:
                     names.append(param.Definition.Name)
             except Exception:
                 continue

@@ -448,7 +448,7 @@ def write_saved_sets(doc, sets_dict):
                 doc.Regenerate()
                 proj_info = doc.ProjectInformation
                 param = proj_info.LookupParameter(PARAM_SAVED_SETS)
-            if param is None or param.IsReadOnly:
+            if param is None:
                 t.RollBack()
                 return False
             raw = (param.AsString() or "").strip()
