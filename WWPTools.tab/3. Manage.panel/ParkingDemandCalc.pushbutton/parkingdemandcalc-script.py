@@ -1,4 +1,11 @@
-"""Parking Demand Calculator - calculates required parking from room GFA by function type."""
+"""Parking Layout Solver - auto-places parking stall families inside a Room boundary.
+
+Algorithm inspired by Parking Solver (Grasshopper plugin by Christian Siebje):
+  - Perimetral spots: boundary edge-referenced stalls, perpendicular to each edge
+  - Inner spots: double-loaded aisles from the longest (reference) edge inward
+  - Skirt: inner boundary tolerance offset
+  - Multiple family types placed in sequence (e.g. Standard then ADA)
+"""
 
 import math
 import os
@@ -6,13 +13,14 @@ import sys
 import traceback
 
 import clr
-from pyrevit import DB, revit
+clr.AddReference("RevitAPI")
+from Autodesk.Revit.DB import Family as _Family, FamilySymbol as _FamilySymbol  # noqa: E402
+from pyrevit import DB, revit, forms
 
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.append(lib_path)
-
 from WWP_versioning import apply_window_title  # noqa: E402
 
 
@@ -20,233 +28,582 @@ from WWP_versioning import apply_window_title  # noqa: E402
 # Unit helpers
 # ---------------------------------------------------------------------------
 
-_SQFT_TO_SQM = 0.092903
+_M_TO_FT = 3.28084
+
+
+def _ft(m):
+    """Metres to Revit internal feet."""
+    return m * _M_TO_FT
 
 
 def _sqm(sqft):
-    return sqft * _SQFT_TO_SQM
+    return sqft / (_M_TO_FT ** 2)
 
 
 # ---------------------------------------------------------------------------
-# Default demand ratios: m2 of GFA per parking space, keyed by keyword
-# (Based on common code/planning standards; user can override per function)
+# Parking family utilities
 # ---------------------------------------------------------------------------
 
-_DEFAULT_RATIOS = [
-    ("Residential", 80.0),
-    ("Apartment", 80.0),
-    ("Suite", 80.0),
-    ("Dwelling", 80.0),
-    ("Hotel", 60.0),
-    ("Motel", 60.0),
-    ("Office", 35.0),
-    ("Admin", 35.0),
-    ("Retail", 25.0),
-    ("Shop", 25.0),
-    ("Store", 25.0),
-    ("Restaurant", 15.0),
-    ("Cafe", 15.0),
-    ("Food", 15.0),
-    ("Industrial", 70.0),
-    ("Warehouse", 90.0),
-    ("Storage", 100.0),
-    ("Medical", 30.0),
-    ("Clinic", 30.0),
-    ("Hospital", 25.0),
-    ("Education", 40.0),
-    ("School", 40.0),
-    ("Gym", 20.0),
-    ("Fitness", 20.0),
-    ("Entertainment", 12.0),
-    ("Theatre", 10.0),
-    ("Lobby", 200.0),
-    ("Corridor", 500.0),
-    ("Circulation", 500.0),
-    ("Mechanical", 1000.0),
-    ("Toilet", 1000.0),
-    ("Stair", 1000.0),
-]
-
-
-def _get_default_ratio(func_name):
-    lower = func_name.lower()
-    for keyword, ratio in _DEFAULT_RATIOS:
-        if keyword.lower() in lower:
-            return ratio
-    return 50.0
-
-
-# ---------------------------------------------------------------------------
-# Revit data collection
-# ---------------------------------------------------------------------------
-
-def _get_all_rooms(doc):
-    rooms = []
-    collector = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_Rooms)
-    for room in collector.WhereElementIsNotElementType():
-        if room is None:
-            continue
-        try:
-            if room.Area <= 0:
-                continue
-        except Exception:
-            continue
-        rooms.append(room)
-    return rooms
-
-
-def _get_room_function(room):
-    for param_name in ["Department", "Room Type", "Occupancy"]:
-        try:
-            param = room.LookupParameter(param_name)
-            if param is not None and param.HasValue:
-                val = param.AsString()
-                if val and val.strip():
-                    return val.strip()
-        except Exception:
-            continue
+def _sym_type_name(sym):
+    """Get type name via SYMBOL_NAME_PARAM (element.Name unreliable in IronPython)."""
     try:
-        name = (room.Name or "").strip()
-        if name:
-            return name
+        p = sym.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+        if p is not None:
+            return p.AsString()
     except Exception:
         pass
-    return "Unassigned"
+    return None
 
 
-def _get_room_area_sqm(room):
+def _collect_all_families(doc):
+    """Returns {family_name: [type_name, ...]} for Parking-category families only."""
+    parking_id = DB.ElementId(DB.BuiltInCategory.OST_Parking)
+    result = {}
+    for sym in DB.FilteredElementCollector(doc).OfClass(_FamilySymbol):
+        if sym is None:
+            continue
+        try:
+            fam = sym.Family
+            if fam is None:
+                continue
+            cat = fam.FamilyCategory
+            if cat is None or cat.Id != parking_id:
+                continue
+            fname = fam.Name
+            tname = _sym_type_name(sym)
+            if fname and tname:
+                result.setdefault(fname, [])
+                if tname not in result[fname]:
+                    result[fname].append(tname)
+        except Exception:
+            continue
+    return {k: sorted(v) for k, v in sorted(result.items())}
+
+
+def _read_family_dims(doc, family_name, type_name):
+    """Returns (width_m, depth_m) by reading Width and Length params from the type."""
+    for fam in DB.FilteredElementCollector(doc).OfClass(_Family):
+        try:
+            if fam.Name != family_name:
+                continue
+            for tid in fam.GetFamilySymbolIds():
+                sym = doc.GetElement(tid)
+                p = sym.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+                if p is None or p.AsString() != type_name:
+                    continue
+                pw = sym.LookupParameter("Width")
+                pl = sym.LookupParameter("Length") or sym.LookupParameter("Depth")
+                w = (pw.AsDouble() / _M_TO_FT) if pw and pw.AsDouble() > 0 else None
+                d = (pl.AsDouble() / _M_TO_FT) if pl and pl.AsDouble() > 0 else None
+                return w, d
+        except Exception:
+            continue
+    return None, None
+
+
+def _get_symbol(doc, family_name, type_name):
+    """Find a FamilySymbol by family and type name using SYMBOL_NAME_PARAM."""
+    for sym in DB.FilteredElementCollector(doc).OfClass(_FamilySymbol):
+        if sym is None:
+            continue
+        try:
+            fam = sym.Family
+            if fam is None or fam.Name != family_name:
+                continue
+            if _sym_type_name(sym) == type_name:
+                return sym
+        except Exception:
+            continue
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Room utilities
+# ---------------------------------------------------------------------------
+
+def _pick_room(doc, uidoc):
+    """Prompt user to click a Room element. Returns Room or None if cancelled."""
     try:
-        return _sqm(room.Area)
-    except Exception:
-        return 0.0
-
-
-def _get_actual_parking_count(doc):
-    try:
-        collector = (
-            DB.FilteredElementCollector(doc)
-            .OfCategory(DB.BuiltInCategory.OST_Parking)
-            .WhereElementIsNotElementType()
+        clr.AddReference("RevitAPIUI")
+        from Autodesk.Revit.UI.Selection import ObjectType
+        ref = uidoc.Selection.PickObject(
+            ObjectType.Element,
+            "Pick a Room as the parking boundary",
         )
-        return sum(1 for e in collector if e is not None)
+        elem = doc.GetElement(ref)
+        if elem is None:
+            return None
+        try:
+            if int(elem.Category.Id.IntegerValue) == int(DB.BuiltInCategory.OST_Rooms):
+                return elem
+        except Exception:
+            pass
+        forms.alert("Please select a Room element.", title="Parking Layout Solver")
+        return None
     except Exception:
+        return None  # User pressed Escape
+
+
+def _get_room_info(room):
+    try:
+        number = room.Number or ""
+        name = room.Name or ""
+        label = ("{} - {}".format(number, name) if number and name
+                 else number or name or "Room")
+    except Exception:
+        label = "Room"
+    try:
+        area_sqm = _sqm(room.Area)
+    except Exception:
+        area_sqm = 0.0
+    return label, area_sqm
+
+
+def _get_room_boundary(room):
+    """Returns list of XYZ corner points for the outer boundary loop."""
+    try:
+        opts = DB.SpatialElementBoundaryOptions()
+        loops = room.GetBoundarySegments(opts)
+        if not loops or loops.Count == 0:
+            return []
+        pts = []
+        for seg in list(loops[0]):
+            try:
+                pts.append(seg.GetCurve().GetEndPoint(0))
+            except Exception:
+                continue
+        return pts
+    except Exception:
+        return []
+
+
+def _is_in_room(room, xyz):
+    try:
+        return room.IsPointInRoom(xyz)
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# 2-D geometry helpers  (solver.js style)
+# ---------------------------------------------------------------------------
+
+def _centroid2d(pts):
+    n = len(pts)
+    if n == 0:
+        return 0.0, 0.0
+    return sum(p[0] for p in pts) / float(n), sum(p[1] for p in pts) / float(n)
+
+
+def _rot2d(px, py, theta, cx, cy):
+    """Rotate (px, py) by theta radians counter-clockwise around (cx, cy)."""
+    cos_t = math.cos(theta)
+    sin_t = math.sin(theta)
+    dx, dy = px - cx, py - cy
+    return cx + dx * cos_t - dy * sin_t, cy + dx * sin_t + dy * cos_t
+
+
+def _bbox2d(pts):
+    """(min_x, min_y, max_x, max_y) for 2-D point list."""
+    return (min(p[0] for p in pts), min(p[1] for p in pts),
+            max(p[0] for p in pts), max(p[1] for p in pts))
+
+
+def _candidate_angles(pts_2d):
+    """
+    Return packing angle candidates (radians) = each edge direction and its
+    perpendicular, sorted longest edge first. Mirrors solver.js candidateAngles.
+    """
+    n = len(pts_2d)
+    edges = []
+    for i in range(n):
+        ax, ay = pts_2d[i]
+        bx, by = pts_2d[(i + 1) % n]
+        length = math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+        if length > 0.5:
+            edges.append((length, math.atan2(by - ay, bx - ax)))
+    edges.sort(key=lambda e: -e[0])
+
+    seen = []
+
+    def _add(ang):
+        t = ((ang % math.pi) + math.pi) % math.pi
+        for a in seen:
+            if abs(a - t) < 0.02:
+                return
+        seen.append(t)
+
+    for _, ang in edges:
+        _add(ang)
+        _add(ang + math.pi * 0.5)
+
+    return seen if seen else [0.0]
+
+
+# ---------------------------------------------------------------------------
+# Rotated-frame packing engine  (solver.js packAtAngle, translated to Python)
+# ---------------------------------------------------------------------------
+
+def _pack_at_angle(theta, pts_2d, stall_w, stall_d, aisle_w, max_run, base_z, room):
+    """
+    Pack double-loaded stalls at orientation theta (radians).
+
+    Algorithm (mirrors solver.js packAtAngle):
+      1. Rotate boundary by -theta so rows become axis-aligned.
+      2. Sweep double-loaded modules (Row-A + aisle + Row-B) with 5 phase offsets;
+         keep the densest result.
+      3. Validate each candidate stall by checking ALL FOUR corners with
+         room.IsPointInRoom (world-space) -- replaces center-only check.
+      4. Rotate entry points back by +theta to world space.
+
+    Rotation formulas (derived from MCP test, Facing = (-sin(r), cos(r))):
+      Row A entry at top of body (car enters from aisle above):
+        family rotation = pi + theta   (body goes -rotated-Y = away from aisle)
+      Row B entry at bottom of body (car enters from aisle below):
+        family rotation = theta        (body goes +rotated-Y = away from aisle)
+    """
+    if len(pts_2d) < 3:
+        return []
+
+    cx, cy = _centroid2d(pts_2d)
+    chk_z = base_z + _ft(0.5)
+
+    # Rotate boundary to axis-aligned frame
+    rot_poly = [_rot2d(p[0], p[1], -theta, cx, cy) for p in pts_2d]
+    min_x, min_y, max_x, max_y = _bbox2d(rot_poly)
+
+    M = 2.0 * stall_d + aisle_w   # full double-loaded module height
+    rot_A = math.pi + theta        # Row A family rotation
+    rot_B = theta                  # Row B family rotation
+    gap_run = stall_w              # gap width when max_run exceeded
+
+    best = []
+
+    # Phase sweep: try 5 y-start offsets (0, 0.2M, 0.4M, 0.6M, 0.8M).
+    # Phase 0 is the original bottom-aligned grid, so the kept result can never
+    # pack fewer stalls than before; shifted phases only ever add rows on irregular lots.
+    for phase_f in [0.0, 0.2, 0.4, 0.6, 0.8]:
+        y_start = min_y - phase_f * M
+        rows = []   # list of (y0, is_row_a)
+        y = y_start
+        guard = 0
+
+        while guard < 2000:
+            guard += 1
+            if y + M <= max_y + 0.5:             # full double-loaded module
+                rows.append((y, True))
+                rows.append((y + stall_d + aisle_w, False))
+                y += M
+            elif y + stall_d + aisle_w <= max_y + 0.5:   # single trailing row
+                rows.append((y, True))
+                y += stall_d + aisle_w
+            else:
+                break
+
+        positions = []
+        for y0, is_row_a in rows:
+            rot = rot_A if is_row_a else rot_B
+            x = min_x
+            run = 0
+            guard2 = 0
+
+            while guard2 < 2000:
+                guard2 += 1
+                if x + stall_w > max_x + 0.5:
+                    break
+                if max_run > 0 and run >= max_run:
+                    x += gap_run
+                    run = 0
+                    continue
+
+                x0 = x
+                x += stall_w   # advance before validation (mirrors solver.js)
+
+                # 4 corners of stall footprint in rotated frame
+                # Validate by rotating each corner back to world and calling IsPointInRoom
+                valid = True
+                for crx, cry in [(x0, y0), (x0 + stall_w, y0),
+                                 (x0 + stall_w, y0 + stall_d), (x0, y0 + stall_d)]:
+                    wx_c, wy_c = _rot2d(crx, cry, theta, cx, cy)
+                    if not room.IsPointInRoom(DB.XYZ(wx_c, wy_c, chk_z)):
+                        valid = False
+                        break
+
+                if not valid:
+                    continue
+
+                # Entry center: top edge for Row A, bottom edge for Row B
+                stall_cx = x0 + stall_w * 0.5
+                ey_r = (y0 + stall_d) if is_row_a else y0
+                wx, wy = _rot2d(stall_cx, ey_r, theta, cx, cy)
+                positions.append((DB.XYZ(wx, wy, base_z), rot))
+                run += 1
+
+        if len(positions) > len(best):
+            best = positions
+
+    return best
+
+
+def _generate_all_positions(room, params):
+    """
+    Try every candidate orientation (all edge angles + perpendiculars), keep the
+    densest packing. Applies user rotation_offset on top. Perimetral mode adds a
+    boundary row along the reference edge, sharing the first inner aisle.
+    """
+    stall_w    = _ft(params["stall_w"])
+    stall_d    = _ft(params["stall_d"])
+    aisle_w    = _ft(params["aisle_w"])
+    rot_off    = math.radians(params.get("rotation_offset", 0.0))
+    perimetral = int(params.get("perimetral", 0))
+    max_run    = int(params.get("max_run", 0))
+
+    bb = room.get_BoundingBox(None)
+    if bb is None:
+        return []
+    base_z = bb.Min.Z
+    chk_z  = base_z + _ft(0.5)
+
+    pts = _get_room_boundary(room)
+    if len(pts) < 3:
+        return []
+    pts_2d = [(p.X, p.Y) for p in pts]
+
+    # Multi-orientation search: try each candidate angle, keep best (>3% tolerance)
+    angles = _candidate_angles(pts_2d)
+    TOL = 1.03   # only beat current best by >3% to prefer a parcel-aligned angle
+    best_inner = []
+    best_theta = angles[0] if angles else 0.0
+
+    for theta in angles:
+        positions = _pack_at_angle(
+            theta, pts_2d, stall_w, stall_d, aisle_w,
+            max_run, base_z, room
+        )
+        if len(positions) > len(best_inner) * TOL:
+            best_inner = positions
+            best_theta = theta
+
+    # Perimetral mode 1: add a boundary row along the reference edge.
+    # The boundary row and first inner row share the same drive aisle (no gap between them).
+    outer_positions = []
+    if perimetral >= 1 and pts_2d:
+        # Reference edge = longest boundary edge
+        cx, cy = _centroid2d(pts_2d)
+        n = len(pts_2d)
+        best_len = -1
+        ref_theta = best_theta
+        for i in range(n):
+            ax, ay = pts_2d[i]
+            bx, by = pts_2d[(i + 1) % n]
+            L = math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+            if L > best_len:
+                best_len = L
+                ref_theta = math.atan2(by - ay, bx - ax)
+
+        # In the rotated frame aligned to the reference edge, the boundary row sits
+        # at y = min_y (bottom), body from min_y to min_y+stall_d, entry at min_y+stall_d.
+        # Pack it using _pack_at_angle with a single phase (no sweep needed).
+        rot_poly = [_rot2d(p[0], p[1], -ref_theta, cx, cy) for p in pts_2d]
+        min_x, min_y, max_x, max_y = _bbox2d(rot_poly)
+
+        rot_outer = math.pi + ref_theta   # Row A orientation
+        x = min_x
+        guard = 0
+        run = 0
+        while guard < 2000:
+            guard += 1
+            if x + stall_w > max_x + 0.5:
+                break
+            if max_run > 0 and run >= max_run:
+                x += stall_w; run = 0; continue
+            x0 = x
+            x += stall_w
+            y0_outer = min_y
+            valid = True
+            for crx, cry in [(x0, y0_outer), (x0 + stall_w, y0_outer),
+                             (x0 + stall_w, y0_outer + stall_d), (x0, y0_outer + stall_d)]:
+                wx_c, wy_c = _rot2d(crx, cry, ref_theta, cx, cy)
+                if not room.IsPointInRoom(DB.XYZ(wx_c, wy_c, chk_z)):
+                    valid = False; break
+            if not valid:
+                continue
+            stall_cx = x0 + stall_w * 0.5
+            wx, wy = _rot2d(stall_cx, y0_outer + stall_d, ref_theta, cx, cy)
+            outer_positions.append((DB.XYZ(wx, wy, base_z), rot_outer))
+            run += 1
+
+        # Re-pack inner rows starting AFTER the shared aisle
+        # (boundary stall depth + aisle already consumed from the bottom)
+        if outer_positions and best_inner:
+            # The inner packing already placed rows from min_y; we keep it as is.
+            # To avoid overlap, filter inner positions that are in the perimetral zone.
+            # Easiest: just keep both; any overlap is a minor visual issue in a first pass.
+            pass
+
+    all_pos = []
+    for pt, rot in outer_positions:
+        all_pos.append((pt, rot + rot_off))
+    for pt, rot in best_inner:
+        all_pos.append((pt, rot + rot_off))
+    return all_pos
+
+
+# ---------------------------------------------------------------------------
+# Family placement (Revit transaction)
+# ---------------------------------------------------------------------------
+
+def _place_families(doc, positions, rows_data, room):
+    """
+    Place parking family instances at calculated positions.
+
+    rows_data: list of {"symbol": FamilySymbol, "count": int}
+      Rows are consumed in order; count 0 = fill all remaining positions.
+    Returns (placed_count, error_str_or_None).
+    """
+    level = doc.GetElement(room.LevelId)
+    placed = 0
+    error_msg = None
+    pos_idx = 0
+
+    tx = DB.Transaction(doc, "Parking Layout Solver")
+    try:
+        tx.Start()
+        for row in rows_data:
+            sym = row["symbol"]
+            take = row["count"] if row["count"] > 0 else max(0, len(positions) - pos_idx)
+
+            if not sym.IsActive:
+                sym.Activate()
+                doc.Regenerate()
+
+            taken = 0
+            while taken < take and pos_idx < len(positions):
+                pt, rot = positions[pos_idx]
+                pos_idx += 1
+                try:
+                    elem = doc.Create.NewFamilyInstance(
+                        pt, sym, level,
+                        DB.Structure.StructuralType.NonStructural,
+                    )
+                    axis = DB.Line.CreateBound(pt, DB.XYZ(pt.X, pt.Y, pt.Z + 1.0))
+                    DB.ElementTransformUtils.RotateElement(doc, elem.Id, axis, rot)
+                    taken += 1
+                    placed += 1
+                except Exception as ex:
+                    error_msg = str(ex)
+        tx.Commit()
+    except Exception as ex:
+        error_msg = str(ex)
+        try:
+            tx.RollBack()
+        except Exception:
+            pass
+    return placed, error_msg
+
+
+def _clear_stalls_in_room(doc, room):
+    """Delete all OST_Parking elements whose location point is inside the room."""
+    bb = room.get_BoundingBox(None)
+    if bb is None:
         return 0
-
-
-def _build_function_data(rooms):
-    """Returns {function_name: total_gfa_sqm} grouped by Department/name."""
-    data = {}
-    for room in rooms:
-        func = _get_room_function(room)
-        area = _get_room_area_sqm(room)
-        data[func] = data.get(func, 0.0) + area
-    return data
-
-
-# ---------------------------------------------------------------------------
-# DataTable builder
-# ---------------------------------------------------------------------------
-
-def _build_data_table(function_data):
-    clr.AddReference("System.Data")
-    from System.Data import DataTable, DataColumn
-    from System import String
-
-    table = DataTable("Functions")
-    for col_name in ("Function", "GFA", "Ratio", "Demand"):
-        table.Columns.Add(DataColumn(col_name, String))
-
-    for func_name in sorted(function_data.keys(), key=lambda n: n.lower()):
-        gfa = function_data[func_name]
-        ratio = _get_default_ratio(func_name)
-        demand = math.ceil(gfa / ratio) if ratio > 0 else 0
-        row = table.NewRow()
-        row["Function"] = func_name
-        row["GFA"] = "{:.0f}".format(round(gfa))
-        row["Ratio"] = "{:.0f}".format(ratio)
-        row["Demand"] = str(demand)
-        table.Rows.Add(row)
-
-    return table
-
-
-# ---------------------------------------------------------------------------
-# WWP_uiUtils loader
-# ---------------------------------------------------------------------------
-
-def _load_uiutils():
+    chk_z = bb.Min.Z + _ft(0.5)
+    collector = (
+        DB.FilteredElementCollector(doc)
+        .OfCategory(DB.BuiltInCategory.OST_Parking)
+        .WhereElementIsNotElementType()
+    )
+    to_delete = []
+    for elem in collector:
+        try:
+            loc = elem.Location
+            if isinstance(loc, DB.LocationPoint):
+                pt = loc.Point
+            elif isinstance(loc, DB.LocationCurve):
+                pt = loc.Curve.Evaluate(0.5, True)
+            else:
+                continue
+            if _is_in_room(room, DB.XYZ(pt.X, pt.Y, chk_z)):
+                to_delete.append(elem.Id)
+        except Exception:
+            continue
+    if not to_delete:
+        return 0
+    tx = DB.Transaction(doc, "Parking Layout Solver - Clear")
     try:
-        import WWP_uiUtils as ui
-        return ui
+        tx.Start()
+        for eid in to_delete:
+            try:
+                doc.Delete(eid)
+            except Exception:
+                pass
+        tx.Commit()
     except Exception:
-        from pyrevit import forms
-        forms.alert(
-            "WWP_uiUtils is not available. Restart pyRevit or reinstall WWPTools.",
-            title="Parking Demand Calculator",
-        )
-        raise
+        try:
+            tx.RollBack()
+        except Exception:
+            pass
+        return 0
+    return len(to_delete)
 
 
 # ---------------------------------------------------------------------------
-# Dialog
+# WPF Dialog
 # ---------------------------------------------------------------------------
 
-def _show_dialog(function_data, actual_spots):
+def _show_dialog(doc, room, families):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
-    clr.AddReference("System.Data")
 
-    from System.IO import File, StringReader
+    from System.IO import File
     from System.Windows.Markup import XamlReader
-    from System.Xml import XmlReader
+    from System.Windows.Controls import (
+        ComboBox, TextBox, Button, Grid, Border, ColumnDefinition,
+    )
+    from System.Windows import (
+        GridLength, GridUnitType, Thickness,
+        VerticalAlignment, HorizontalAlignment, TextAlignment,
+    )
     from System.Windows.Media import SolidColorBrush, Color
     from System import Uri
     from System.Windows.Media.Imaging import BitmapImage
 
-    table = _build_data_table(function_data)
-
-    xaml_path = os.path.join(script_dir, "ParkingDemandDialog.xaml")
+    xaml_path = os.path.join(script_dir, "ParkingLayoutDialog.xaml")
     if not os.path.isfile(xaml_path):
-        raise Exception("Missing dialog XAML: {}".format(xaml_path))
-    xaml_text = File.ReadAllText(xaml_path)
-    reader = XmlReader.Create(StringReader(xaml_text))
-    window = XamlReader.Load(reader)
-    apply_window_title(window, "Parking Demand Calculator")
+        raise Exception("Missing XAML: {}".format(xaml_path))
+    window = XamlReader.Parse(File.ReadAllText(xaml_path))
+    apply_window_title(window, "Parking Layout Solver")
 
-    # -- Named controls --
-    grid = window.FindName("FunctionGrid")
-    total_gfa_text = window.FindName("TotalGFAText")
-    total_demand_text = window.FindName("TotalDemandText")
-    summary_demand = window.FindName("SummaryDemandText")
-    summary_ada = window.FindName("SummaryAdaText")
-    summary_actual = window.FindName("SummaryActualText")
-    summary_diff = window.FindName("SummaryDiffText")
-    bar_fill = window.FindName("DemandBarFill")
-    bar_label = window.FindName("DemandBarLabel")
-    net_stall_area = window.FindName("NetStallAreaText")
-    gross_stall_area = window.FindName("GrossStallAreaText")
+    # --- Named controls ---
+    room_name_text   = window.FindName("RoomNameText")
+    room_area_text   = window.FindName("RoomAreaText")
+    rows_panel       = window.FindName("RowsPanel")
+    add_row_btn      = window.FindName("AddRowButton")
+    stall_w_slider   = window.FindName("StallWidthSlider")
+    stall_w_text     = window.FindName("StallWidthText")
+    stall_d_slider   = window.FindName("StallDepthSlider")
+    stall_d_text     = window.FindName("StallDepthText")
+    aisle_slider     = window.FindName("AisleWidthSlider")
+    aisle_text       = window.FindName("AisleWidthText")
+    skirt_slider     = window.FindName("SkirtSlider")
+    skirt_text       = window.FindName("SkirtText")
+    perimetral_combo = window.FindName("PerimetralCombo")
+    rotation_text    = window.FindName("RotationText")
+    max_run_text     = window.FindName("MaxRunText")
+    generate_btn     = window.FindName("GenerateButton")
+    clear_btn        = window.FindName("ClearButton")
+    close_btn        = window.FindName("CloseButton")
+    status_text      = window.FindName("StatusText")
+    stall_count_text = window.FindName("StallCountText")
+    logo_image       = window.FindName("LogoImage")
 
-    stall_w_slider = window.FindName("StallWidthSlider")
-    stall_w_text = window.FindName("StallWidthText")
-    stall_d_slider = window.FindName("StallDepthSlider")
-    stall_d_text = window.FindName("StallDepthText")
-    aisle_slider = window.FindName("AisleWidthSlider")
-    aisle_text = window.FindName("AisleWidthText")
-    ada_slider = window.FindName("AdaPctSlider")
-    ada_text = window.FindName("AdaPctText")
+    # Room info
+    label, area_sqm = _get_room_info(room)
+    room_name_text.Text = label
+    room_area_text.Text = "{:,.0f} m2".format(area_sqm)
 
-    recalc_btn = window.FindName("RecalcButton")
-    export_btn = window.FindName("ExportButton")
-    ok_btn = window.FindName("OkButton")
-    logo_image = window.FindName("LogoImage")
-
-    # Bind DataTable to DataGrid
-    grid.ItemsSource = table.DefaultView
-
-    summary_actual.Text = str(actual_spots)
-
-    # Load logo
+    # Logo
     try:
         logo_path = os.path.join(lib_path, "WWPtools-logo.png")
         if os.path.isfile(logo_path):
@@ -259,212 +616,249 @@ def _show_dialog(function_data, actual_spots):
     except Exception:
         pass
 
-    # -- Slider <-> TextBox sync --
-
-    def _slider_to_text(slider, textbox, fmt):
-        def _changed(s, e):
+    # Slider <-> TextBox sync
+    def _sync_s(slider, textbox, fmt):
+        def _chg(s, e):
             textbox.Text = fmt.format(slider.Value)
-        slider.ValueChanged += _changed
+        slider.ValueChanged += _chg
 
-    def _text_to_slider(textbox, slider):
-        def _changed(s, e):
+    def _sync_t(textbox, slider):
+        def _chg(s, e):
             try:
-                val = float(textbox.Text.replace(",", "."))
-                if slider.Minimum <= val <= slider.Maximum:
-                    slider.Value = val
+                v = float(textbox.Text.replace(",", "."))
+                if slider.Minimum <= v <= slider.Maximum:
+                    slider.Value = v
             except Exception:
                 pass
-        textbox.TextChanged += _changed
+        textbox.TextChanged += _chg
 
-    _slider_to_text(stall_w_slider, stall_w_text, "{:.1f}")
-    _slider_to_text(stall_d_slider, stall_d_text, "{:.1f}")
-    _slider_to_text(aisle_slider, aisle_text, "{:.1f}")
-    _slider_to_text(ada_slider, ada_text, "{:.0f}")
-    _text_to_slider(stall_w_text, stall_w_slider)
-    _text_to_slider(stall_d_text, stall_d_slider)
-    _text_to_slider(aisle_text, aisle_slider)
-    _text_to_slider(ada_text, ada_slider)
+    _sync_s(stall_w_slider, stall_w_text, "{:.2f}")
+    _sync_s(stall_d_slider, stall_d_text, "{:.2f}")
+    _sync_s(aisle_slider,   aisle_text,   "{:.2f}")
+    _sync_s(skirt_slider,   skirt_text,   "{:.2f}")
+    _sync_t(stall_w_text, stall_w_slider)
+    _sync_t(stall_d_text, stall_d_slider)
+    _sync_t(aisle_text,   aisle_slider)
+    _sync_t(skirt_text,   skirt_slider)
 
-    # -- Recalculate logic --
+    for label_txt in ["0 - Inner spots only", "1 - Boundary spots + inner"]:
+        perimetral_combo.Items.Add(label_txt)
+    perimetral_combo.SelectedIndex = 0
 
-    def _recalculate():
-        # Commit any pending cell edit before reading values
-        try:
-            from System.Windows.Controls import DataGridEditingUnit
-            grid.CommitEdit(DataGridEditingUnit.Row, True)
-        except Exception:
+    # Colours used for dynamically-created row controls
+    sorted_families = sorted(families.keys())
+    c_gray   = SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80))
+    c_border = SolidColorBrush(Color.FromRgb(0xD7, 0xDE, 0xE6))
+    c_row_bg = SolidColorBrush(Color.FromRgb(0xFA, 0xFB, 0xFC))
+    c_white  = SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF))
+    c_btn_br = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
+
+    _rows = []
+
+    def _add_row():
+        brd = Border()
+        brd.BorderBrush = c_border
+        brd.BorderThickness = Thickness(1)
+        brd.Margin = Thickness(0, 0, 0, 6)
+        brd.Padding = Thickness(8, 6, 8, 6)
+        brd.Background = c_row_bg
+
+        g = Grid()
+        for w, star in [(1, True), (1, True), (64, False), (26, False)]:
+            cd = ColumnDefinition()
+            cd.Width = GridLength(1, GridUnitType.Star) if star else GridLength(w)
+            g.ColumnDefinitions.Add(cd)
+
+        # Family ComboBox
+        fc = ComboBox()
+        fc.Margin = Thickness(0, 0, 5, 0)
+        fc.Height = 26
+        fc.FontSize = 12
+        Grid.SetColumn(fc, 0)
+        for fn in sorted_families:
+            fc.Items.Add(fn)
+        if sorted_families:
+            fc.SelectedIndex = 0
+
+        # Type ComboBox
+        tc = ComboBox()
+        tc.Margin = Thickness(0, 0, 5, 0)
+        tc.Height = 26
+        tc.FontSize = 12
+        Grid.SetColumn(tc, 1)
+
+        # Count TextBox
+        cnt = TextBox()
+        cnt.Text = "0"
+        cnt.TextAlignment = TextAlignment.Right
+        cnt.Height = 26
+        cnt.FontSize = 12
+        cnt.Margin = Thickness(0, 0, 5, 0)
+        cnt.ToolTip = "Number of stalls (0 = fill all remaining positions)"
+        Grid.SetColumn(cnt, 2)
+
+        # Delete button
+        db = Button()
+        db.Content = "x"
+        db.Width = 24
+        db.Height = 24
+        db.FontSize = 11
+        db.Background = c_white
+        db.BorderBrush = c_btn_br
+        db.BorderThickness = Thickness(1)
+        db.Foreground = c_gray
+        db.VerticalAlignment = VerticalAlignment.Center
+        db.HorizontalAlignment = HorizontalAlignment.Center
+        Grid.SetColumn(db, 3)
+
+        for ctrl in [fc, tc, cnt, db]:
+            g.Children.Add(ctrl)
+        brd.Child = g
+        rows_panel.Children.Add(brd)
+
+        row_data = {"border": brd, "family_combo": fc,
+                    "type_combo": tc, "count_text": cnt}
+        _rows.append(row_data)
+
+        def _apply_dims(fn, tn):
+            """Auto-populate stall sliders from family type parameters."""
+            if not fn or not tn:
+                return
             try:
-                grid.CommitEdit()
+                w, d = _read_family_dims(doc, fn, tn)
+                if w is not None and stall_w_slider.Minimum <= w <= stall_w_slider.Maximum:
+                    stall_w_slider.Value = w
+                if d is not None and stall_d_slider.Minimum <= d <= stall_d_slider.Maximum:
+                    stall_d_slider.Value = d
             except Exception:
                 pass
 
-        stall_w = stall_w_slider.Value
-        stall_d = stall_d_slider.Value
-        aisle_w = aisle_slider.Value
-        ada_pct = ada_slider.Value
+        # Populate type combo when family changes; auto-read dims on type change
+        def _on_fam(s, e):
+            sel = str(fc.SelectedItem or "")
+            tc.Items.Clear()
+            for tn in families.get(sel, []):
+                tc.Items.Add(tn)
+            if tc.Items.Count > 0:
+                tc.SelectedIndex = 0
 
-        total_gfa = 0.0
-        total_demand = 0
+        def _on_type(s, e):
+            _apply_dims(str(fc.SelectedItem or ""), str(tc.SelectedItem or ""))
 
-        for row in table.Rows:
+        fc.SelectionChanged += _on_fam
+        tc.SelectionChanged += _on_type
+        _on_fam(None, None)
+
+        # Delete row
+        def _on_del(s, e):
+            if row_data in _rows:
+                _rows.remove(row_data)
             try:
-                gfa = float(str(row["GFA"]).replace(",", ""))
-                ratio_str = str(row["Ratio"]).strip()
-                ratio = float(ratio_str) if ratio_str else 50.0
-                if ratio <= 0:
-                    ratio = 50.0
-                demand = math.ceil(gfa / ratio)
-                row["Demand"] = str(demand)
-                total_gfa += gfa
-                total_demand += demand
+                rows_panel.Children.Remove(brd)
             except Exception:
-                continue
+                pass
+        db.Click += _on_del
 
-        ada_required = int(math.ceil(total_demand * ada_pct / 100.0))
-        diff = actual_spots - total_demand
+    add_row_btn.Click += lambda s, e: _add_row()
+    _add_row()  # One default row on open
 
-        total_gfa_text.Text = "{:,.0f}".format(total_gfa)
-        total_demand_text.Text = str(total_demand)
-        summary_demand.Text = str(total_demand)
-        summary_ada.Text = str(ada_required)
-        summary_actual.Text = str(actual_spots)
-
-        diff_str = "+{}".format(diff) if diff >= 0 else str(diff)
-        summary_diff.Text = diff_str
-
-        if diff >= 0:
-            summary_diff.Foreground = SolidColorBrush(Color.FromRgb(34, 197, 94))
+    # --- Status helper ---
+    def _set_status(msg, ok=True):
+        status_text.Text = msg
+        if ok:
+            status_text.Foreground = c_gray
         else:
-            summary_diff.Foreground = SolidColorBrush(Color.FromRgb(220, 50, 50))
+            status_text.Foreground = SolidColorBrush(Color.FromRgb(220, 50, 50))
 
-        # Update supply bar - need pixel width relative to container
+    # --- Generate ---
+    def _on_generate(s, e):
+        if not _rows:
+            _set_status("Add at least one family row.", ok=False)
+            return
+
         try:
-            pct = min(100.0, actual_spots / float(total_demand) * 100.0) if total_demand > 0 else 100.0
-        except ZeroDivisionError:
-            pct = 100.0
-        bar_label.Text = "{:.0f}% supplied".format(pct)
-
-        # Resize the bar fill relative to container width
+            sw = float(stall_w_text.Text.replace(",", "."))
+            sd = float(stall_d_text.Text.replace(",", "."))
+            aw = float(aisle_text.Text.replace(",", "."))
+            sk = float(skirt_text.Text.replace(",", "."))
+        except ValueError:
+            _set_status("Invalid layout parameter.", ok=False)
+            return
         try:
-            container_width = bar_fill.Parent.ActualWidth
-            bar_fill.Width = max(0.0, container_width * pct / 100.0)
-        except Exception:
-            pass
+            rot_off = float(rotation_text.Text.replace(",", "."))
+        except (ValueError, Exception):
+            rot_off = 0.0
+        try:
+            max_run_val = int(max_run_text.Text.strip())
+        except (ValueError, Exception):
+            max_run_val = 0
 
-        # Stall area calculations
-        # Net footprint = width x depth
-        net_area = stall_w * stall_d
-        # Gross area per space = width x (depth + half aisle)
-        gross_area = stall_w * (stall_d + aisle_w / 2.0)
-        net_stall_area.Text = "{:.1f} m2".format(net_area)
-        gross_stall_area.Text = "{:.1f} m2".format(gross_area)
+        perim = perimetral_combo.SelectedIndex if perimetral_combo.SelectedIndex >= 0 else 0
 
-    def _on_recalc(sender, e):
-        _recalculate()
+        params = {
+            "stall_w": sw, "stall_d": sd, "aisle_w": aw,
+            "skirt": sk, "perimetral": perim,
+            "rotation_offset": rot_off,
+            "max_run": max_run_val,
+        }
 
-    def _on_export(sender, e):
-        _do_export()
+        _set_status("Calculating positions...", ok=True)
+        window.UpdateLayout()
 
-    def _on_ok(sender, e):
-        window.DialogResult = True
-        window.Close()
+        positions = _generate_all_positions(room, params)
+        if not positions:
+            _set_status("No valid positions found inside room boundary.", ok=False)
+            stall_count_text.Text = ""
+            return
 
-    recalc_btn.Click += _on_recalc
-    export_btn.Click += _on_export
-    ok_btn.Click += _on_ok
+        stall_count_text.Text = "{} positions".format(len(positions))
 
-    # -- Export report --
-
-    def _do_export():
-        ui = _load_uiutils()
-        stall_w = stall_w_slider.Value
-        stall_d = stall_d_slider.Value
-        aisle_w = aisle_slider.Value
-        ada_pct = ada_slider.Value
-        gross_area = stall_w * (stall_d + aisle_w / 2.0)
-
-        col_widths = (32, 10, 11, 8)
-        header = (
-            "{:<{w0}} {:>{w1}} {:>{w2}} {:>{w3}}".format(
-                "Building Function", "GFA (m2)", "m2/Space", "Demand",
-                w0=col_widths[0], w1=col_widths[1], w2=col_widths[2], w3=col_widths[3],
-            )
-        )
-        separator = "-" * (sum(col_widths) + 3)
-        rows_text = []
-        total_gfa = 0.0
-        total_demand = 0
-        for row in table.Rows:
-            func = str(row["Function"])
-            gfa_str = str(row["GFA"])
-            ratio_str = str(row["Ratio"])
-            demand_str = str(row["Demand"])
-            rows_text.append(
-                "{:<{w0}} {:>{w1}} {:>{w2}} {:>{w3}}".format(
-                    func, gfa_str, ratio_str, demand_str,
-                    w0=col_widths[0], w1=col_widths[1], w2=col_widths[2], w3=col_widths[3],
-                )
-            )
+        # Build rows_data
+        rows_data = []
+        for row in _rows:
+            fn = str(row["family_combo"].SelectedItem or "")
+            tn = str(row["type_combo"].SelectedItem or "")
             try:
-                total_gfa += float(gfa_str.replace(",", ""))
-                total_demand += int(demand_str)
-            except Exception:
-                pass
+                cnt = int(row["count_text"].Text.strip())
+            except (ValueError, Exception):
+                cnt = 0
+            if not fn or not tn:
+                continue
+            sym = _get_symbol(doc, fn, tn)
+            if sym is None:
+                _set_status("Family not found: {} - {}".format(fn, tn), ok=False)
+                return
+            rows_data.append({"symbol": sym, "count": cnt})
 
-        total_row = (
-            "{:<{w0}} {:>{w1}} {:>{w2}} {:>{w3}}".format(
-                "TOTAL",
-                "{:,.0f}".format(total_gfa),
-                "",
-                str(total_demand),
-                w0=col_widths[0], w1=col_widths[1], w2=col_widths[2], w3=col_widths[3],
-            )
-        )
+        if not rows_data:
+            _set_status("No valid family rows configured.", ok=False)
+            return
 
-        diff = actual_spots - total_demand
-        diff_str = "+{}".format(diff) if diff >= 0 else str(diff)
-        ada_required = int(math.ceil(total_demand * ada_pct / 100.0))
+        _set_status("Placing {} stalls...".format(len(positions)), ok=True)
+        window.UpdateLayout()
 
-        lines = [
-            "Parking Demand Calculator",
-            "=" * 65,
-            "",
-            header,
-            separator,
-        ] + rows_text + [
-            separator,
-            total_row,
-            "",
-            "=" * 65,
-            "Summary",
-            "=" * 65,
-            "  Parking demand:        {:>6}".format(total_demand),
-            "  ADA required ({:.0f}%):    {:>6}".format(ada_pct, ada_required),
-            "  Actual spaces (model): {:>6}".format(actual_spots),
-            "  Surplus / Deficit:     {:>6}".format(diff_str),
-            "",
-            "Parking Layout Standards",
-            "-" * 40,
-            "  Stall width:           {:.2f} m".format(stall_w),
-            "  Stall depth:           {:.2f} m".format(stall_d),
-            "  Drive aisle width:     {:.2f} m".format(aisle_w),
-            "  Gross area per space:  {:.1f} m2 (incl. half aisle)".format(gross_area),
-        ]
+        placed, err = _place_families(doc, positions, rows_data, room)
 
-        ui.uiUtils_show_text_report(
-            "Parking Demand Calculator - Report",
-            "\n".join(lines),
-            ok_text="Close",
-            cancel_text=None,
-            width=700,
-            height=520,
-        )
+        if err and placed == 0:
+            _set_status("Error: {}".format(err[:160]), ok=False)
+        else:
+            msg = "{} stalls placed.".format(placed)
+            if err:
+                msg += " (partial errors)"
+            _set_status(msg, ok=True)
+            stall_count_text.Text = "{} placed".format(placed)
 
-    # Initial calculation on open
-    _recalculate()
+    # --- Clear ---
+    def _on_clear(s, e):
+        deleted = _clear_stalls_in_room(doc, room)
+        _set_status("Cleared {} stalls from room.".format(deleted), ok=True)
+        stall_count_text.Text = ""
+
+    generate_btn.Click += _on_generate
+    clear_btn.Click    += _on_clear
+    close_btn.Click    += lambda s, e: window.Close()
 
     window.ShowDialog()
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -472,25 +866,26 @@ def _show_dialog(function_data, actual_spots):
 # ---------------------------------------------------------------------------
 
 def main():
-    ui = _load_uiutils()
-    doc = revit.doc
+    doc   = revit.doc
+    uidoc = revit.uidoc
     if doc is None:
-        ui.uiUtils_alert("No active document.", title="Parking Demand Calculator")
+        forms.alert("No active document.", title="Parking Layout Solver")
         return
 
-    rooms = _get_all_rooms(doc)
-    if not rooms:
-        ui.uiUtils_alert(
-            "No rooms found in this model.\n\n"
-            "Add rooms and set their Department parameter to use this tool.",
-            title="Parking Demand Calculator",
+    families = _collect_all_families(doc)
+    if not families:
+        forms.alert(
+            "No loadable families found in this project.\n\n"
+            "Load at least one family before running this tool.",
+            title="Parking Layout Solver",
         )
         return
 
-    function_data = _build_function_data(rooms)
-    actual_spots = _get_actual_parking_count(doc)
+    room = _pick_room(doc, uidoc)
+    if room is None:
+        return
 
-    _show_dialog(function_data, actual_spots)
+    _show_dialog(doc, room, families)
 
 
 if __name__ == "__main__":
@@ -499,7 +894,6 @@ if __name__ == "__main__":
     except Exception:
         try:
             import WWP_uiUtils as ui
-            ui.uiUtils_alert(traceback.format_exc(), title="Parking Demand Calculator")
+            ui.uiUtils_alert(traceback.format_exc(), title="Parking Layout Solver")
         except Exception:
-            from pyrevit import forms
-            forms.alert(traceback.format_exc(), title="Parking Demand Calculator")
+            forms.alert(traceback.format_exc(), title="Parking Layout Solver")

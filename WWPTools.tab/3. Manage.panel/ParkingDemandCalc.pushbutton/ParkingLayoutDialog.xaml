@@ -1,0 +1,416 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Parking Layout Solver"
+        Width="540"
+        Height="730"
+        MinWidth="460"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        FontFamily="Segoe UI"
+        FontSize="13"
+        Background="#F3F5F7">
+    <Window.Resources>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3F9AD9"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#3F9AD9"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2E87C5"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#2E87C5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#374151"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+        </Style>
+
+        <Style x:Key="GreenButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#16A34A"/>
+            <Setter Property="BorderBrush" Value="#16A34A"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#15803D"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#15803D"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#9CA3AF"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="ParamLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Background" Value="#EDF0F3"/>
+            <Setter Property="Margin" Value="0,8,0,10"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Parking Layout Solver"
+                       FontSize="17" FontWeight="SemiBold" Foreground="#17324D"/>
+            <TextBlock Text="Pick a Room boundary, configure spot types and layout, then Generate."
+                       FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- ROOM INFO CARD -->
+        <Border Grid.Row="1"
+                Background="#FFFFFF"
+                BorderBrush="#D7DEE6"
+                BorderThickness="1"
+                Margin="0,0,0,10"
+                Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="BOUNDARY ROOM"
+                               Style="{StaticResource SectionLabel}"
+                               Margin="0,0,0,3"/>
+                    <TextBlock x:Name="RoomNameText"
+                               Text="-"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#17324D"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <TextBlock Text="GROSS AREA"
+                               Style="{StaticResource SectionLabel}"
+                               HorizontalAlignment="Right" Margin="0,0,0,3"/>
+                    <TextBlock x:Name="RoomAreaText"
+                               Text="-"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#17324D"
+                               HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- SCROLLABLE CONTENT -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- SPOT TYPES CARD -->
+                <Border Background="#FFFFFF"
+                        BorderBrush="#D7DEE6"
+                        BorderThickness="1"
+                        Margin="0,0,0,10"
+                        Padding="12,10">
+                    <StackPanel>
+
+                        <!-- Header row with Add button -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="PARKING SPOT TYPES"
+                                       Style="{StaticResource SectionLabel}"
+                                       VerticalAlignment="Center"/>
+                            <Button x:Name="AddRowButton"
+                                    Grid.Column="1"
+                                    Content="+ Add Row"
+                                    Height="22" FontSize="11"
+                                    Padding="8,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                        </Grid>
+
+                        <!-- Column labels -->
+                        <Grid Margin="8,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="64"/>
+                                <ColumnDefinition Width="26"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Family"
+                                       Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Grid.Column="1" Text="Type"
+                                       Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Grid.Column="2" Text="Count"
+                                       Style="{StaticResource SectionLabel}"
+                                       HorizontalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Dynamic rows - populated by Python -->
+                        <StackPanel x:Name="RowsPanel"/>
+
+                        <TextBlock Text="Count 0 = fill all remaining available positions."
+                                   FontSize="10" Foreground="#9CA3AF" Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- DIMENSIONS CARD -->
+                <Border Background="#FFFFFF"
+                        BorderBrush="#D7DEE6"
+                        BorderThickness="1"
+                        Margin="0,0,0,10"
+                        Padding="12,10">
+                    <StackPanel>
+
+                        <TextBlock Text="SPOT DIMENSIONS"
+                                   Style="{StaticResource SectionLabel}"
+                                   Margin="0,0,0,10"/>
+
+                        <!-- Stall width -->
+                        <TextBlock Text="Stall width" Style="{StaticResource ParamLabel}"/>
+                        <Grid Margin="0,0,0,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="StallWidthSlider" Grid.Column="0"
+                                    Minimum="2.2" Maximum="3.5" Value="2.5"
+                                    SmallChange="0.05" LargeChange="0.25"
+                                    VerticalAlignment="Center"/>
+                            <TextBox x:Name="StallWidthText" Grid.Column="1"
+                                     Text="2.50" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="m"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <!-- Stall depth -->
+                        <TextBlock Text="Stall depth (length)" Style="{StaticResource ParamLabel}"/>
+                        <Grid Margin="0,0,0,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="StallDepthSlider" Grid.Column="0"
+                                    Minimum="4.5" Maximum="6.5" Value="5.0"
+                                    SmallChange="0.05" LargeChange="0.25"
+                                    VerticalAlignment="Center"/>
+                            <TextBox x:Name="StallDepthText" Grid.Column="1"
+                                     Text="5.00" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="m"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <!-- Road / aisle width -->
+                        <TextBlock Text="Road width (drive aisle)" Style="{StaticResource ParamLabel}"/>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="AisleWidthSlider" Grid.Column="0"
+                                    Minimum="5.0" Maximum="9.0" Value="6.5"
+                                    SmallChange="0.1" LargeChange="0.5"
+                                    VerticalAlignment="Center"/>
+                            <TextBox x:Name="AisleWidthText" Grid.Column="1"
+                                     Text="6.50" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="m"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <Separator/>
+                        <TextBlock Text="PLOT SETTINGS"
+                                   Style="{StaticResource SectionLabel}"
+                                   Margin="0,0,0,10"/>
+
+                        <!-- Skirt -->
+                        <TextBlock Text="Skirt - inner boundary tolerance" Style="{StaticResource ParamLabel}"/>
+                        <Grid Margin="0,0,0,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="SkirtSlider" Grid.Column="0"
+                                    Minimum="0.0" Maximum="2.0" Value="0.5"
+                                    SmallChange="0.05" LargeChange="0.25"
+                                    VerticalAlignment="Center"/>
+                            <TextBox x:Name="SkirtText" Grid.Column="1"
+                                     Text="0.50" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="m"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <!-- Perimetral mode -->
+                        <TextBlock Text="Perimetral spots" Style="{StaticResource ParamLabel}"/>
+                        <ComboBox x:Name="PerimetralCombo" Margin="0,0,0,9"/>
+
+                        <!-- Rotation offset -->
+                        <TextBlock Text="Rotation offset" Style="{StaticResource ParamLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Adjust if stalls face the wrong direction after generate."
+                                       FontSize="11" Foreground="#9CA3AF"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBox x:Name="RotationText" Grid.Column="1"
+                                     Text="0" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="°"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <!-- Max run -->
+                        <TextBlock Text="Max run stall count" Style="{StaticResource ParamLabel}" Margin="0,8,0,3"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Max stalls before a mid-row gap. 0 = no limit."
+                                       FontSize="11" Foreground="#9CA3AF"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBox x:Name="MaxRunText" Grid.Column="1"
+                                     Text="0" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="#"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- FOOTER -->
+        <Grid Grid.Row="3" Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Status row -->
+            <Grid Grid.Row="0" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText"
+                           Grid.Column="0"
+                           Text="Ready. Configure settings and click Generate."
+                           FontSize="11" Foreground="#9CA3AF"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <TextBlock x:Name="StallCountText"
+                           Grid.Column="1"
+                           Text=""
+                           FontSize="12" FontWeight="SemiBold"
+                           Foreground="#16A34A"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0"/>
+            </Grid>
+
+            <!-- Button row -->
+            <DockPanel Grid.Row="1">
+                <Image x:Name="LogoImage"
+                       DockPanel.Dock="Left"
+                       Width="36" Height="36"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False"
+                       Margin="0,0,10,0"/>
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button x:Name="ClearButton"
+                            Content="Clear Stalls"
+                            Width="100" Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button x:Name="GenerateButton"
+                            Content="Generate"
+                            Width="110" Margin="0,0,6,0"
+                            Style="{StaticResource GreenButtonStyle}"/>
+                    <Button x:Name="CloseButton"
+                            Content="Close"
+                            Width="80"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+
+    </Grid>
+</Window>

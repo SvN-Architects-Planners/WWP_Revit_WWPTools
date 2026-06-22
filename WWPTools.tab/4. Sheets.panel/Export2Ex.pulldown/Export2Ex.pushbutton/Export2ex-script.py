@@ -2115,9 +2115,9 @@ def main():
                         sdata["csv_folder"] = new_path
                         paths_changed = True
             if paths_changed:
-                proj_data_back = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param_name))
+                proj_data_back = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
                 proj_data_back["sets"] = saved_sets
-                write_saved_sets(doc, proj_data_back, saved_sets_param_name)
+                write_saved_sets(doc, proj_data_back, saved_sets_param)
 
             msg = "{} of {} set(s) exported successfully.".format(success_count, len(batch_set_names))
             if warnings:
