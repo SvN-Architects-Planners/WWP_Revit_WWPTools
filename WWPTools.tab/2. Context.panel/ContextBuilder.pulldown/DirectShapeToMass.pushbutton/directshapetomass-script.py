@@ -757,7 +757,7 @@ def _add_material_instance_param(family_doc, freeform_elements):
 
 def _convert_element_to_directshape(doc, element, solids, output_option, seen_family_names=None):
     # Caller is responsible for the active transaction.
-    _log_debug("Converting source element id={} app_id='{}' app_data='{}' solids={} → DirectShape".format(
+    _log_debug("Converting source element id={} app_id='{}' app_data='{}' solids={} -> DirectShape".format(
         _elem_id_int(element.Id),
         (getattr(element, "ApplicationId", None) or ""),
         (getattr(element, "ApplicationDataId", None) or ""),

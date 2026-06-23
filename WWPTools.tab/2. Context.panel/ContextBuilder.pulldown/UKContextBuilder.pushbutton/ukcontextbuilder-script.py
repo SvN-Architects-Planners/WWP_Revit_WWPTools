@@ -1,4 +1,4 @@
-﻿import clr
+import clr
 clr.AddReference('System')
 clr.AddReference('System.Xml')
 clr.AddReference('PresentationFramework')

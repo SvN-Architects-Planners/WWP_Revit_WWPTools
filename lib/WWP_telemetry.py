@@ -135,13 +135,13 @@ def _wwptools_version():
 def _format_details_md(script_name, event_type, success, user_name, machine_name,
                         revit_ver, pyrevit_ver, wwptools_ver, document_name,
                         duration_ms, error_msg):
-    status = u"✅ Success" if success else u"❌ Failed"
+    status = u"[OK] Success" if success else u"[FAILED] Failed"
     lines = [
         u"**Script:** {}".format(script_name or ""),
         u"**Event:** {}".format(event_type or "tool_use"),
         u"**Status:** {}".format(status),
         u"**User:** {} @ {}".format(user_name or "", machine_name or ""),
-        u"**Revit:** {} · **pyRevit:** {} · **WWPTools:** {}".format(
+        u"**Revit:** {} - **pyRevit:** {} - **WWPTools:** {}".format(
             revit_ver or "", pyrevit_ver or "", wwptools_ver or ""),
         u"**Document:** {}".format(document_name or ""),
         u"**Duration:** {} ms".format(int(duration_ms or 0)),

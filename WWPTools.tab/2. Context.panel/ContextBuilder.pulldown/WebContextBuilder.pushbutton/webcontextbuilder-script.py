@@ -1,4 +1,4 @@
-﻿import clr
+import clr
 clr.AddReference('System')
 clr.AddReference('System.Xml')
 clr.AddReference('PresentationFramework')
@@ -728,7 +728,7 @@ def _show_dialog(doc):
     if use_revit_location_button is not None:
         if initial_site_location is not None:
             lat, lon = initial_site_location
-            use_revit_location_button.Content = "Use Revit Geo-Reference  ({:.6f}°, {:.6f}°)".format(lat, lon)
+            use_revit_location_button.Content = "Use Revit Geo-Reference  ({:.6f}deg, {:.6f}deg)".format(lat, lon)
             use_revit_location_button.Visibility = Visibility.Visible
         else:
             use_revit_location_button.Visibility = Visibility.Collapsed
@@ -846,7 +846,7 @@ def _show_dialog(doc):
             _set_validation("No geo-reference location found in this Revit file.")
             return
         lat, lon = initial_site_location
-        label = "Revit geo-reference ({:.6f}°, {:.6f}°)".format(lat, lon)
+        label = "Revit geo-reference ({:.6f}deg, {:.6f}deg)".format(lat, lon)
         _set_map_location(lat, lon, label, zoom=15, update_address=False)
         _set_validation("")
 
