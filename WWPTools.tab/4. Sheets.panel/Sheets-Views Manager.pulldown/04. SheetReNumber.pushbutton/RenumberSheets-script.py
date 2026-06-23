@@ -1,5 +1,6 @@
 import importlib
 import os
+import re
 import sys
 import traceback
 
@@ -37,6 +38,23 @@ def build_new_numbers(starting_str, count, reference_list):
 	width = len(numeric)
 	return [
 		"{}{}".format(prefix, str(i).zfill(width))
+		for i in range(starting_number, starting_number + count)
+	]
+
+
+def parse_iso19650_pattern(pattern):
+	"""Parse '515T[200]D1' → ('515T', '200', 'D1'). Returns None if no [nnn] found."""
+	m = re.match(r'^(.*)\[(\d+)\](.*)$', pattern.strip())
+	if not m:
+		return None
+	return m.group(1), m.group(2), m.group(3)
+
+
+def build_new_numbers_iso19650(prefix, starting_str, suffix, count):
+	width = len(starting_str)
+	starting_number = int(starting_str)
+	return [
+		"{}{}{}".format(prefix, str(i).zfill(width), suffix)
 		for i in range(starting_number, starting_number + count)
 	]
 
@@ -86,19 +104,32 @@ def main():
 
 	if not selected_indices:
 		return
+
+	iso19650_mode = combined_inputs.get("iso19650_mode", False)
+
 	if not starting_number.strip():
 		ui.uiUtils_alert("Starting Number is required.", title="Renumber Sheets")
-		return
-
-	_, _numeric_part = split_prefix_numeric(starting_number.strip())
-	if not _numeric_part:
-		ui.uiUtils_alert("Starting Sheet Number must contain a number (e.g. A100 or 100).", title="Renumber Sheets")
 		return
 
 	selected_sheets = [sorted_sheets[i] for i in selected_indices]
 	sorted_keys = [s.SheetNumber or "" for s in selected_sheets]
 
-	new_numbers = build_new_numbers(starting_number, len(selected_sheets), sorted_keys)
+	if iso19650_mode:
+		parsed = parse_iso19650_pattern(starting_number)
+		if not parsed:
+			ui.uiUtils_alert(
+				"Pattern must contain a bracketed segment, e.g. 515T[200]D1",
+				title="Renumber Sheets",
+			)
+			return
+		prefix, numeric_start, suffix = parsed
+		new_numbers = build_new_numbers_iso19650(prefix, numeric_start, suffix, len(selected_sheets))
+	else:
+		_, _numeric_part = split_prefix_numeric(starting_number.strip())
+		if not _numeric_part:
+			ui.uiUtils_alert("Starting Sheet Number must contain a number (e.g. A100 or 100).", title="Renumber Sheets")
+			return
+		new_numbers = build_new_numbers(starting_number, len(selected_sheets), sorted_keys)
 
 	transaction = DB.Transaction(doc, "Renumber Sheets")
 	transaction.Start()
