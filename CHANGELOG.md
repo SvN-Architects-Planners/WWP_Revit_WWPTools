@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-06-23
 
+### Fixed
+
+- Super Renamer: replaced non-ASCII em dash characters in two UI strings that caused IronPython encoding errors.
+
+### Changed
+
+- Family Swapper: now works with all loadable family categories, not just Titleblocks. The family dropdowns are populated from every `FamilySymbol` in the document, and auto-detection from selection works for any `FamilyInstance`.
+
 ### Added
 - Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets — e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` → `515T211D1`.
 

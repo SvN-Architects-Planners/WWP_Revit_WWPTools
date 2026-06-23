@@ -496,7 +496,7 @@ def _populate_param_list(lst, all_params, families):
 
     multi_family = len(families) > 1
     if multi_family:
-        _add_header("All Families  —  {} parameters".format(len(all_params)))
+        _add_header("All Families - {} parameters".format(len(all_params)))
     for name in all_params:
         _add_param(name)
 
@@ -941,7 +941,7 @@ def show_dialog(script_dir, lib_path, mode):
             txt_find.Text, txt_prefix.Text, txt_suffix.Text
         ]):
             ui.uiUtils_alert(
-                "Provide at least a Find text, Prefix, or Suffix — or switch to Overwrite mode.",
+                "Provide at least a Find text, Prefix, or Suffix - or switch to Overwrite mode.",
                 title=config["title"],
             )
             return

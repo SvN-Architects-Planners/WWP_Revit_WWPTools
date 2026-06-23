@@ -109,8 +109,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def _load_families(self):
         all_tb_types = (DB.FilteredElementCollector(doc)
-                        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsElementType()
+                        .OfClass(DB.FamilySymbol)
                         .ToElements())
         fam_types = {}
         fam_cats  = {}
@@ -143,10 +142,9 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def _detect_source_family(self):
         try:
-            tb_cat_id = DB.ElementId(DB.BuiltInCategory.OST_TitleBlocks)
             for eid in revit.uidoc.Selection.GetElementIds():
                 elem = doc.GetElement(eid)
-                if elem and elem.Category and elem.Category.Id == tb_cat_id:
+                if isinstance(elem, DB.FamilyInstance):
                     ftype = doc.GetElement(elem.GetTypeId())
                     if ftype and ftype.Family:
                         return ftype.Family.Name
@@ -443,10 +441,8 @@ class FamilySwapperWindow(forms.WPFWindow):
         t = DB.Transaction(doc, 'Family Swapper')
         t.Start()
         for tb in batch:
-            sheet = None
             try:
                 old_type_id = _id_val(tb.GetTypeId())
-                sheet = doc.GetElement(tb.OwnerViewId)
                 old_vals = {}
                 for p in tb.Parameters:
                     if _is_swappable(p):
@@ -496,14 +492,13 @@ class FamilySwapperWindow(forms.WPFWindow):
                         new_p.Set(val)
                 ok += 1
             except Exception as ex:
-                sn = sheet.SheetNumber if sheet else '?'
-                errors.append('Sheet {} : {}'.format(sn, str(ex)[:100]))
+                errors.append('Element {} : {}'.format(_id_val(tb.Id), str(ex)[:100]))
         t.Commit()
 
         self._log('\nResult : {}/{} succeeded'.format(ok, len(batch)))
         left = len(remaining) - ok
         if left > 0:
-            self._log('{} sheet(s) still pending - run again.'.format(left))
+            self._log('{} instance(s) still pending - run again.'.format(left))
         else:
             self._log('All done!')
         if type_param_skipped:
