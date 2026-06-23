@@ -43,7 +43,7 @@ def build_new_numbers(starting_str, count, reference_list):
 
 
 def parse_iso19650_pattern(pattern):
-	"""Parse '515T[200]D1' → ('515T', '200', 'D1'). Returns None if no [nnn] found."""
+	"""Parse '515T[200]D1' -> ('515T', '200', 'D1'). Returns None if no [nnn] found."""
 	m = re.match(r'^(.*)\[(\d+)\](.*)$', pattern.strip())
 	if not m:
 		return None
@@ -131,17 +131,12 @@ def main():
 			return
 		new_numbers = build_new_numbers(starting_number, len(selected_sheets), sorted_keys)
 
-	transaction = DB.Transaction(doc, "Renumber Sheets")
-	transaction.Start()
-	try:
+	with revit.Transaction("Renumber Sheets"):
 		for sheet in selected_sheets:
 			temp_value = "t{}".format(sheet.SheetNumber or "")
 			sheet.SheetNumber = temp_value
 		for sheet, new_value in zip(selected_sheets, new_numbers):
 			sheet.SheetNumber = new_value
-	finally:
-		if transaction.HasStarted():
-			transaction.Commit()
 
 
 if __name__ == "__main__":
