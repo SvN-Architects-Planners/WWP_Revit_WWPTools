@@ -5,6 +5,14 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-22
+
+### Changed
+- Parking Count in Room: now also collects areas (OST_Areas) from the active view, so the tool works in area plan views as well as floor plan views. The dialog list and result report use "rooms/areas" terminology.
+- Parking Count in Room: target parameter dropdown is now restricted to text (string) parameters only.
+- Parking Count in Room: added a **Parking families to include** multi-select list (pre-populated from the view). A text box and **+ Add** button let users include families not currently visible. Only selected families contribute to the count.
+- Parking Count in Room: replaced the always-on type-source combo with an **Include parking type breakdowns** checkbox. When unchecked, the tool writes just the total count. When checked, a Type parameter combo appears and the written value becomes a multi-line breakdown ("TypeA: 3\nTypeB: 2\n\nTotal: 5").
+
 ## [2.0.1] - 2026-06-18
 
 ### Changed
@@ -12,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to Excel/CSV: if `! P_STATS_Export_Text` is absent from Project Information, the tool now prompts the user to select any existing writable text parameter as the saved-sets store instead. The chosen parameter is remembered per project. Previously, the tool silently returned empty sets on read and attempted to auto-create the parameter on write.
 - Export2Ex Beta: moved the Delete button from the bottom toolbar into each row, next to the Edit button. Each set can now be deleted directly without checking a checkbox first.
 - Export2Ex Beta: added **Query Fields** button next to Browse. Reads column headers from an existing exported Excel file and auto-populates Selected Properties to match. Any header that has no matching Revit parameter is reported by name.
-- Export to Excel (by schedule): Batch Export dialog redesigned to match the by-category interface — rows now show Set Name, Sheet Name, File Path with inline **Edit** and **Delete** buttons. Added **Add Set** to the footer. Delete removes the set immediately and persists to the project. Edit reloads the set into the main form for modification.
+- Export to Excel (by schedule): completely redesigned as a single **Batch Export** primary interface. Each row shows an editable Set Name, a **Schedule** dropdown with live contains-filtering (type any substring to narrow), a read-only **Sheet Name** preview, and File Path. Inline **Export** and **Delete** per row replace the old Edit button. Footer: **Settings** (export mode, header toggles, CSV options, use-category-as-sheet-name defaults to on), **Add Set**, **Save** (persists all row edits to Project Information), **Export Selected**, **Cancel**. The separate configuration dialog is no longer shown on tool launch.
 
 ### Added
 - Update WWPTools: converted the updater into a pulldown with three commands: **Update WWPTools**, **Generate Updater Manually**, and **Force Updater**.

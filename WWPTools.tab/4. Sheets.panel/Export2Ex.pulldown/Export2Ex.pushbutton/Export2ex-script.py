@@ -622,59 +622,180 @@ def load_uiutils():
     return ui
 
 
+def _to_net_str_list(values):
+    lst = List[String]()
+    for v in values:
+        lst.Add(str(v))
+    return lst
+
+
+def _show_export_settings_popup(current_settings, ui):
+    """Settings popup for export options. Returns updated dict or None if cancelled."""
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.Windows import (Window, WindowStartupLocation, Thickness, ResizeMode,
+                                 SizeToContent, HorizontalAlignment, FontWeights)
+    from System.Windows.Controls import (StackPanel, Button, CheckBox, RadioButton,
+                                          TextBlock, ComboBox, Separator, Orientation)
+
+    s = dict(current_settings)
+    _ok = [False]
+
+    win = Window()
+    win.Title = "Export Settings"
+    win.Width = 420
+    win.SizeToContent = SizeToContent.Height
+    win.ResizeMode = ResizeMode.NoResize
+    win.WindowStartupLocation = WindowStartupLocation.CenterScreen
+
+    outer = StackPanel()
+    outer.Margin = Thickness(20)
+    win.Content = outer
+
+    def _section(text):
+        tb = TextBlock()
+        tb.Text = text
+        tb.FontWeight = FontWeights.SemiBold
+        tb.Margin = Thickness(0, 0, 0, 8)
+        outer.Children.Add(tb)
+
+    def _chk(label, key, default=False):
+        cb = CheckBox()
+        cb.Content = label
+        cb.IsChecked = bool(s.get(key, default))
+        cb.Margin = Thickness(0, 0, 0, 6)
+        outer.Children.Add(cb)
+        return cb
+
+    _section("Export mode")
+    mode_row = StackPanel()
+    mode_row.Orientation = Orientation.Horizontal
+    mode_row.Margin = Thickness(0, 0, 0, 14)
+    excel_radio = RadioButton()
+    excel_radio.Content = "Excel"
+    excel_radio.GroupName = "ExportMode"
+    excel_radio.Margin = Thickness(0, 0, 16, 0)
+    csv_radio = RadioButton()
+    csv_radio.Content = "CSV"
+    csv_radio.GroupName = "ExportMode"
+    if s.get("export_mode", 0) == 1:
+        csv_radio.IsChecked = True
+    else:
+        excel_radio.IsChecked = True
+    mode_row.Children.Add(excel_radio)
+    mode_row.Children.Add(csv_radio)
+    outer.Children.Add(mode_row)
+
+    _section("Schedule appearance")
+    chk_title    = _chk("Export title",                               "export_title",                False)
+    chk_col_hdr  = _chk("Export column headers",                      "export_column_headers",       True)
+    chk_grpd_col = _chk("Include grouped column headers",             "export_grouped_column_headers", False)
+    chk_grp_hdr  = _chk("Export group headers, footers, and blank lines", "export_group_headers",    False)
+    chk_use_cat  = _chk("Use category as sheet name",                 "use_category_sheet_name",     True)
+
+    sep = Separator()
+    sep.Margin = Thickness(0, 8, 0, 8)
+    outer.Children.Add(sep)
+
+    _section("CSV options")
+    delim_lbl = TextBlock()
+    delim_lbl.Text = "Delimiter"
+    delim_lbl.Margin = Thickness(0, 0, 0, 4)
+    outer.Children.Add(delim_lbl)
+    delimiter_map = {"Comma (,)": ",", "Semicolon (;)": ";", "Tab (\\t)": "\t"}
+    delim_combo = ComboBox()
+    delim_combo.ItemsSource = _to_net_str_list(list(delimiter_map.keys()))
+    delim_combo.Margin = Thickness(0, 0, 0, 10)
+    cur_delim = s.get("csv_delim", ",")
+    for lbl, val in delimiter_map.items():
+        if val == cur_delim:
+            delim_combo.SelectedItem = lbl
+            break
+    outer.Children.Add(delim_combo)
+    chk_quote = _chk("Quote all fields", "csv_mode_quote", bool(s.get("csv_mode", 0) == 1))
+
+    sep2 = Separator()
+    sep2.Margin = Thickness(0, 8, 0, 12)
+    outer.Children.Add(sep2)
+
+    btn_row = StackPanel()
+    btn_row.Orientation = Orientation.Horizontal
+    btn_row.HorizontalAlignment = HorizontalAlignment.Right
+    apply_btn = Button()
+    apply_btn.Content = "Apply"
+    apply_btn.MinWidth = 80
+    apply_btn.Margin = Thickness(0, 0, 8, 0)
+    cancel_btn = Button()
+    cancel_btn.Content = "Cancel"
+    cancel_btn.MinWidth = 80
+    btn_row.Children.Add(apply_btn)
+    btn_row.Children.Add(cancel_btn)
+    outer.Children.Add(btn_row)
+
+    def _apply(sv, e):
+        _ok[0] = True
+        win.Close()
+
+    def _cancel(sv, e):
+        win.Close()
+
+    apply_btn.Click += _apply
+    cancel_btn.Click += _cancel
+    win.ShowDialog()
+
+    if not _ok[0]:
+        return None
+
+    s["export_mode"]                  = 1 if csv_radio.IsChecked else 0
+    s["export_title"]                 = bool(chk_title.IsChecked)
+    s["export_column_headers"]        = bool(chk_col_hdr.IsChecked)
+    s["export_grouped_column_headers"]= bool(chk_grpd_col.IsChecked)
+    s["export_group_headers"]         = bool(chk_grp_hdr.IsChecked)
+    s["use_category_sheet_name"]      = bool(chk_use_cat.IsChecked)
+    s["csv_mode"]                     = 1 if chk_quote.IsChecked else 0
+    s["csv_delim"]                    = delimiter_map.get(str(delim_combo.SelectedItem or ""), ",")
+    return s
+
+
 def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
-                       edit_callback=None, add_callback=None):
-    """Batch export dialog: checkbox | set name | sheet name | file path | ... | Edit | Delete"""
+                       default_settings=None, edit_callback=None, add_callback=None):
+    """Primary export UI: checkbox | set name | schedule (search) | sheet name | file path | ... | Export | Delete"""
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
     from System.Windows import (Window, WindowStartupLocation, Thickness,
                                  HorizontalAlignment, VerticalAlignment,
                                  FontWeights, TextTrimming, GridLength, GridUnitType)
-    from System.Windows.Controls import (Grid, StackPanel, ScrollViewer, Button,
-                                          CheckBox, TextBlock, ColumnDefinition,
+    from System.Windows.Controls import (Grid, StackPanel, ScrollViewer, Button, TextBox,
+                                          ComboBox, CheckBox, TextBlock, ColumnDefinition,
                                           RowDefinition, Orientation, ScrollBarVisibility)
 
-    all_schedules_by_name = {v.Name: v for v in collect_schedules(doc)}
+    _all_schedule_views = collect_schedules(doc)
+    all_schedule_names = sorted(v.Name for v in _all_schedule_views)
+    all_schedules_by_name = {v.Name: v for v in _all_schedule_views}
+    current_settings = dict(default_settings) if default_settings else {
+        "export_mode": 0, "export_title": False, "export_column_headers": True,
+        "export_group_headers": False, "export_grouped_column_headers": False,
+        "use_category_sheet_name": True, "csv_mode": 0, "csv_delim": ",", "csv_text_qualifier": "",
+    }
 
     paths = {}
     set_modes = {}
-
-    def _build_sheet_label(sname):
-        sdata = saved_sets.get(sname) or {}
-        mode = int(sdata.get("export_mode", 0))
-        set_modes[sname] = mode
-        raw = sdata.get("excel_path") if mode == 0 else sdata.get("csv_folder")
-        if sname not in paths:
-            paths[sname] = (raw or "").strip()
-        sched_names = sdata.get("schedule_names") or []
-        use_cat = bool(sdata.get("use_category_sheet_name", False))
-        if not sched_names:
-            return "(no schedules)"
-        if len(sched_names) == 1:
-            view = all_schedules_by_name.get(sched_names[0])
-            if view is None:
-                return sanitize_sheet_name(sched_names[0])
-            if use_cat:
-                return sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view)))
-            return sanitize_sheet_name(view.Name)
-        if use_cat:
-            first = all_schedules_by_name.get(sched_names[0])
-            first_label = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, first))) if first else sched_names[0]
-            return "{}, ... ({})".format(first_label, len(sched_names))
-        return "{} sheets".format(len(sched_names))
-
-    _ok_clicked = [False]
-    checkboxes = {}
+    name_boxes = {}
+    schedule_combos = {}
+    sheet_name_labels = {}
     path_labels = {}
+    checkboxes = {}
     data_row_elements = []
+    _ok_clicked = [False]
 
     window = Window()
     window.Title = "Batch Export"
-    window.Width = 900
-    window.MinWidth = 640
-    window.Height = min(220 + len(saved_sets) * 34, 600)
-    window.MinHeight = 240
+    window.Width = 1000
+    window.MinWidth = 700
+    window.Height = min(240 + max(len(saved_sets), 1) * 42, 660)
+    window.MinHeight = 260
     window.WindowStartupLocation = WindowStartupLocation.CenterScreen
 
     outer = Grid()
@@ -688,7 +809,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     window.Content = outer
 
     prompt = TextBlock()
-    prompt.Text = "Manage export sets below. Select sets and click Export Selected to run."
+    prompt.Text = "Manage export sets. Select sets and click Export Selected to run."
     prompt.Margin = Thickness(0, 0, 0, 8)
     Grid.SetRow(prompt, 0)
     outer.Children.Add(prompt)
@@ -699,9 +820,9 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     Grid.SetRow(scroll, 1)
     outer.Children.Add(scroll)
 
-    # checkbox | set name | sheet name | file path | ... | Edit | Delete
+    # checkbox | set name | schedule | sheet name | file path | ... | Export | Delete
     tbl = Grid()
-    for w in [28, 160, 130, -1, 34, 60, 60]:
+    for w in [28, 160, 200, 140, -1, 34, 60, 60]:
         cd = ColumnDefinition()
         cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
         tbl.ColumnDefinitions.Add(cd)
@@ -709,13 +830,12 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
 
     hrd = RowDefinition(); hrd.Height = GridLength.Auto
     tbl.RowDefinitions.Add(hrd)
-    for col, text in [(1, "Set Name"), (2, "Sheet Name"), (3, "File Path")]:
+    for col, text in [(1, "Set Name"), (2, "Schedule"), (3, "Sheet Name"), (4, "File Path")]:
         tb = TextBlock()
         tb.Text = text
         tb.FontWeight = FontWeights.Bold
         tb.Margin = Thickness(4, 2, 4, 6)
-        Grid.SetRow(tb, 0)
-        Grid.SetColumn(tb, col)
+        Grid.SetRow(tb, 0); Grid.SetColumn(tb, col)
         tbl.Children.Add(tb)
 
     def _make_browse(sname_, mode_):
@@ -727,29 +847,81 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                 new_path = _pick_save_file(
                     title="'{}' -- Choose Output File".format(sname_),
                     filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                    default_extension="xlsx",
-                    initial_directory=init_dir,
-                    file_name=fname,
+                    default_extension="xlsx", initial_directory=init_dir, file_name=fname,
                 )
                 new_path = normalize_excel_output_path(new_path or "")
             else:
                 init_dir = cur if cur and os.path.isdir(cur) else get_default_dir(doc)
-                new_path = _pick_folder(
-                    title="'{}' -- Choose CSV Folder".format(sname_),
-                    initial_directory=init_dir,
-                )
+                new_path = _pick_folder("'{}' -- Choose CSV Folder".format(sname_), initial_directory=init_dir)
                 new_path = (new_path or "").strip()
             if new_path:
                 paths[sname_] = new_path
                 path_labels[sname_].Text = new_path
         return _on_browse
 
-    def _make_edit_row(sname_):
-        def _on_edit(_s, _e):
-            if edit_callback:
-                edit_callback(sname_, saved_sets.get(sname_) or {})
-                _rebuild_rows()
-        return _on_edit
+    def _make_export_row(sname_):
+        def _on_export(_s, _e):
+            sdata = dict(saved_sets.get(sname_) or {})
+            combo = schedule_combos.get(sname_)
+            if combo:
+                sel = str(combo.Text or (str(combo.SelectedItem) if combo.SelectedItem is not None else "")).strip()
+                if sel:
+                    sdata["schedule_names"] = [sel]
+            mode = int(sdata.get("export_mode", current_settings.get("export_mode", 0)))
+            path = paths.get(sname_) or ""
+            if not path:
+                init_dir = get_default_dir(doc)
+                safe = re.sub(r'[\\/:*?"<>|]', "_", sname_)
+                if mode == 0:
+                    new_path = _pick_save_file("'{}' -- Output File".format(sname_),
+                        "Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm", "xlsx", init_dir,
+                        "{}.xlsx".format(safe))
+                    new_path = normalize_excel_output_path(new_path or "")
+                else:
+                    new_path = _pick_folder("'{}' -- CSV Folder".format(sname_), init_dir)
+                    new_path = (new_path or "").strip()
+                if not new_path:
+                    return
+                paths[sname_] = new_path
+                if sname_ in path_labels:
+                    path_labels[sname_].Text = new_path
+                path = new_path
+            all_sched = {v.Name: v for v in collect_schedules(doc)}
+            sched_names = sdata.get("schedule_names") or []
+            views = [all_sched[n] for n in sched_names if n in all_sched]
+            if not views:
+                if ui:
+                    ui.uiUtils_alert("No schedule '{}' found in this model.".format(", ".join(sched_names) or "(none)"), title="Export")
+                return
+            cs = current_settings
+            ok_val = None
+            if mode == 0:
+                ok_val = export_to_excel(doc, views, path, ui,
+                    export_title=bool(sdata.get("export_title", cs.get("export_title", False))),
+                    export_column_headers=bool(sdata.get("export_column_headers", cs.get("export_column_headers", True))),
+                    export_group_headers=bool(sdata.get("export_group_headers", cs.get("export_group_headers", False))),
+                    export_grouped_column_headers=bool(sdata.get("export_grouped_column_headers", cs.get("export_grouped_column_headers", False))),
+                    text_qualifier=sdata.get("csv_text_qualifier", cs.get("csv_text_qualifier", "")),
+                    delimiter=sdata.get("csv_delim", cs.get("csv_delim", ",")),
+                    use_category_sheet_name=bool(cs.get("use_category_sheet_name", True)))
+                msg = "Exported '{}' successfully.".format(sname_) if ok_val else "Export failed for '{}'. Check the log.".format(sname_)
+            else:
+                try:
+                    export_to_csv(doc, views, path,
+                        quote_all=bool(int(sdata.get("csv_mode", cs.get("csv_mode", 0))) == 1),
+                        delimiter=sdata.get("csv_delim", cs.get("csv_delim", ",")),
+                        export_title=bool(sdata.get("export_title", cs.get("export_title", False))),
+                        export_column_headers=bool(sdata.get("export_column_headers", cs.get("export_column_headers", True))),
+                        export_group_headers=bool(sdata.get("export_group_headers", cs.get("export_group_headers", False))),
+                        export_grouped_column_headers=bool(sdata.get("export_grouped_column_headers", cs.get("export_grouped_column_headers", False))),
+                        text_qualifier=sdata.get("csv_text_qualifier", cs.get("csv_text_qualifier", "")))
+                    msg = "Exported '{}' to CSV.".format(sname_)
+                except Exception as exc:
+                    log_exception("inline export '{}'".format(sname_), exc)
+                    msg = "Export failed for '{}'. Check the log.".format(sname_)
+            if ui:
+                ui.uiUtils_alert(msg, title="Batch Export")
+        return _on_export
 
     def _make_delete_row(sname_):
         def _on_delete(_s, _e):
@@ -768,8 +940,8 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
         data_row_elements[:] = []
         while tbl.RowDefinitions.Count > 1:
             tbl.RowDefinitions.RemoveAt(1)
-        checkboxes.clear()
-        path_labels.clear()
+        checkboxes.clear(); path_labels.clear(); name_boxes.clear()
+        schedule_combos.clear(); sheet_name_labels.clear()
 
         current_names = sorted(saved_sets.keys())
         if not current_names:
@@ -779,110 +951,211 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
             empty_tb.Text = "No saved sets. Click 'Add Set' to create one."
             empty_tb.Margin = Thickness(4, 16, 4, 4)
             empty_tb.HorizontalAlignment = HorizontalAlignment.Center
-            Grid.SetRow(empty_tb, 1)
-            Grid.SetColumnSpan(empty_tb, 7)
+            Grid.SetRow(empty_tb, 1); Grid.SetColumnSpan(empty_tb, 8)
             tbl.Children.Add(empty_tb)
             data_row_elements.append([empty_tb])
             return
 
         for row_idx, sname in enumerate(current_names, 1):
-            sheet_label = _build_sheet_label(sname)
-            mode = set_modes.get(sname, 0)
+            sdata = saved_sets.get(sname) or {}
+            mode = int(sdata.get("export_mode", current_settings.get("export_mode", 0)))
+            set_modes[sname] = mode
+            if sname not in paths:
+                raw = sdata.get("excel_path") if mode == 0 else sdata.get("csv_folder")
+                paths[sname] = (raw or "").strip()
 
-            rd = RowDefinition(); rd.Height = GridLength(34)
+            rd = RowDefinition(); rd.Height = GridLength(42)
             tbl.RowDefinitions.Add(rd)
             row_elems = []
 
-            cb = CheckBox()
-            cb.IsChecked = True
+            cb = CheckBox(); cb.IsChecked = True
             cb.VerticalAlignment = VerticalAlignment.Center
             cb.HorizontalAlignment = HorizontalAlignment.Center
             Grid.SetRow(cb, row_idx); Grid.SetColumn(cb, 0)
-            tbl.Children.Add(cb)
-            checkboxes[sname] = cb
-            row_elems.append(cb)
+            tbl.Children.Add(cb); checkboxes[sname] = cb; row_elems.append(cb)
 
-            name_tb = TextBlock()
-            name_tb.Text = sname
-            name_tb.VerticalAlignment = VerticalAlignment.Center
-            name_tb.Margin = Thickness(4, 0, 8, 0)
-            name_tb.TextTrimming = TextTrimming.CharacterEllipsis
-            Grid.SetRow(name_tb, row_idx); Grid.SetColumn(name_tb, 1)
-            tbl.Children.Add(name_tb)
-            row_elems.append(name_tb)
+            name_box = TextBox(); name_box.Text = sname
+            name_box.VerticalAlignment = VerticalAlignment.Center
+            name_box.Margin = Thickness(2, 3, 4, 3)
+            Grid.SetRow(name_box, row_idx); Grid.SetColumn(name_box, 1)
+            tbl.Children.Add(name_box); name_boxes[sname] = name_box; row_elems.append(name_box)
 
-            sheet_tb = TextBlock()
-            sheet_tb.Text = sheet_label
-            sheet_tb.VerticalAlignment = VerticalAlignment.Center
-            sheet_tb.Margin = Thickness(4, 0, 8, 0)
-            sheet_tb.TextTrimming = TextTrimming.CharacterEllipsis
-            Grid.SetRow(sheet_tb, row_idx); Grid.SetColumn(sheet_tb, 2)
-            tbl.Children.Add(sheet_tb)
-            row_elems.append(sheet_tb)
+            sched_combo = ComboBox(); sched_combo.IsEditable = True
+            sched_combo.IsTextSearchEnabled = False  # handled manually below
+            for n in all_schedule_names:
+                sched_combo.Items.Add(n)
+            existing = sdata.get("schedule_names") or []
+            if existing:
+                sched_combo.Text = existing[0]
+            sched_combo.VerticalAlignment = VerticalAlignment.Center
+            sched_combo.Margin = Thickness(2, 3, 4, 3)
+            Grid.SetRow(sched_combo, row_idx); Grid.SetColumn(sched_combo, 2)
+            tbl.Children.Add(sched_combo); schedule_combos[sname] = sched_combo; row_elems.append(sched_combo)
+
+            _init_sched = existing[0] if existing else ""
+            if _init_sched and current_settings.get("use_category_sheet_name", True):
+                _iv = all_schedules_by_name.get(_init_sched)
+                _init_sheet = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, _iv))) if _iv else sanitize_sheet_name(_init_sched)
+            else:
+                _init_sheet = sanitize_sheet_name(_init_sched) if _init_sched else ""
+            sheet_lbl = TextBlock()
+            sheet_lbl.Text = _init_sheet
+            sheet_lbl.VerticalAlignment = VerticalAlignment.Center
+            sheet_lbl.Margin = Thickness(4, 0, 4, 0)
+            sheet_lbl.TextTrimming = TextTrimming.CharacterEllipsis
+            Grid.SetRow(sheet_lbl, row_idx); Grid.SetColumn(sheet_lbl, 3)
+            tbl.Children.Add(sheet_lbl); sheet_name_labels[sname] = sheet_lbl; row_elems.append(sheet_lbl)
+
+            def _wire_combo(combo_, lbl_, names_):
+                _busy = [False]
+                def _compute_sheet(sel):
+                    if not sel:
+                        return ""
+                    if current_settings.get("use_category_sheet_name", True):
+                        view = all_schedules_by_name.get(sel)
+                        if view:
+                            return sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view)))
+                    return sanitize_sheet_name(sel)
+                def _update_lbl():
+                    lbl_.Text = _compute_sheet(str(combo_.Text or "").strip())
+                def _on_key_up(s, e):
+                    from System.Windows.Input import Key
+                    if _busy[0]:
+                        return
+                    if e.Key in (Key.Up, Key.Down, Key.Enter, Key.Return, Key.Tab, Key.Escape):
+                        _update_lbl()
+                        return
+                    text = str(combo_.Text or "").strip().lower()
+                    filtered = [n for n in names_ if text in n.lower()] if text else names_
+                    saved_text = combo_.Text
+                    _busy[0] = True
+                    combo_.Items.Clear()
+                    for n in filtered:
+                        combo_.Items.Add(n)
+                    combo_.Text = saved_text
+                    _busy[0] = False
+                    if filtered and not combo_.IsDropDownOpen:
+                        combo_.IsDropDownOpen = True
+                    _update_lbl()
+                def _on_sel_changed(s, e):
+                    _update_lbl()
+                combo_.PreviewKeyUp += _on_key_up
+                combo_.SelectionChanged += _on_sel_changed
+                _update_lbl()
+            _wire_combo(sched_combo, sheet_lbl, all_schedule_names)
 
             path_tb = TextBlock()
             path_tb.Text = paths.get(sname) or "(no path)"
             path_tb.VerticalAlignment = VerticalAlignment.Center
             path_tb.Margin = Thickness(4, 0, 4, 0)
             path_tb.TextTrimming = TextTrimming.CharacterEllipsis
-            Grid.SetRow(path_tb, row_idx); Grid.SetColumn(path_tb, 3)
-            tbl.Children.Add(path_tb)
-            path_labels[sname] = path_tb
-            row_elems.append(path_tb)
+            Grid.SetRow(path_tb, row_idx); Grid.SetColumn(path_tb, 4)
+            tbl.Children.Add(path_tb); path_labels[sname] = path_tb; row_elems.append(path_tb)
 
-            browse_btn = Button()
-            browse_btn.Content = "..."
+            browse_btn = Button(); browse_btn.Content = "..."
             browse_btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(browse_btn, row_idx); Grid.SetColumn(browse_btn, 4)
+            Grid.SetRow(browse_btn, row_idx); Grid.SetColumn(browse_btn, 5)
             tbl.Children.Add(browse_btn)
-            browse_btn.Click += _make_browse(sname, mode)
-            row_elems.append(browse_btn)
+            browse_btn.Click += _make_browse(sname, mode); row_elems.append(browse_btn)
 
-            edit_btn = Button()
-            edit_btn.Content = "Edit"
-            edit_btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(edit_btn, row_idx); Grid.SetColumn(edit_btn, 5)
-            tbl.Children.Add(edit_btn)
-            edit_btn.Click += _make_edit_row(sname)
-            row_elems.append(edit_btn)
+            export_btn = Button(); export_btn.Content = "Export"
+            export_btn.Margin = Thickness(2, 3, 2, 3)
+            Grid.SetRow(export_btn, row_idx); Grid.SetColumn(export_btn, 6)
+            tbl.Children.Add(export_btn)
+            export_btn.Click += _make_export_row(sname); row_elems.append(export_btn)
 
-            del_btn = Button()
-            del_btn.Content = "Delete"
+            del_btn = Button(); del_btn.Content = "Delete"
             del_btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(del_btn, row_idx); Grid.SetColumn(del_btn, 6)
+            Grid.SetRow(del_btn, row_idx); Grid.SetColumn(del_btn, 7)
             tbl.Children.Add(del_btn)
-            del_btn.Click += _make_delete_row(sname)
-            row_elems.append(del_btn)
+            del_btn.Click += _make_delete_row(sname); row_elems.append(del_btn)
 
             data_row_elements.append(row_elems)
 
     _rebuild_rows()
 
-    btns = StackPanel()
-    btns.Orientation = Orientation.Horizontal
-    btns.HorizontalAlignment = HorizontalAlignment.Right
-    btns.Margin = Thickness(0, 10, 0, 0)
-    Grid.SetRow(btns, 2)
-    outer.Children.Add(btns)
+    # Footer: Settings (left) | Add Set + Save + Export Selected + Cancel (right)
+    footer = Grid()
+    footer.Margin = Thickness(0, 10, 0, 0)
+    Grid.SetRow(footer, 2)
+    outer.Children.Add(footer)
 
-    add_btn = Button()
-    add_btn.Content = "Add Set"
-    add_btn.MinWidth = 80
-    add_btn.Margin = Thickness(0, 0, 20, 0)
+    settings_btn = Button(); settings_btn.Content = "Settings"
+    settings_btn.MinWidth = 80
+    settings_btn.HorizontalAlignment = HorizontalAlignment.Left
 
-    ok_btn = Button()
-    ok_btn.Content = "Export Selected"
-    ok_btn.MinWidth = 110
-    ok_btn.Margin = Thickness(0, 0, 6, 0)
+    def _open_settings(_s, _e):
+        new_s = _show_export_settings_popup(current_settings, ui)
+        if new_s is not None:
+            current_settings.clear()
+            current_settings.update(new_s)
+            use_cat = current_settings.get("use_category_sheet_name", True)
+            for sname, combo in list(schedule_combos.items()):
+                lbl = sheet_name_labels.get(sname)
+                if not lbl:
+                    continue
+                sel = str(combo.Text or "").strip()
+                if not sel:
+                    lbl.Text = ""
+                    continue
+                if use_cat:
+                    view = all_schedules_by_name.get(sel)
+                    lbl.Text = sanitize_sheet_name(_pluralize(_get_schedule_category_name(doc, view))) if view else sanitize_sheet_name(sel)
+                else:
+                    lbl.Text = sanitize_sheet_name(sel)
 
-    cancel_btn = Button()
-    cancel_btn.Content = "Cancel"
+    settings_btn.Click += _open_settings
+    footer.Children.Add(settings_btn)
+
+    right_btns = StackPanel()
+    right_btns.Orientation = Orientation.Horizontal
+    right_btns.HorizontalAlignment = HorizontalAlignment.Right
+    footer.Children.Add(right_btns)
+
+    add_btn = Button(); add_btn.Content = "Add Set"
+    add_btn.MinWidth = 80; add_btn.Margin = Thickness(0, 0, 6, 0)
+
+    save_btn = Button(); save_btn.Content = "Save"
+    save_btn.MinWidth = 80; save_btn.Margin = Thickness(0, 0, 20, 0)
+
+    ok_btn = Button(); ok_btn.Content = "Export Selected"
+    ok_btn.MinWidth = 110; ok_btn.Margin = Thickness(0, 0, 6, 0)
+
+    cancel_btn = Button(); cancel_btn.Content = "Cancel"
     cancel_btn.MinWidth = 70
 
     def _add(_s, _e):
-        if add_callback:
-            add_callback()
-            _rebuild_rows()
+        idx = 1
+        while "New Set {}".format(idx) in saved_sets:
+            idx += 1
+        new_name = "New Set {}".format(idx)
+        saved_sets[new_name] = dict(current_settings)
+        saved_sets[new_name]["schedule_names"] = []
+        _rebuild_rows()
+
+    def _save(_s, _e):
+        renames = [(orig, (nb.Text or "").strip())
+                   for orig, nb in list(name_boxes.items())
+                   if (nb.Text or "").strip() and (nb.Text or "").strip() != orig]
+        for orig, new in renames:
+            if orig in saved_sets:
+                saved_sets[new] = saved_sets.pop(orig)
+                if orig in paths: paths[new] = paths.pop(orig)
+                if orig in schedule_combos: schedule_combos[new] = schedule_combos.pop(orig)
+        for sname, combo in list(schedule_combos.items()):
+            sel = str(combo.Text or (str(combo.SelectedItem) if combo.SelectedItem is not None else "")).strip()
+            if sel and sname in saved_sets:
+                saved_sets[sname]["schedule_names"] = [sel]
+        for sname, path_val in list(paths.items()):
+            if path_val and sname in saved_sets:
+                mode = int(saved_sets[sname].get("export_mode", 0))
+                saved_sets[sname]["excel_path" if mode == 0 else "csv_folder"] = path_val
+        proj_data_back = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
+        proj_data_back["sets"] = saved_sets
+        ok_saved = write_saved_sets(doc, proj_data_back, saved_sets_param)
+        if ui:
+            ui.uiUtils_alert("Sets saved." if ok_saved else "Could not save to Project Information.", title="Batch Export")
+        _rebuild_rows()
 
     def _ok(_s, _e):
         _ok_clicked[0] = True
@@ -891,12 +1164,10 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     def _cancel(_s, _e):
         window.Close()
 
-    add_btn.Click += _add
-    ok_btn.Click += _ok
-    cancel_btn.Click += _cancel
-    btns.Children.Add(add_btn)
-    btns.Children.Add(ok_btn)
-    btns.Children.Add(cancel_btn)
+    add_btn.Click += _add; save_btn.Click += _save
+    ok_btn.Click += _ok; cancel_btn.Click += _cancel
+    right_btns.Children.Add(add_btn); right_btns.Children.Add(save_btn)
+    right_btns.Children.Add(ok_btn); right_btns.Children.Add(cancel_btn)
 
     window.ShowDialog()
 
@@ -905,7 +1176,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
 
     current_names = sorted(saved_sets.keys())
     selected = [sname for sname in current_names if checkboxes.get(sname) and checkboxes[sname].IsChecked]
-    return selected, dict(paths)
+    return selected, dict(paths), dict(current_settings)
 
 
 def _show_export_form(
@@ -957,8 +1228,6 @@ def _show_export_form(
     schedule_list = window.FindName("ScheduleList")
     excel_mode = window.FindName("ExcelMode")
     csv_mode = window.FindName("CsvMode")
-    excel_path = window.FindName("ExcelPath")
-    browse_excel = window.FindName("BrowseExcel")
     csv_folder = window.FindName("CsvFolder")
     browse_csv = window.FindName("BrowseCsv")
     csv_delim = window.FindName("CsvDelimiter")
@@ -968,11 +1237,6 @@ def _show_export_form(
     export_column_headers = window.FindName("ExportColumnHeaders")
     export_group_headers = window.FindName("ExportGroupHeaders")
     export_grouped_column_headers = window.FindName("ExportGroupedColumnHeaders")
-    saved_set_box = window.FindName("SavedSetBox")
-    load_set_button = window.FindName("LoadSetButton")
-    save_set_button = window.FindName("SaveSetButton")
-    delete_set_button = window.FindName("DeleteSetButton")
-    ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
     use_category_sheet_name_ctrl = window.FindName("UseCategorySheetName")
@@ -1005,7 +1269,6 @@ def _show_export_form(
             default_delim_label = label
             break
 
-    excel_path.Text = init_excel_path or ""
     csv_folder.Text = init_csv_dir or ""
     quote_all.IsChecked = bool(last_csv_mode == 1)
     csv_delim.SelectedItem = default_delim_label
@@ -1107,7 +1370,6 @@ def _show_export_form(
             "export_column_headers": bool(export_column_headers.IsChecked),
             "export_group_headers": bool(export_group_headers.IsChecked),
             "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
-            "excel_path": excel_path.Text or "",
             "csv_folder": csv_folder.Text or "",
             "use_category_sheet_name": bool(use_category_sheet_name_ctrl.IsChecked) if use_category_sheet_name_ctrl is not None else False,
         }
@@ -1982,48 +2244,27 @@ def main():
     init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
     init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
 
-    def _open_export_form(preselect_names=None):
-        if preselect_names:
-            all_names = [item.view.Name for item in items]
-            pre_idx = [i for i, n in enumerate(all_names) if n in set(preselect_names)]
-        else:
-            pre_idx = prechecked_indices
-        _show_export_form(
-            ui,
-            [item.display_name for item in items],
-            [item.view.Name for item in items],
-            pre_idx,
-            init_excel_path,
-            init_csv_dir,
-            last_csv_delim,
-            last_csv_mode,
-            last_export_mode,
-            last_export_title,
-            last_column_headers,
-            last_group_headers,
-            last_grouped_column_headers,
-            last_text_qualifier,
-            saved_sets,
-            doc,
-            last_use_category_sheet_name=last_use_category_sheet_name,
-            saved_sets_param_name=saved_sets_param,
-        )
-        refreshed = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
-        new_sets = refreshed.get("sets", {})
-        if isinstance(new_sets, dict):
-            saved_sets.clear()
-            saved_sets.update(new_sets)
+    default_settings = {
+        "export_mode": last_export_mode,
+        "export_title": bool(last_export_title),
+        "export_column_headers": bool(last_column_headers),
+        "export_group_headers": bool(last_group_headers),
+        "export_grouped_column_headers": bool(last_grouped_column_headers),
+        "use_category_sheet_name": True,
+        "csv_mode": last_csv_mode,
+        "csv_delim": last_csv_delim,
+        "csv_text_qualifier": last_text_qualifier,
+    }
 
     batch_result = _show_batch_dialog(
         saved_sets, doc,
         ui=ui,
         saved_sets_param=saved_sets_param,
-        edit_callback=lambda sname, sdata: _open_export_form(sdata.get("schedule_names")),
-        add_callback=lambda: _open_export_form(),
+        default_settings=default_settings,
     )
     if batch_result is None:
         return
-    selected_batch_names, batch_override_paths = batch_result
+    selected_batch_names, batch_override_paths, batch_settings = batch_result
     if not selected_batch_names:
         ui.uiUtils_alert("Select at least one set to export.", title="Multiple Schedules Exporter")
         return
@@ -2054,13 +2295,14 @@ def main():
                     sample = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
                     warnings.append("{}: {}/{} schedules not found (renamed?) -- {}".format(
                         set_name, len(set_views), len(set_sched_names), sample))
-                set_use_cat = bool(set_data.get("use_category_sheet_name", False))
-                set_exp_title = bool(set_data.get("export_title", False))
-                set_col_hdr = bool(set_data.get("export_column_headers", True))
-                set_grp_hdr = bool(set_data.get("export_group_headers", False))
-                set_grpd_col = bool(set_data.get("export_grouped_column_headers", False))
-                set_delim = set_data.get("csv_delim", ",")
-                set_qualifier = set_data.get("csv_text_qualifier", "")
+                set_use_cat = bool(batch_settings.get("use_category_sheet_name", True))
+                bs = batch_settings
+                set_exp_title = bool(set_data.get("export_title", bs.get("export_title", False)))
+                set_col_hdr = bool(set_data.get("export_column_headers", bs.get("export_column_headers", True)))
+                set_grp_hdr = bool(set_data.get("export_group_headers", bs.get("export_group_headers", False)))
+                set_grpd_col = bool(set_data.get("export_grouped_column_headers", bs.get("export_grouped_column_headers", False)))
+                set_delim = set_data.get("csv_delim", bs.get("csv_delim", ","))
+                set_qualifier = set_data.get("csv_text_qualifier", bs.get("csv_text_qualifier", ""))
                 if set_mode == 0:
                     set_excel_path = normalize_excel_output_path(batch_paths.get(set_name) or "")
                     if not set_excel_path:

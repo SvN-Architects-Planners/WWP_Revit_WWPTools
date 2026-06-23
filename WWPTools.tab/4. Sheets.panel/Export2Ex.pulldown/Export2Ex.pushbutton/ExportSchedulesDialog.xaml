@@ -123,50 +123,6 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0">
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="Saved set:"
-                                   Foreground="#374151"
-                                   VerticalAlignment="Center"
-                                   FontSize="12"
-                                   Margin="0,0,8,0"/>
-                        <ComboBox Name="SavedSetBox"
-                                  Grid.Column="1"
-                                  IsEditable="True"
-                                  Margin="0,0,8,0"/>
-                        <Button Name="LoadSetButton"
-                                Grid.Column="2"
-                                Content="Load"
-                                Width="64"
-                                Margin="0,0,6,0"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Button Name="SaveSetButton"
-                                Grid.Column="3"
-                                Content="Save"
-                                Width="64"
-                                Margin="0,0,6,0"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Button Name="DeleteSetButton"
-                                Grid.Column="4"
-                                Content="Delete"
-                                Width="64"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                    </Grid>
-                    <TextBlock Text="Excel file path"
-                               Margin="0,0,0,6"
-                               Foreground="#6B7280"
-                               FontWeight="SemiBold"/>
-                    <DockPanel Margin="0,0,0,10" LastChildFill="True">
-                        <Button Name="BrowseExcel" Content="Browse" Width="80" DockPanel.Dock="Right" Style="{StaticResource SecondaryButtonStyle}"/>
-                        <TextBox Name="ExcelPath" Margin="0,0,6,0"/>
-                    </DockPanel>
                     <TextBlock Text="Search schedules"
                                Margin="0,0,0,6"
                                Foreground="#6B7280"
@@ -250,16 +206,10 @@
                            HorizontalAlignment="Left"
                            IsHitTestVisible="False" />
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Name="BatchExportButton" Style="{StaticResource SecondaryButtonStyle}" Width="160" Margin="0,0,8,0">
+                        <Button Name="BatchExportButton" Style="{StaticResource PrimaryButtonStyle}" Width="160" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                                <TextBlock Text="Batch Export..." FontSize="14"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Name="OkButton" Style="{StaticResource PrimaryButtonStyle}" Width="150" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE105;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                                <TextBlock Text="Export" FontSize="14"/>
+                                <TextBlock Text="Save" FontSize="14"/>
                             </StackPanel>
                         </Button>
                         <Button Name="CancelButton" Style="{StaticResource SecondaryButtonStyle}" Width="150">

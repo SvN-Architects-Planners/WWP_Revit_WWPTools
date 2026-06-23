@@ -1,8 +1,8 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Parking Count in Room"
-        Height="620"
-        Width="720"
+        Title="Parking Count in Room/Area"
+        Height="660"
+        Width="980"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
@@ -46,6 +46,11 @@
             <Setter Property="Foreground" Value="#1F2937"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
         </Style>
+        <Style x:Key="SmallButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
@@ -59,6 +64,16 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="4"/>
         </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#1F2937"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
     </Window.Resources>
     <Grid Margin="16">
         <Border Background="#FFFFFF"
@@ -71,29 +86,87 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
+
                 <TextBlock Grid.Row="0"
-                           Text="Select rooms that have parking"
-                           Margin="0,0,0,8"
+                           Text="Select rooms/areas with parking"
+                           Margin="0,0,0,10"
                            Foreground="#6B7280"
                            FontWeight="SemiBold"/>
+
+                <!-- Three-column main area -->
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="290"/>
                     </Grid.ColumnDefinitions>
-                    <ListBox Name="RoomsList"
-                             Grid.Column="0"
-                             SelectionMode="Extended"
-                             Margin="0,0,12,0"/>
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="Parking type source" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
-                        <ComboBox Name="TypeSourceCombo" Margin="0,0,0,10"/>
-                        <TextBlock Text="Room parameter to write" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
-                        <ComboBox Name="RoomParamCombo" Margin="0,0,0,10"/>
-                        <TextBlock Text="Parking count source parameter" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
-                        <ComboBox Name="CountParamCombo" Margin="0,0,0,12"/>
+
+                    <!-- Column 0: Spaces list -->
+                    <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="Rooms / areas"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <ListBox Name="RoomsList" SelectionMode="Extended"/>
+                    </DockPanel>
+
+                    <!-- Column 1: Families list -->
+                    <DockPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="Parking families to include"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <Grid DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Name="AddFamilyText"
+                                     Grid.Column="0"
+                                     Height="30"
+                                     Margin="0,0,6,0"
+                                     VerticalContentAlignment="Center"/>
+                            <Button Name="AddFamilyButton"
+                                    Grid.Column="1"
+                                    Content="+ Add"
+                                    Style="{StaticResource SmallButtonStyle}"/>
+                        </Grid>
+                        <ListBox Name="FamiliesList" SelectionMode="Extended"/>
+                    </DockPanel>
+
+                    <!-- Column 2: Options -->
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Target text parameter to write"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <ComboBox Name="RoomParamCombo" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Parking count source"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <ComboBox Name="CountParamCombo" Margin="0,0,0,16"/>
+
+                        <CheckBox Name="BreakdownCheckBox"
+                                  Content="Include parking type breakdowns"
+                                  Margin="0,0,0,10"/>
+
+                        <TextBlock Name="TypeSourceLabel"
+                                   Text="Type parameter"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"
+                                   Visibility="Collapsed"/>
+                        <ComboBox Name="TypeSourceCombo"
+                                  Margin="0,0,0,0"
+                                  Visibility="Collapsed"/>
                     </StackPanel>
                 </Grid>
+
+                <!-- Footer -->
                 <DockPanel Grid.Row="2" Margin="0,12,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
@@ -101,7 +174,7 @@
                            Height="56"
                            VerticalAlignment="Bottom"
                            HorizontalAlignment="Left"
-                           IsHitTestVisible="False" />
+                           IsHitTestVisible="False"/>
                     <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">
