@@ -5,7 +5,7 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-06-23
+## [2.1.0] - 2026-06-23
 
 ### Added
 - Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets — e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` → `515T211D1`.
