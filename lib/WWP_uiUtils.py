@@ -443,7 +443,7 @@ def uiUtils_select_sheet_renumber_inputs_with_list(
 	return {
 		"selected_indices": list(result.SelectedIndices),
 		"starting_number": result.StartingNumber or "",
-		"iso19650_mode": bool(result.Iso19650Mode),
+		"iso19650_mode": bool(getattr(result, "Iso19650Mode", False)),
 	}
 
 

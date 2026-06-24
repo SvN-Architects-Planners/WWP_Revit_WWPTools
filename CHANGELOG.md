@@ -16,7 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Family Swapper: now works with all loadable family categories, not just Titleblocks. The family dropdowns are populated from every `FamilySymbol` in the document, and auto-detection from selection works for any `FamilyInstance`.
 
 ### Added
-- Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets — e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` → `515T211D1`.
+
+- Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets - e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` to `515T211D1`.
+
+### Fixed (code review)
+
+- Renumber Sheets: regex in ISO 19650 parser was greedy and would pick the **last** bracket group when a pattern contained multiple (e.g. `[100]T[200]D1` would have incremented `[200]` incorrectly). Fixed with non-greedy match to always pick the first bracket group.
+- Renumber Sheets: guard checking for the UI helper function was checking the wrong function name, so a stale DLL would crash with `AttributeError` instead of showing a friendly reload prompt.
+- Renumber Sheets: `build_new_numbers` had a dead `reference_list` parameter that callers were passing, believing conflict-checking was happening. Removed the parameter; no conflict-checking was ever implemented.
+- Renumber Sheets: temporary sheet number prefix during the two-pass rename changed from `t` to `_renumber_tmp_` to reduce collision risk with real sheet numbers.
+- Renumber Sheets: `result.Iso19650Mode` access in `WWP_uiUtils.py` is now guarded with `getattr(..., False)` so a stale in-process DLL does not crash on tool launch.
 
 ## [2.0.1] - 2026-06-22
 

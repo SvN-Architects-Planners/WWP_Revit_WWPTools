@@ -30,7 +30,7 @@ def split_prefix_numeric(text):
 	return prefix, numeric
 
 
-def build_new_numbers(starting_str, count, reference_list):
+def build_new_numbers(starting_str, count):
 	prefix, numeric = split_prefix_numeric(starting_str.strip())
 	if not numeric:
 		numeric = "1"
@@ -44,7 +44,7 @@ def build_new_numbers(starting_str, count, reference_list):
 
 def parse_iso19650_pattern(pattern):
 	"""Parse '515T[200]D1' -> ('515T', '200', 'D1'). Returns None if no [nnn] found."""
-	m = re.match(r'^(.*)\[(\d+)\](.*)$', pattern.strip())
+	m = re.match(r'^(.*?)\[(\d+)\](.*)$', pattern.strip())
 	if not m:
 		return None
 	return m.group(1), m.group(2), m.group(3)
@@ -70,9 +70,9 @@ def collect_sheets(doc):
 
 def main():
 	ui = load_uiutils()
-	if not hasattr(ui, "uiUtils_select_sheet_renumber_inputs"):
+	if not hasattr(ui, "uiUtils_select_sheet_renumber_inputs_with_list"):
 		ui.uiUtils_alert(
-			"UI helper uiUtils_select_sheet_renumber_inputs is unavailable.",
+			"UI helper uiUtils_select_sheet_renumber_inputs_with_list is unavailable. Try reloading pyRevit.",
 			title="Renumber Sheets",
 		)
 		return
@@ -129,11 +129,11 @@ def main():
 		if not _numeric_part:
 			ui.uiUtils_alert("Starting Sheet Number must contain a number (e.g. A100 or 100).", title="Renumber Sheets")
 			return
-		new_numbers = build_new_numbers(starting_number, len(selected_sheets), sorted_keys)
+		new_numbers = build_new_numbers(starting_number, len(selected_sheets))
 
 	with revit.Transaction("Renumber Sheets"):
 		for sheet in selected_sheets:
-			temp_value = "t{}".format(sheet.SheetNumber or "")
+			temp_value = "_renumber_tmp_{}".format(sheet.SheetNumber or "")
 			sheet.SheetNumber = temp_value
 		for sheet, new_value in zip(selected_sheets, new_numbers):
 			sheet.SheetNumber = new_value
