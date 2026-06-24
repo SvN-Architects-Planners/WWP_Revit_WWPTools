@@ -130,6 +130,23 @@ def main():
 			return
 		new_numbers = build_new_numbers(starting_number, len(selected_sheets))
 
+	current_numbers = [s.SheetNumber or "" for s in selected_sheets]
+	if new_numbers == current_numbers:
+		if iso19650_mode:
+			ui.uiUtils_alert(
+				"The pattern '{}' generates the same sheet numbers that are already selected.\n\n"
+				"Enter the number for the FIRST sheet after renumbering.\n"
+				"Example: to shift 515T200D1..211D1 up by one, enter 515T[201]D1.".format(starting_number),
+				title="Renumber Sheets",
+			)
+		else:
+			ui.uiUtils_alert(
+				"Starting number '{}' generates the same sheet numbers as the current selection. "
+				"Enter a different starting number.".format(starting_number),
+				title="Renumber Sheets",
+			)
+		return
+
 	selected_set = {s.SheetNumber for s in selected_sheets if s.SheetNumber}
 	all_numbers  = {s.SheetNumber for s in sheets if s.SheetNumber}
 	conflicts    = [n for n in new_numbers if n in all_numbers - selected_set]

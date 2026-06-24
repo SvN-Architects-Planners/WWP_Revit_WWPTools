@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Super Renamer: replaced non-ASCII em dash characters in two UI strings that caused IronPython encoding errors.
 - Renumber Sheets: added pre-flight check — target sheet numbers are validated against all unselected sheets before the transaction starts, preventing a mid-rename rollback when a new number conflicts with an existing sheet.
+- Renumber Sheets: added no-op guard — if the pattern or starting number generates the same sheet numbers as the current selection, the tool now shows a clear error explaining what to enter instead of silently committing an invisible rename.
 - Renumber Sheets: two-pass rename now uses an index-based `_tmp_{n}` temp name instead of `_renumber_tmp_<original>`, eliminating length-overflow risk on long sheet numbers.
 - Renumber Sheets: regex in ISO 19650 parser was greedy and would pick the **last** bracket group when a pattern contained multiple (e.g. `[100]T[200]D1` would have incremented `[200]` incorrectly). Fixed with non-greedy match to always pick the first bracket group.
 - Renumber Sheets: guard checking for the UI helper function was checking the wrong function name, so a stale DLL would crash with `AttributeError` instead of showing a friendly reload prompt.
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.1] - 2026-06-22
 
 ### Changed
+
 - Parking Count in Room: now also collects areas (OST_Areas) from the active view, so the tool works in area plan views as well as floor plan views. The dialog list and result report use "rooms/areas" terminology.
 - Parking Count in Room: target parameter dropdown is now restricted to text (string) parameters only.
 - Parking Count in Room: added a **Parking families to include** multi-select list (pre-populated from the view). A text box and **+ Add** button let users include families not currently visible. Only selected families contribute to the count.
