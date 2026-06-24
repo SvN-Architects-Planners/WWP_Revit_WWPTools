@@ -1,4 +1,4 @@
-title: "Parking\nLayout\nSolver"
+title: "Parking Layout Solver"
 tooltip: |
   Auto-place parking stall families inside a selected Room boundary.
   Algorithm based on Parking Solver: edge-referenced outer spots + double-loaded

@@ -1,9 +1,12 @@
-title: "Parking\nLayout\nSolver"
+title: "Parking\nFunctions"
 tooltip: |
-  Auto-place parking stall families inside a selected Room boundary.
-  Algorithm based on Parking Solver: edge-referenced outer spots + double-loaded
-  inner aisles from the longest boundary edge. Supports multiple spot types (e.g.
-  Standard + ADA), configurable stall dimensions, skirt offset, and perimetral modes.
-  Pick a Room, configure spot families and layout settings, then click Generate.
-help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/parking-layout-solver"
+  A set of tools for managing parking in Revit:
+
+  • Parking Layout Solver — auto-places parking stall families inside a Room
+    boundary using an edge-referenced perimetral + double-loaded aisle algorithm.
+    Supports multiple spot types (Standard, ADA), configurable stall dimensions,
+    skirt offset, and perimetral modes.
+
+  • Parking Count in Room/Area — reads parking elements in the current view and
+    writes their counts back to the associated Room/Area parameters.
 author: "Jason Tian"
