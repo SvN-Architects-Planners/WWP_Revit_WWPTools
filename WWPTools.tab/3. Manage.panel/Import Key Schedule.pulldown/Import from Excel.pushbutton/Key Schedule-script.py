@@ -550,9 +550,9 @@ def _show_area_keyplan_import_dialog(
 
 def _elem_id_int(eid):
     try:
-        return int(eid.Value)      # Revit 2024+
+        return int(eid.Value)         # Revit 2024+
     except AttributeError:
-        return int(eid.Value)  # Revit 2023-
+        return int(eid.IntegerValue)  # Revit 2023-
 
 def _get_config():
     global _CONFIG_CACHE
@@ -994,63 +994,44 @@ def get_category_parameter_options(doc, category_bic):
 
 
 def _get_schedulable_parameter_options(doc, category_bic):
+    # Read parameters from doc.ParameterBindings — no transaction needed and
+    # avoids the rolled-back ViewSchedule probe that corrupts Revit's undo stack.
     params = {}
-    transaction = DB.Transaction(doc, TITLE + " Parameter Probe")
     try:
-        transaction.Start()
-        schedule, _ = create_key_schedule(doc, "__WWP_TEMP_KEY_SCHEDULE__", category_bic, "Temporary")
-        if schedule is None or not schedule.Definition:
-            return {}
-
-        definition = schedule.Definition
-        try:
-            schedulable_fields = list(definition.GetSchedulableFields())
-        except Exception:
-            schedulable_fields = []
-
-        for schedulable_field in schedulable_fields:
+        cat = doc.Settings.Categories.get_Item(category_bic)
+        if cat is None:
+            return params
+        cat_id_val = element_id_value(cat.Id)
+        it = doc.ParameterBindings.ForwardIterator()
+        while it.MoveNext():
             try:
-                field = definition.AddField(schedulable_field)
-            except Exception:
-                continue
-            if not field:
-                continue
-            try:
-                name = field.GetName() or ""
-            except Exception:
-                name = ""
-            name = name.strip()
-            if not name or _normalize_name(name) in ("key", "key name", "keyname"):
-                continue
-            try:
-                param_id = field.ParameterId
-            except Exception:
-                param_id = None
-            if not param_id:
-                continue
-
-            if name in params and params[name] != param_id:
-                existing_id = params.get(name)
-                if existing_id is not None:
-                    existing_display = "{} (Id {})".format(name, element_id_value(existing_id))
-                    if existing_display not in params:
-                        params[existing_display] = existing_id
-                    params.pop(name, None)
-                display_name = "{} (Id {})".format(name, element_id_value(param_id))
-            else:
-                display_name = name
-            params[display_name] = param_id
-    except Exception:
-        params = {}
-    finally:
-        try:
-            if transaction.HasStarted():
-                transaction.RollBack()
-        except Exception:
-            try:
-                transaction.RollBack()
+                definition = it.Key
+                binding = it.Current
+                for bound_cat in binding.Categories:
+                    try:
+                        if element_id_value(bound_cat.Id) != cat_id_val:
+                            continue
+                        name = (definition.Name or "").strip()
+                        if not name or _normalize_name(name) in ("key", "key name", "keyname"):
+                            break
+                        param_id = definition.Id
+                        if name in params and params[name] != param_id:
+                            existing_id = params[name]
+                            existing_display = "{} (Id {})".format(name, element_id_value(existing_id))
+                            if existing_display not in params:
+                                params[existing_display] = existing_id
+                            params.pop(name, None)
+                            display_name = "{} (Id {})".format(name, element_id_value(param_id))
+                        else:
+                            display_name = name
+                        params[display_name] = param_id
+                        break
+                    except Exception:
+                        pass
             except Exception:
                 pass
+    except Exception:
+        pass
     return params
 
 

@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renumber Sheets: `__main__` block now pre-loads the UI object before the try block so the error alert is available even if `load_uiutils()` itself is the failure source. Added telemetry tracking.
 - Family Swapper: auto-detection from selection now only fires when all selected `FamilyInstance` elements share the same family — a mixed selection no longer pre-populates the wrong source family.
 - Family Swapper: `_run()` now reuses the type-ID map built at dialog open instead of issuing a redundant `FilteredElementCollector` query on every Run click.
+- Import Key Schedule: `_elem_id_int` fallback branch used `.Value` (Revit 2024+ attribute) instead of `.IntegerValue`, causing `AttributeError` on Revit 2023 and earlier.
+- Import Key Schedule: replaced the schedule-probe transaction in `_get_schedulable_parameter_options` with a transaction-free `doc.ParameterBindings` lookup. The old probe created a temporary `ViewSchedule` inside a `DB.Transaction` and rolled it back, which corrupted Revit's undo stack and made the import operation non-undoable.
 
 ## [2.0.1] - 2026-06-22
 

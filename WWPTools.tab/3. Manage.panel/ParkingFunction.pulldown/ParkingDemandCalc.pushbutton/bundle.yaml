@@ -1,0 +1,9 @@
+title: "Parking\nLayout\nSolver"
+tooltip: |
+  Auto-place parking stall families inside a selected Room boundary.
+  Algorithm based on Parking Solver: edge-referenced outer spots + double-loaded
+  inner aisles from the longest boundary edge. Supports multiple spot types (e.g.
+  Standard + ADA), configurable stall dimensions, skirt offset, and perimetral modes.
+  Pick a Room, configure spot families and layout settings, then click Generate.
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/parking-layout-solver"
+author: "Jason Tian"
