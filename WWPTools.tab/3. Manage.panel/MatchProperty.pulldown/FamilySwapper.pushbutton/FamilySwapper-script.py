@@ -81,8 +81,9 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, 'FamilySwapper.xaml')
-        self._family_type_map = {}   # {family_name: [sorted type names]}
-        self._family_cat_map  = {}   # {family_name: category ElementId}
+        self._family_type_map    = {}  # {family_name: [sorted type names]}
+        self._family_cat_map     = {}  # {family_name: category ElementId}
+        self._family_type_id_map = {}  # {family_name: {type_name: element_id}}
         self._src_cat_id = None
         self._src_types = []
         self._tgt_types = []
@@ -111,23 +112,28 @@ class FamilySwapperWindow(forms.WPFWindow):
         all_tb_types = (DB.FilteredElementCollector(doc)
                         .OfClass(DB.FamilySymbol)
                         .ToElements())
-        fam_types = {}
-        fam_cats  = {}
+        fam_types    = {}
+        fam_cats     = {}
+        fam_type_ids = {}  # {family_name: {type_name: element_id}}
         for t in all_tb_types:
             fam = t.Family.Name if t.Family else ''
             p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
             typ = p.AsString() if p else ''
             if fam:
                 if fam not in fam_types:
-                    fam_types[fam] = []
-                if typ and typ not in fam_types[fam]:
-                    fam_types[fam].append(typ)
+                    fam_types[fam]    = []
+                    fam_type_ids[fam] = {}
+                if typ:
+                    if typ not in fam_types[fam]:
+                        fam_types[fam].append(typ)
+                    fam_type_ids[fam][typ] = _id_val(t.Id)
                 if fam not in fam_cats and t.Category:
                     fam_cats[fam] = t.Category.Id
         for fam in fam_types:
             fam_types[fam].sort()
-        self._family_type_map = fam_types
-        self._family_cat_map  = fam_cats
+        self._family_type_map    = fam_types
+        self._family_cat_map     = fam_cats
+        self._family_type_id_map = fam_type_ids
 
         families = sorted(fam_types.keys())
         for fam in families:
@@ -142,12 +148,15 @@ class FamilySwapperWindow(forms.WPFWindow):
 
     def _detect_source_family(self):
         try:
+            names = set()
             for eid in revit.uidoc.Selection.GetElementIds():
                 elem = doc.GetElement(eid)
                 if isinstance(elem, DB.FamilyInstance):
                     ftype = doc.GetElement(elem.GetTypeId())
                     if ftype and ftype.Family:
-                        return ftype.Family.Name
+                        names.add(ftype.Family.Name)
+            if len(names) == 1:
+                return names.pop()
         except Exception:
             pass
         return None
@@ -387,20 +396,10 @@ class FamilySwapperWindow(forms.WPFWindow):
             self._log('ERROR: Select target family.')
             return
 
-        all_types = (DB.FilteredElementCollector(doc)
-                     .OfCategoryId(cat_id)
-                     .WhereElementIsElementType()
-                     .ToElements())
-        src_type_ids, tgt_type_ids = {}, {}
         tgt_type_names = set(type_name_map.values())
-        for t in all_types:
-            fam = t.Family.Name if t.Family else ''
-            p = t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
-            typ = p.AsString() if p else ''
-            if fam == src_fam:
-                src_type_ids[typ] = _id_val(t.Id)
-            if fam == tgt_fam and typ in tgt_type_names:
-                tgt_type_ids[typ] = _id_val(t.Id)
+        src_type_ids   = dict(self._family_type_id_map.get(src_fam, {}))
+        tgt_type_ids   = {n: i for n, i in self._family_type_id_map.get(tgt_fam, {}).items()
+                          if n in tgt_type_names}
 
         type_id_map = {}
         for src_typ, tgt_typ in type_name_map.items():

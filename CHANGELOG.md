@@ -7,25 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-06-23
 
-### Fixed
+### Added
 
-- Super Renamer: replaced non-ASCII em dash characters in two UI strings that caused IronPython encoding errors.
+- Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets - e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` to `515T211D1`.
 
 ### Changed
 
 - Family Swapper: now works with all loadable family categories, not just Titleblocks. The family dropdowns are populated from every `FamilySymbol` in the document, and auto-detection from selection works for any `FamilyInstance`.
 
-### Added
+### Fixed
 
-- Renumber Sheets: added **ISO 19650 mode** checkbox. When checked, the "Starting Number" field is replaced by a single **Pattern** field. Type the full sheet number with the segment to increment wrapped in brackets - e.g. `515T[200]D1`. The tool increments only that bracketed segment, leaving the surrounding characters fixed. Example: selecting 12 sheets and entering `515T[200]D1` renumbers them `515T200D1` to `515T211D1`.
-
-### Fixed (code review)
-
+- Super Renamer: replaced non-ASCII em dash characters in two UI strings that caused IronPython encoding errors.
+- Renumber Sheets: added pre-flight check — target sheet numbers are validated against all unselected sheets before the transaction starts, preventing a mid-rename rollback when a new number conflicts with an existing sheet.
+- Renumber Sheets: two-pass rename now uses an index-based `_tmp_{n}` temp name instead of `_renumber_tmp_<original>`, eliminating length-overflow risk on long sheet numbers.
 - Renumber Sheets: regex in ISO 19650 parser was greedy and would pick the **last** bracket group when a pattern contained multiple (e.g. `[100]T[200]D1` would have incremented `[200]` incorrectly). Fixed with non-greedy match to always pick the first bracket group.
 - Renumber Sheets: guard checking for the UI helper function was checking the wrong function name, so a stale DLL would crash with `AttributeError` instead of showing a friendly reload prompt.
 - Renumber Sheets: `build_new_numbers` had a dead `reference_list` parameter that callers were passing, believing conflict-checking was happening. Removed the parameter; no conflict-checking was ever implemented.
-- Renumber Sheets: temporary sheet number prefix during the two-pass rename changed from `t` to `_renumber_tmp_` to reduce collision risk with real sheet numbers.
 - Renumber Sheets: `result.Iso19650Mode` access in `WWP_uiUtils.py` is now guarded with `getattr(..., False)` so a stale in-process DLL does not crash on tool launch.
+- Renumber Sheets: `__main__` block now pre-loads the UI object before the try block so the error alert is available even if `load_uiutils()` itself is the failure source. Added telemetry tracking.
+- Family Swapper: auto-detection from selection now only fires when all selected `FamilyInstance` elements share the same family — a mixed selection no longer pre-populates the wrong source family.
+- Family Swapper: `_run()` now reuses the type-ID map built at dialog open instead of issuing a redundant `FilteredElementCollector` query on every Run click.
 
 ## [2.0.1] - 2026-06-22
 

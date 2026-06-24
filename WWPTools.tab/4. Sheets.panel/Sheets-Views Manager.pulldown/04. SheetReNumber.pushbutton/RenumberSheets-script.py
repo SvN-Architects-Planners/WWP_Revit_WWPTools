@@ -112,7 +112,6 @@ def main():
 		return
 
 	selected_sheets = [sorted_sheets[i] for i in selected_indices]
-	sorted_keys = [s.SheetNumber or "" for s in selected_sheets]
 
 	if iso19650_mode:
 		parsed = parse_iso19650_pattern(starting_number)
@@ -131,17 +130,31 @@ def main():
 			return
 		new_numbers = build_new_numbers(starting_number, len(selected_sheets))
 
+	selected_set = {s.SheetNumber for s in selected_sheets if s.SheetNumber}
+	all_numbers  = {s.SheetNumber for s in sheets if s.SheetNumber}
+	conflicts    = [n for n in new_numbers if n in all_numbers - selected_set]
+	if conflicts:
+		ui.uiUtils_alert(
+			"These sheet numbers are already in use:\n{}{}".format(
+				"\n".join(conflicts[:20]),
+				"\n... and {} more".format(len(conflicts) - 20) if len(conflicts) > 20 else "",
+			),
+			title="Renumber Sheets",
+		)
+		return
+
 	with revit.Transaction("Renumber Sheets"):
-		for sheet in selected_sheets:
-			temp_value = "_renumber_tmp_{}".format(sheet.SheetNumber or "")
-			sheet.SheetNumber = temp_value
+		for idx, sheet in enumerate(selected_sheets):
+			sheet.SheetNumber = "_tmp_{}".format(idx)
 		for sheet, new_value in zip(selected_sheets, new_numbers):
 			sheet.SheetNumber = new_value
 
 
 if __name__ == "__main__":
+	_err_ui = load_uiutils()
 	try:
 		main()
+		import WWP_telemetry
+		WWP_telemetry.track_use("RenumberSheets")
 	except Exception:
-		ui = load_uiutils()
-		ui.uiUtils_alert(traceback.format_exc(), title="Renumber Sheets")
+		_err_ui.uiUtils_alert(traceback.format_exc(), title="Renumber Sheets")
