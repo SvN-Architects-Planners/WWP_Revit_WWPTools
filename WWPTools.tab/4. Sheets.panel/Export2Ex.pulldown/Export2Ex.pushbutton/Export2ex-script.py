@@ -622,6 +622,51 @@ def load_uiutils():
     return ui
 
 
+def _export_sets_to_file(saved_sets, ui, tool_name="Export2Ex"):
+    """Save current saved sets to an external .settings file."""
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import SaveFileDialog
+    dlg = SaveFileDialog()
+    dlg.Title = "Save Settings File"
+    dlg.Filter = "Export Settings (*.settings)|*.settings|All Files (*.*)|*.*"
+    dlg.DefaultExt = "settings"
+    dlg.FileName = "{}_sets.settings".format(tool_name)
+    if dlg.ShowDialog() != True:
+        return
+    try:
+        payload = {"tool": tool_name, "version": "1.0", "sets": saved_sets}
+        with open(dlg.FileName, "w") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        if ui:
+            ui.uiUtils_alert("Settings saved to:\n{}".format(dlg.FileName), title="Save Settings")
+    except Exception as exc:
+        if ui:
+            ui.uiUtils_alert("Could not save settings file:\n{}".format(exc), title="Save Settings")
+
+
+def _import_sets_from_file(ui):
+    """Load saved sets from an external .settings file. Returns dict or None if cancelled/failed."""
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import OpenFileDialog
+    dlg = OpenFileDialog()
+    dlg.Title = "Load Settings File"
+    dlg.Filter = "Export Settings (*.settings)|*.settings|All Files (*.*)|*.*"
+    dlg.CheckFileExists = True
+    if dlg.ShowDialog() != True:
+        return None
+    try:
+        with open(dlg.FileName, "r") as f:
+            data = json.load(f)
+        sets = data.get("sets", {})
+        if not isinstance(sets, dict):
+            raise ValueError("Invalid settings file: 'sets' key missing or not a dict.")
+        return sets
+    except Exception as exc:
+        if ui:
+            ui.uiUtils_alert("Could not load settings file:\n{}".format(exc), title="Load Settings")
+        return None
+
+
 def _to_net_str_list(values):
     lst = List[String]()
     for v in values:
@@ -1080,9 +1125,19 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     Grid.SetRow(footer, 2)
     outer.Children.Add(footer)
 
+    left_btns = StackPanel()
+    left_btns.Orientation = Orientation.Horizontal
+    left_btns.HorizontalAlignment = HorizontalAlignment.Left
+    footer.Children.Add(left_btns)
+
     settings_btn = Button(); settings_btn.Content = "Settings"
-    settings_btn.MinWidth = 80
-    settings_btn.HorizontalAlignment = HorizontalAlignment.Left
+    settings_btn.MinWidth = 80; settings_btn.Margin = Thickness(0, 0, 6, 0)
+
+    save_file_btn = Button(); save_file_btn.Content = "Save Settings..."
+    save_file_btn.MinWidth = 100; save_file_btn.Margin = Thickness(0, 0, 6, 0)
+
+    load_file_btn = Button(); load_file_btn.Content = "Load Settings..."
+    load_file_btn.MinWidth = 100
 
     def _open_settings(_s, _e):
         new_s = _show_export_settings_popup(current_settings, ui)
@@ -1104,8 +1159,22 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                 else:
                     lbl.Text = sanitize_sheet_name(sel)
 
+    def _save_file(_s, _e):
+        _export_sets_to_file(saved_sets, ui, tool_name="Export2Ex")
+
+    def _load_file(_s, _e):
+        imported = _import_sets_from_file(ui)
+        if imported is not None:
+            saved_sets.update(imported)
+            write_saved_sets(doc, saved_sets, saved_sets_param)
+            _rebuild_rows()
+
     settings_btn.Click += _open_settings
-    footer.Children.Add(settings_btn)
+    save_file_btn.Click += _save_file
+    load_file_btn.Click += _load_file
+    left_btns.Children.Add(settings_btn)
+    left_btns.Children.Add(save_file_btn)
+    left_btns.Children.Add(load_file_btn)
 
     right_btns = StackPanel()
     right_btns.Orientation = Orientation.Horizontal

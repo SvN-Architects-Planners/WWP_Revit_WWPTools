@@ -867,6 +867,51 @@ def _load_export_window():
     raise last_exc
 
 
+def _export_sets_to_file(saved_sets, ui, tool_name="Export2ExBeta"):
+    """Save current saved sets to an external .settings file."""
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import SaveFileDialog
+    dlg = SaveFileDialog()
+    dlg.Title = "Save Settings File"
+    dlg.Filter = "Export Settings (*.settings)|*.settings|All Files (*.*)|*.*"
+    dlg.DefaultExt = "settings"
+    dlg.FileName = "{}_sets.settings".format(tool_name)
+    if dlg.ShowDialog() != True:
+        return
+    try:
+        payload = {"tool": tool_name, "version": "1.0", "sets": saved_sets}
+        with open(dlg.FileName, "w") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        if ui:
+            ui.uiUtils_alert("Settings saved to:\n{}".format(dlg.FileName), title="Save Settings")
+    except Exception as exc:
+        if ui:
+            ui.uiUtils_alert("Could not save settings file:\n{}".format(exc), title="Save Settings")
+
+
+def _import_sets_from_file(ui):
+    """Load saved sets from an external .settings file. Returns dict or None if cancelled/failed."""
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import OpenFileDialog
+    dlg = OpenFileDialog()
+    dlg.Title = "Load Settings File"
+    dlg.Filter = "Export Settings (*.settings)|*.settings|All Files (*.*)|*.*"
+    dlg.CheckFileExists = True
+    if dlg.ShowDialog() != True:
+        return None
+    try:
+        with open(dlg.FileName, "r") as f:
+            data = json.load(f)
+        sets = data.get("sets", {})
+        if not isinstance(sets, dict):
+            raise ValueError("Invalid settings file: 'sets' key missing or not a dict.")
+        return sets
+    except Exception as exc:
+        if ui:
+            ui.uiUtils_alert("Could not load settings file:\n{}".format(exc), title="Load Settings")
+        return None
+
+
 def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_callback=None):
     """Primary UI for Export2Ex Beta: manage and batch-export saved sets."""
     clr.AddReference("PresentationFramework")
@@ -1080,12 +1125,29 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
 
     _rebuild_rows()
 
-    btns = StackPanel()
-    btns.Orientation = Orientation.Horizontal
-    btns.HorizontalAlignment = HorizontalAlignment.Right
-    btns.Margin = Thickness(0, 10, 0, 0)
-    Grid.SetRow(btns, 2)
-    outer.Children.Add(btns)
+    footer = Grid()
+    footer.Margin = Thickness(0, 10, 0, 0)
+    Grid.SetRow(footer, 2)
+    outer.Children.Add(footer)
+
+    left_btns = StackPanel()
+    left_btns.Orientation = Orientation.Horizontal
+    left_btns.HorizontalAlignment = HorizontalAlignment.Left
+    footer.Children.Add(left_btns)
+
+    save_file_btn = Button()
+    save_file_btn.Content = "Save Settings..."
+    save_file_btn.MinWidth = 100
+    save_file_btn.Margin = Thickness(0, 0, 6, 0)
+
+    load_file_btn = Button()
+    load_file_btn.Content = "Load Settings..."
+    load_file_btn.MinWidth = 100
+
+    right_btns = StackPanel()
+    right_btns.Orientation = Orientation.Horizontal
+    right_btns.HorizontalAlignment = HorizontalAlignment.Right
+    footer.Children.Add(right_btns)
 
     add_btn = Button()
     add_btn.Content = "Add Set"
@@ -1133,13 +1195,27 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     def _cancel(_s, _e):
         window.Close()
 
+    def _save_file(_s, _e):
+        _export_sets_to_file(saved_sets, ui, tool_name="Export2ExBeta")
+
+    def _load_file(_s, _e):
+        imported = _import_sets_from_file(ui)
+        if imported is not None:
+            saved_sets.update(imported)
+            write_saved_sets(doc, saved_sets)
+            _rebuild_rows()
+
     add_btn.Click += _add
     ok_btn.Click += _ok
     cancel_btn.Click += _cancel
+    save_file_btn.Click += _save_file
+    load_file_btn.Click += _load_file
 
-    btns.Children.Add(add_btn)
-    btns.Children.Add(ok_btn)
-    btns.Children.Add(cancel_btn)
+    left_btns.Children.Add(save_file_btn)
+    left_btns.Children.Add(load_file_btn)
+    right_btns.Children.Add(add_btn)
+    right_btns.Children.Add(ok_btn)
+    right_btns.Children.Add(cancel_btn)
 
     window.ShowDialog()
 
@@ -1174,21 +1250,14 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     remove_parameter_button = window.FindName("RemoveParameterButton")
     move_parameter_up_button = window.FindName("MoveParameterUpButton")
     move_parameter_down_button = window.FindName("MoveParameterDownButton")
-    excel_path = window.FindName("ExcelPath")
-    browse_excel = window.FindName("BrowseExcel")
-    query_excel_button = window.FindName("QueryExcelFields")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     batch_export_button = window.FindName("BatchExportButton")
     logo_image = window.FindName("LogoImage")
     show_read_only_filter = window.FindName("ShowReadOnlyFilter")
     sheet_name_box = window.FindName("SheetNameBox")
-    saved_set_box = window.FindName("SavedSetBox")
-    load_set_button = window.FindName("LoadSetButton")
-    save_set_button = window.FindName("SaveSetButton")
-    delete_set_button = window.FindName("DeleteSetButton")
+    set_name_box = window.FindName("SetNameBox")
 
-    excel_path.Text = init_excel_path or ""
     schedule_items = schedules or []
     category_items = categories or []
     parameter_cache = {}
@@ -1428,140 +1497,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _move_down(_sender=None, _args=None):
         _move_selected_parameters(1)
 
-    def _browse_excel(_sender, _args):
-        current = excel_path.Text or ""
-        file_name = os.path.basename(current) if current else "CategoryExport.xlsx"
-        initial_directory = ensure_existing_dir(
-            os.path.dirname(current) if current else "",
-            os.path.dirname(init_excel_path) if init_excel_path else get_default_dir(get_active_doc()),
-        )
-        try:
-            file_path = _pick_save_file(
-                title="Export Category Data to Excel",
-                filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                default_extension="xlsx",
-                initial_directory=initial_directory,
-                file_name=file_name,
-            )
-        except Exception as exc:
-            log_exception("Native browse Excel dialog failed", exc)
-            try:
-                file_path = _pick_save_file(
-                    title="Export Category Data to Excel",
-                    filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-                    default_extension="xlsx",
-                    initial_directory="",
-                    file_name=file_name,
-                )
-            except Exception as retry_exc:
-                log_exception("Native browse Excel dialog retry failed", retry_exc)
-                ui.uiUtils_alert(
-                    "Could not open the Excel save dialog. Check the suggested path and try again.",
-                    title="Export2Ex Beta",
-                )
-                return
-        if file_path:
-            excel_path.Text = file_path
-
-    def _query_excel_fields(_sender, _args):
-        path = os.path.expandvars((excel_path.Text or "").strip())
-        if not path or not os.path.isfile(path):
-            ui.uiUtils_alert(
-                "No existing Excel file found at the current path.\n\n"
-                "Browse to an existing exported file first, then click Query Fields.",
-                title="Query Fields from Excel",
-            )
-            return
-
-        selected_item = source_list.SelectedItem
-        category_id = _resolve_category_id(selected_item)
-        if category_id is None:
-            ui.uiUtils_alert(
-                "Select a category or schedule first.",
-                title="Query Fields from Excel",
-            )
-            return
-
-        target_sheet = (sheet_name_box.Text or "").strip() if sheet_name_box else ""
-
-        try:
-            add_lib_path()
-            import WWP_xlsx as _xlsx
-        except Exception:
-            try:
-                import openpyxl as _xlsx
-            except Exception as exc:
-                ui.uiUtils_alert(
-                    "Excel reader not available:\n{}".format(exc),
-                    title="Query Fields from Excel",
-                )
-                return
-
-        try:
-            wb = _xlsx.load_workbook(path)
-            if target_sheet and target_sheet in wb.sheetnames:
-                ws = wb[target_sheet]
-            elif wb.sheetnames:
-                ws = wb[wb.sheetnames[0]]
-            else:
-                ui.uiUtils_alert("The Excel file contains no sheets.", title="Query Fields from Excel")
-                return
-            headers = []
-            col = 1
-            while True:
-                val = ws.cell(row=1, column=col).value
-                if val is None:
-                    break
-                headers.append(str(val).strip())
-                col += 1
-        except Exception as exc:
-            ui.uiUtils_alert(
-                "Could not read the Excel file:\n{}".format(exc),
-                title="Query Fields from Excel",
-            )
-            return
-
-        if not headers:
-            ui.uiUtils_alert(
-                "No column headers found in row 1 of the Excel file.",
-                title="Query Fields from Excel",
-            )
-            return
-
-        available = set(opt["name"] for opt in _get_parameter_names(category_id))
-        found = []
-        missing = []
-        for h in headers:
-            if h == "Id":
-                continue
-            if h in available:
-                found.append(h)
-            else:
-                missing.append(h)
-
-        selected_params_by_category[category_id] = found
-        _refresh_parameter_list()
-
-        if missing:
-            ui.uiUtils_alert(
-                "{} column(s) from the Excel file have no matching Revit parameter "
-                "and were skipped:\n\n{}".format(
-                    len(missing),
-                    "\n".join("  - {}".format(m) for m in missing),
-                ),
-                title="Query Fields - Missing Parameters",
-            )
-
     saved_sets = read_saved_sets(doc)
-
-    def _refresh_saved_set_dropdown():
-        if saved_set_box is None:
-            return
-        current_text = saved_set_box.Text or ""
-        saved_set_box.Items.Clear()
-        for name in sorted(saved_sets.keys()):
-            saved_set_box.Items.Add(name)
-        saved_set_box.Text = current_text
 
     def _get_current_set_data():
         selected_item = source_list.SelectedItem
@@ -1573,7 +1509,6 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             "category_id": int(category_id) if category_id is not None else None,
             "param_names": list(selected_params_by_category.get(category_id, [])),
             "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
-            "excel_path": (excel_path.Text or "").strip() if excel_path is not None else "",
         }
 
     def _apply_saved_set(set_data):
@@ -1595,65 +1530,29 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
                     break
             if sheet_name_box is not None and saved_sheet:
                 sheet_name_box.Text = saved_sheet
-            if excel_path is not None and saved_excel:
-                excel_path.Text = saved_excel
             _refresh_parameter_list()
         finally:
             _initialized[0] = True
 
-    def _load_set(_sender=None, _args=None):
-        if saved_set_box is None:
-            return
-        name = (saved_set_box.Text or "").strip()
-        if not name or name not in saved_sets:
-            ui.uiUtils_alert("Select a saved set from the dropdown to load.", title="Export2Ex Beta")
-            return
-        _apply_saved_set(saved_sets[name])
-
-    def _save_set(_sender=None, _args=None):
-        if saved_set_box is None:
-            return
-        name = (saved_set_box.Text or "").strip()
-        if not name:
-            ui.uiUtils_alert("Type a name for the saved set before saving.", title="Export2Ex Beta")
-            return
-        saved_sets[name] = _get_current_set_data()
-        if not write_saved_sets(doc, saved_sets):
-            detail = "\n\n{}".format(_last_write_error) if _last_write_error else ""
-            ui.uiUtils_alert(
-                "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.{}".format(PARAM_SAVED_SETS, detail),
-                title="Export2Ex Beta",
-            )
-            return
-        _refresh_saved_set_dropdown()
-
-    def _delete_set(_sender=None, _args=None):
-        if saved_set_box is None:
-            return
-        name = (saved_set_box.Text or "").strip()
-        if not name or name not in saved_sets:
-            ui.uiUtils_alert("Select a saved set from the dropdown to delete.", title="Export2Ex Beta")
-            return
-        del saved_sets[name]
-        if not write_saved_sets(doc, saved_sets):
-            detail = "\n\n{}".format(_last_write_error) if _last_write_error else ""
-            ui.uiUtils_alert(
-                "Could not update '{}' on Project Information.{}".format(PARAM_SAVED_SETS, detail),
-                title="Export2Ex Beta",
-            )
-            return
-        saved_set_box.Text = ""
-        _refresh_saved_set_dropdown()
-
     _batch_result = [None]
 
-    def _batch_export(_sender, _args):
-        result = _show_beta_batch_dialog(saved_sets, doc)
-        if result is None:
+    def _save_set(_sender=None, _args=None):
+        name = (set_name_box.Text or "").strip() if set_name_box is not None else ""
+        if not name:
+            ui.uiUtils_alert("Enter a name in the Set name field before saving.", title="Export2Ex Beta")
             return
-        _batch_result[0] = result
-        window.DialogResult = False
-        window.Close()
+        new_data = _get_current_set_data()
+        existing = saved_sets.get(name) or {}
+        if existing.get("excel_path"):
+            new_data["excel_path"] = existing["excel_path"]
+        saved_sets[name] = new_data
+        if not write_saved_sets(doc, saved_sets):
+            ui.uiUtils_alert(
+                "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.".format(PARAM_SAVED_SETS),
+                title="Export2Ex Beta",
+            )
+            return
+        ui.uiUtils_alert("Set '{}' saved.".format(name), title="Export2Ex Beta")
 
     def _ok(_sender, _args):
         window.DialogResult = True
@@ -1686,24 +1585,14 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     remove_parameter_button.Click += _remove_parameters
     move_parameter_up_button.Click += _move_up
     move_parameter_down_button.Click += _move_down
-    browse_excel.Click += _browse_excel
-    if query_excel_button is not None:
-        query_excel_button.Click += _query_excel_fields
     ok_button.Click += _ok
     cancel_button.Click += _cancel
-    if load_set_button is not None:
-        load_set_button.Click += _load_set
-    if save_set_button is not None:
-        save_set_button.Click += _save_set
-    if delete_set_button is not None:
-        delete_set_button.Click += _delete_set
     if batch_export_button is not None:
-        batch_export_button.Click += _batch_export
+        batch_export_button.Click += _save_set
     if sheet_name_box is not None:
         sheet_name_box.TextChanged += _sheet_name_changed
-    _refresh_saved_set_dropdown()
-    if initial_set_name and saved_set_box is not None:
-        saved_set_box.Text = initial_set_name
+    if set_name_box is not None and initial_set_name:
+        set_name_box.Text = initial_set_name
     _refresh_source_list()
     _initialized[0] = True
 
@@ -1749,7 +1638,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "source_name": source_name,
         "category_id": category_id,
         "selected_param_names": list(selected_params_by_category.get(category_id, [])),
-        "excel_path": excel_path.Text or "",
+        "excel_path": "",
         "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
         "units_mode": units_mode,
     }
