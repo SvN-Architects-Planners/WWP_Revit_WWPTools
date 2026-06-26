@@ -10,7 +10,7 @@ import clr
 clr.AddReference('System.Xml')
 clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
-from System import String
+from System import String, Int64
 from System import Object
 from System.Collections.Generic import List
 from System.IO import File
@@ -1309,7 +1309,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if category_id is None:
             return []
         if category_id not in parameter_cache:
-            parameter_cache[category_id] = get_parameter_options_for_category(doc, DB.ElementId(category_id))
+            parameter_cache[category_id] = get_parameter_options_for_category(doc, DB.ElementId(Int64(category_id)))
         return parameter_cache[category_id]
 
     def _get_selected_parameter_names(category_id):
@@ -2285,7 +2285,7 @@ def main():
                 break
         category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
         sheet_name_raw = (result.get("sheet_name") or "").strip()
-        if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw, units_mode=result.get("units_mode", "project")):
+        if not export_to_excel(doc, category_name, DB.ElementId(Int64(category_id_value)), selected_param_names, file_path, ui, sheet_name=sheet_name_raw, units_mode=result.get("units_mode", "project")):
             return
         config.last_mode = _normalize_mode(result.get("mode"))
         config.last_schedule_id = result.get("source_id") if config.last_mode == MODE_FROM_SCHEDULE else None
@@ -2370,7 +2370,7 @@ def main():
         category_name = category_record["name"] if category_record else sname
         try:
             ok = export_to_excel(
-                doc, category_name, DB.ElementId(cat_id_val),
+                doc, category_name, DB.ElementId(Int64(cat_id_val)),
                 param_names, file_path, ui, sheet_name=sheet_name_val,
             )
             if ok:
