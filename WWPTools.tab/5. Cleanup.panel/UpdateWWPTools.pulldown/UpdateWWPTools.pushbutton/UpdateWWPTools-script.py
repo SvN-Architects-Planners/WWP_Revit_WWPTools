@@ -1146,7 +1146,7 @@ def _update_repo(repo_info, repo_root):
         confirm_msg = (
             confirm_msg +
             "\n\nThis update changes folder structure, file names, or created/deleted files.\n"
-            "WWPTools will update now, then pyRevit will reload automatically."
+            "WWPTools will update now. Please restart Revit afterwards to apply cleanly."
         )
     else:
         confirm_msg = (
@@ -1243,15 +1243,13 @@ def _update_repo(repo_info, repo_root):
             "WWPTools updated successfully.\n\n"
             "Previous version: {}\n"
             "New version:      {}\n\n"
-            "pyRevit will reload because this update changed folder structure, file names,\n"
-            "or created/deleted files.".format(current_label, after_label),
+            "This update changed folder structure or file names.\n"
+            "Please restart Revit to apply the changes cleanly.\n\n"
+            "(A pyRevit hot-reload is not used here because it can cause\n"
+            "'ribbon name already exists' errors when updating from older versions.)".format(
+                current_label, after_label),
             TITLE,
         )
-        if not _reload_pyrevit():
-            _alert(
-                "Could not reload pyRevit automatically.\n\nPlease restart Revit to apply the update.",
-                TITLE,
-            )
     else:
         _alert(
             "WWPTools updated successfully.\n\n"

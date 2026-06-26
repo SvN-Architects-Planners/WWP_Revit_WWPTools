@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parking Count in Room: added a **Parking families to include** multi-select list (pre-populated from the view). A text box and **+ Add** button let users include families not currently visible. Only selected families contribute to the count.
 - Parking Count in Room: replaced the always-on type-source combo with an **Include parking type breakdowns** checkbox. When unchecked, the tool writes just the total count. When checked, a Type parameter combo appears and the written value becomes a multi-line breakdown ("TypeA: 3\nTypeB: 2\n\nTotal: 5").
 
+## [2.0.1] - 2026-06-26
+
+### Fixed
+- Update WWPTools: structural-change updates no longer attempt a pyRevit hot-reload, which caused a `'The name already exists: MatchProperty'` ribbon error when updating from older versions. Users are now prompted to restart Revit instead, which is the only reliable way to rebuild the ribbon cleanly.
+
 ## [2.0.1] - 2026-06-18
 
 ### Changed
