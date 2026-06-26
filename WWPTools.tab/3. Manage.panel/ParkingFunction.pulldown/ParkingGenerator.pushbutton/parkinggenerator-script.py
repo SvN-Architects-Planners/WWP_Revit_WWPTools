@@ -1,4 +1,4 @@
-"""Parking Layout Solver - auto-places parking stall families inside a Room boundary.
+"""Parking Layout Solver - auto-places parking stall families inside a Room or Area boundary.
 
 Algorithm inspired by Parking Solver (Grasshopper plugin by Christian Siebje):
   - Perimetral spots: boundary edge-referenced stalls, perpendicular to each edge
@@ -18,10 +18,13 @@ from Autodesk.Revit.DB import Family as _Family, FamilySymbol as _FamilySymbol  
 from pyrevit import DB, revit, forms
 
 script_dir = os.path.dirname(__file__)
-lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.append(lib_path)
 from WWP_versioning import apply_window_title  # noqa: E402
+from WWP_settings import ProjectToolSettings   # noqa: E402
+
+_SETTINGS_KEY = "ParkingLayoutSolver"
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +46,14 @@ def _sqm(sqft):
 # ---------------------------------------------------------------------------
 # Parking family utilities
 # ---------------------------------------------------------------------------
+
+def _eid_int(element_id):
+    """ElementId -> int, works on Revit 2025+ (.Value) and 2024- (.IntegerValue)."""
+    try:
+        return int(element_id.Value)         # Revit 2025+
+    except AttributeError:
+        return int(element_id.IntegerValue)  # Revit 2024-
+
 
 def _sym_type_name(sym):
     """Get type name via SYMBOL_NAME_PARAM (element.Name unreliable in IronPython)."""
@@ -122,59 +133,83 @@ def _get_symbol(doc, family_name, type_name):
 # ---------------------------------------------------------------------------
 
 def _pick_room(doc, uidoc):
-    """Prompt user to click a Room element. Returns Room or None if cancelled."""
+    """Prompt user to click a Room or Area element. Returns element or None if cancelled."""
+    _valid_cats = {
+        int(DB.BuiltInCategory.OST_Rooms),
+        int(DB.BuiltInCategory.OST_Areas),
+    }
     try:
         clr.AddReference("RevitAPIUI")
         from Autodesk.Revit.UI.Selection import ObjectType
         ref = uidoc.Selection.PickObject(
             ObjectType.Element,
-            "Pick a Room as the parking boundary",
+            "Pick a Room or Area as the parking boundary",
         )
         elem = doc.GetElement(ref)
         if elem is None:
             return None
         try:
-            if int(elem.Category.Id.IntegerValue) == int(DB.BuiltInCategory.OST_Rooms):
+            if _eid_int(elem.Category.Id) in _valid_cats:
                 return elem
         except Exception:
             pass
-        forms.alert("Please select a Room element.", title="Parking Layout Solver")
+        forms.alert("Please select a Room or Area element.", title="Parking Layout Solver")
         return None
     except Exception:
         return None  # User pressed Escape
 
 
-def _get_room_info(room):
+def _get_room_info(elem):
+    """Return (label, area_sqm) for a Room or Area element."""
     try:
-        number = room.Number or ""
-        name = room.Name or ""
+        # Room: has .Number and .Name properties
+        number = getattr(elem, "Number", None) or ""
+        name   = getattr(elem, "Name",   None) or ""
+        # Area: fall back to parameters if attributes don't exist
+        if not number:
+            p = elem.get_Parameter(DB.BuiltInParameter.ROOM_NUMBER)
+            if p:
+                number = p.AsString() or ""
+        if not name:
+            p = elem.get_Parameter(DB.BuiltInParameter.ROOM_NAME)
+            if p:
+                name = p.AsString() or ""
+        is_area = (_eid_int(elem.Category.Id) == int(DB.BuiltInCategory.OST_Areas))
+        prefix = "Area" if is_area else "Room"
         label = ("{} - {}".format(number, name) if number and name
-                 else number or name or "Room")
+                 else number or name or prefix)
     except Exception:
-        label = "Room"
+        label = "Boundary"
     try:
-        area_sqm = _sqm(room.Area)
+        area_sqm = _sqm(elem.Area)
     except Exception:
         area_sqm = 0.0
     return label, area_sqm
 
 
 def _get_room_boundary(room):
-    """Returns list of XYZ corner points for the outer boundary loop."""
+    """Returns (outer_pts, holes) where outer_pts=[XYZ...], holes=[[XYZ...]...]."""
     try:
         opts = DB.SpatialElementBoundaryOptions()
         loops = room.GetBoundarySegments(opts)
         if not loops or loops.Count == 0:
-            return []
-        pts = []
-        for seg in list(loops[0]):
-            try:
-                pts.append(seg.GetCurve().GetEndPoint(0))
-            except Exception:
-                continue
-        return pts
+            return [], []
+        outer = []
+        holes = []
+        for loop_idx, loop in enumerate(loops):
+            pts = []
+            for seg in list(loop):
+                try:
+                    pts.append(seg.GetCurve().GetEndPoint(0))
+                except Exception:
+                    continue
+            if loop_idx == 0:
+                outer = pts
+            elif len(pts) >= 3:
+                holes.append(pts)
+        return outer, holes
     except Exception:
-        return []
+        return [], []
 
 
 def _is_in_room(room, xyz):
@@ -207,6 +242,102 @@ def _bbox2d(pts):
     """(min_x, min_y, max_x, max_y) for 2-D point list."""
     return (min(p[0] for p in pts), min(p[1] for p in pts),
             max(p[0] for p in pts), max(p[1] for p in pts))
+
+
+def _pt_in_poly2d(px, py, poly):
+    """Ray-casting point-in-polygon for 2-D tuples. Works for Room and Area boundaries."""
+    n = len(poly)
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]
+        xj, yj = poly[j]
+        if ((yi > py) != (yj > py)) and (
+                px < (xj - xi) * (py - yi) / (yj - yi + 1e-12) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
+def _rotation_for_normal(nx, ny):
+    """Z-axis rotation so the stall body extends in direction (nx, ny). rot = atan2(nx, -ny)."""
+    return math.atan2(nx, -ny)
+
+
+def _perimetral_all_edges(pts_2d, holes_2d, stall_w_ft, stall_d_ft, skirt_ft,
+                          base_z, max_run):
+    """
+    Place boundary stalls along EVERY polygon edge (world-space).
+    Stall backs against the wall, entries facing the room interior.
+    The skirt offset keeps corners away from the exact boundary so _pt_in_poly2d works.
+    """
+    positions = []
+    n = len(pts_2d)
+    if n < 3:
+        return positions
+
+    cx, cy = _centroid2d(pts_2d)
+
+    for i in range(n):
+        ax, ay = pts_2d[i]
+        bx, by = pts_2d[(i + 1) % n]
+        dx, dy = bx - ax, by - ay
+        L = math.sqrt(dx * dx + dy * dy)
+        if L < stall_w_ft * 2:
+            continue
+        ux, uy = dx / L, dy / L
+
+        # Inward normal (toward centroid)
+        nx, ny = -uy, ux
+        mx, my = (ax + bx) * 0.5, (ay + by) * 0.5
+        if nx * (cx - mx) + ny * (cy - my) < 0:
+            nx, ny = -nx, -ny
+
+        # Rotation: _rotation_for_normal(nx, ny) = atan2(nx, -ny).
+        # For top edge inward=(0,-1): atan2(0,1)=0 -> Facing=+Y -> body toward top wall. OK
+        # For bottom inward=(0,1): atan2(0,-1)=pi -> Facing=-Y -> body toward bottom wall. OK
+        # For left inward=(1,0): atan2(1,0)=pi/2 -> Facing=-X -> body toward left wall. OK
+        rot_stall = _rotation_for_normal(nx, ny)
+
+        EPSILON = 0.1  # ft (~3 cm) - keeps validation corners just inside polygon boundary
+
+        run = 0
+        t = stall_w_ft * 0.5
+        while t + stall_w_ft * 0.5 <= L:
+            if max_run > 0 and run >= max_run:
+                t += stall_w_ft
+                run = 0
+                continue
+
+            # Validate: outer corners at EPSILON from wall, inner at stall_d-EPSILON.
+            # Back of stall is flush to wall (no skirt gap in placement).
+            valid = True
+            for dt in [-stall_w_ft * 0.5, stall_w_ft * 0.5]:
+                for dd in [EPSILON, stall_d_ft - EPSILON]:
+                    cx_c = ax + (t + dt) * ux + dd * nx
+                    cy_c = ay + (t + dt) * uy + dd * ny
+                    if not _pt_in_poly2d(cx_c, cy_c, pts_2d):
+                        valid = False
+                        break
+                    for hole in holes_2d:
+                        if _pt_in_poly2d(cx_c, cy_c, hole):
+                            valid = False
+                            break
+                    if not valid:
+                        break
+                if not valid:
+                    break
+
+            if valid:
+                # Entry at stall_d from wall (aisle side). Back is flush against the wall.
+                entry_x = ax + t * ux + stall_d_ft * nx
+                entry_y = ay + t * uy + stall_d_ft * ny
+                positions.append((DB.XYZ(entry_x, entry_y, base_z), rot_stall))
+                run += 1
+
+            t += stall_w_ft
+
+    return positions
 
 
 def _candidate_angles(pts_2d):
@@ -244,89 +375,133 @@ def _candidate_angles(pts_2d):
 # Rotated-frame packing engine  (solver.js packAtAngle, translated to Python)
 # ---------------------------------------------------------------------------
 
-def _pack_at_angle(theta, pts_2d, stall_w, stall_d, aisle_w, max_run, base_z, room):
+def _pack_at_angle(theta, pts_2d, holes_2d, stall_w, stall_d, aisle_w, max_run, base_z,
+                   outer_depth=0.0, start_with_b=False, x_inset=0.0, max_run_gap=0.0):
     """
     Pack double-loaded stalls at orientation theta (radians).
+
+    Works for both Room and Area boundaries - uses _pt_in_poly2d on the rotated
+    boundary polygon instead of room.IsPointInRoom (which is Room-only).
 
     Algorithm (mirrors solver.js packAtAngle):
       1. Rotate boundary by -theta so rows become axis-aligned.
       2. Sweep double-loaded modules (Row-A + aisle + Row-B) with 5 phase offsets;
          keep the densest result.
-      3. Validate each candidate stall by checking ALL FOUR corners with
-         room.IsPointInRoom (world-space) -- replaces center-only check.
+      3. Validate all 4 stall corners via _pt_in_poly2d in the rotated frame.
       4. Rotate entry points back by +theta to world space.
 
     Rotation formulas (derived from MCP test, Facing = (-sin(r), cos(r))):
-      Row A entry at top of body (car enters from aisle above):
-        family rotation = pi + theta   (body goes -rotated-Y = away from aisle)
-      Row B entry at bottom of body (car enters from aisle below):
-        family rotation = theta        (body goes +rotated-Y = away from aisle)
+      Row A entry at top of body (car enters from aisle above): rot = pi + theta
+      Row B entry at bottom of body (car enters from aisle below): rot = theta
     """
     if len(pts_2d) < 3:
         return []
 
     cx, cy = _centroid2d(pts_2d)
-    chk_z = base_z + _ft(0.5)
-
-    # Rotate boundary to axis-aligned frame
-    rot_poly = [_rot2d(p[0], p[1], -theta, cx, cy) for p in pts_2d]
+    rot_poly  = [_rot2d(p[0], p[1], -theta, cx, cy) for p in pts_2d]
+    rot_holes = [[_rot2d(p[0], p[1], -theta, cx, cy) for p in h] for h in holes_2d]
     min_x, min_y, max_x, max_y = _bbox2d(rot_poly)
 
     M = 2.0 * stall_d + aisle_w   # full double-loaded module height
     rot_A = math.pi + theta        # Row A family rotation
     rot_B = theta                  # Row B family rotation
-    gap_run = stall_w              # gap width when max_run exceeded
+    gap_run = max_run_gap if max_run_gap > 0.0 else stall_w
 
     best = []
 
     # Phase sweep: try 5 y-start offsets (0, 0.2M, 0.4M, 0.6M, 0.8M).
     # Phase 0 is the original bottom-aligned grid, so the kept result can never
     # pack fewer stalls than before; shifted phases only ever add rows on irregular lots.
-    for phase_f in [0.0, 0.2, 0.4, 0.6, 0.8]:
-        y_start = min_y - phase_f * M
-        rows = []   # list of (y0, is_row_a)
-        y = y_start
-        guard = 0
+    # When start_with_b=True (perimetral mode): first Row B is ALWAYS fixed at
+    # min_y + outer_depth. The phase sweep only shifts the FULL MODULE sequence
+    # that follows. The partial Row B advances by stall_d only (body depth) so
+    # the next module's Row A starts immediately after the Row B body ends.
+    first_b_y = min_y + outer_depth  # fixed reference for perimetral first Row B
 
+    for phase_f in [0.0, 0.2, 0.4, 0.6, 0.8]:
+        rows = []   # list of (y0, is_row_a)
+
+        if start_with_b:
+            # Fixed first Row B - no phase offset on this row
+            if first_b_y + stall_d <= max_y + 0.5:
+                rows.append((first_b_y, False))
+            # Full modules start right after Row B body ends, phase-shifted
+            y = first_b_y + stall_d - phase_f * M
+            y = max(y, first_b_y + stall_d)  # cannot start before end of Row B body
+        else:
+            y = min_y + outer_depth - phase_f * M
+
+        guard = 0
         while guard < 2000:
             guard += 1
-            if y + M <= max_y + 0.5:             # full double-loaded module
+            if y + M <= max_y + 0.5:
                 rows.append((y, True))
                 rows.append((y + stall_d + aisle_w, False))
                 y += M
-            elif y + stall_d + aisle_w <= max_y + 0.5:   # single trailing row
+            elif y + stall_d + aisle_w <= max_y + 0.5 and not start_with_b:
                 rows.append((y, True))
                 y += stall_d + aisle_w
             else:
                 break
 
+        # Row width thresholds.
+        # MIN_ROW: skip rows with fewer than 20% of the bounding-box stall count.
+        # WIDTH_BREAK: stop the sweep when a row is narrower than 60% of the
+        #   widest row seen so far - detects entry into a narrow irregular extension.
+        # DEPTH_CAP: skip rows whose body end exceeds 75% of the total area depth -
+        #   prevents stalls spilling into the lower extension.
+        max_possible_row = max(1, int((max_x - min_x) / stall_w))
+        MIN_ROW = max(4, int(max_possible_row * 0.20))
+        depth_cap = min_y + (max_y - min_y) * 0.75
         positions = []
+        max_row_seen = 0   # widest valid row in this phase
+        stop_sweep = False
         for y0, is_row_a in rows:
+            if stop_sweep:
+                break
+            if y0 + stall_d > depth_cap:
+                break  # body would exceed usable area depth
             rot = rot_A if is_row_a else rot_B
-            x = min_x
+            # Alignment: Row A Hand projects -1 onto rotated-X (body centre = rx - stall_w/2).
+            #            Row B Hand projects +1 onto rotated-X (body centre = rx + stall_w/2).
+            # To align body centres: Row A starts stall_w ahead of Row B in rotated-x.
+            # End is shifted by the same amount so both rows have identical stall counts.
+            x_align_offset = stall_w if is_row_a else 0.0
+            x     = min_x + x_inset + x_align_offset
+            x_end = max_x - x_inset + x_align_offset   # shift end = same count as Row B
             run = 0
             guard2 = 0
+            slot = 0   # slot counts ALL stall positions (valid + invalid)
+            row_stalls = []
 
             while guard2 < 2000:
                 guard2 += 1
-                if x + stall_w > max_x + 0.5:
+                if x + stall_w > x_end + 0.5:
                     break
-                if max_run > 0 and run >= max_run:
+
+                # Slot-based gap: fire at every max_run slots regardless of validation
+                # so both rows gap at the same body-centre positions.
+                if max_run > 0 and slot > 0 and slot % max_run == 0:
                     x += gap_run
-                    run = 0
-                    continue
+                    if x + stall_w > x_end + 0.5:
+                        break
 
                 x0 = x
                 x += stall_w   # advance before validation (mirrors solver.js)
+                slot += 1
 
-                # 4 corners of stall footprint in rotated frame
-                # Validate by rotating each corner back to world and calling IsPointInRoom
+                # Validate all 4 corners: inside outer boundary, outside all holes.
                 valid = True
                 for crx, cry in [(x0, y0), (x0 + stall_w, y0),
                                  (x0 + stall_w, y0 + stall_d), (x0, y0 + stall_d)]:
-                    wx_c, wy_c = _rot2d(crx, cry, theta, cx, cy)
-                    if not room.IsPointInRoom(DB.XYZ(wx_c, wy_c, chk_z)):
+                    if not _pt_in_poly2d(crx, cry, rot_poly):
                         valid = False
+                        break
+                    for hole in rot_holes:
+                        if _pt_in_poly2d(crx, cry, hole):
+                            valid = False
+                            break
+                    if not valid:
                         break
 
                 if not valid:
@@ -336,8 +511,16 @@ def _pack_at_angle(theta, pts_2d, stall_w, stall_d, aisle_w, max_run, base_z, ro
                 stall_cx = x0 + stall_w * 0.5
                 ey_r = (y0 + stall_d) if is_row_a else y0
                 wx, wy = _rot2d(stall_cx, ey_r, theta, cx, cy)
-                positions.append((DB.XYZ(wx, wy, base_z), rot))
-                run += 1
+                row_stalls.append((DB.XYZ(wx, wy, base_z), rot))
+
+            n_stalls = len(row_stalls)
+            # Break sweep when row narrows to <60% of widest row (entered narrow zone)
+            if max_row_seen > 0 and n_stalls < max_row_seen * 0.60:
+                stop_sweep = True
+            elif n_stalls >= MIN_ROW:
+                positions.extend(row_stalls)
+                if n_stalls > max_row_seen:
+                    max_row_seen = n_stalls
 
         if len(positions) > len(best):
             best = positions
@@ -356,18 +539,24 @@ def _generate_all_positions(room, params):
     aisle_w    = _ft(params["aisle_w"])
     rot_off    = math.radians(params.get("rotation_offset", 0.0))
     perimetral = int(params.get("perimetral", 0))
-    max_run    = int(params.get("max_run", 0))
+    max_run     = int(params.get("max_run", 0))
+    max_run_gap = _ft(float(params.get("max_run_gap", 0.0)))
 
+    # Area elements return None for get_BoundingBox(None) - use Level elevation instead.
     bb = room.get_BoundingBox(None)
-    if bb is None:
-        return []
-    base_z = bb.Min.Z
-    chk_z  = base_z + _ft(0.5)
+    if bb is not None:
+        base_z = bb.Min.Z
+    else:
+        try:
+            base_z = doc.GetElement(room.LevelId).Elevation
+        except Exception:
+            base_z = 0.0
 
-    pts = _get_room_boundary(room)
-    if len(pts) < 3:
+    outer_pts, hole_pts = _get_room_boundary(room)
+    if len(outer_pts) < 3:
         return []
-    pts_2d = [(p.X, p.Y) for p in pts]
+    pts_2d    = [(p.X, p.Y) for p in outer_pts]
+    holes_2d  = [[(p.X, p.Y) for p in h] for h in hole_pts]
 
     # Multi-orientation search: try each candidate angle, keep best (>3% tolerance)
     angles = _candidate_angles(pts_2d)
@@ -375,71 +564,66 @@ def _generate_all_positions(room, params):
     best_inner = []
     best_theta = angles[0] if angles else 0.0
 
+    # Find the reference edge angle (longest edge) - used for perimetral alignment.
+    cx_ref, cy_ref = _centroid2d(pts_2d)
+    n_ref = len(pts_2d)
+    best_len_ref = -1
+    ref_theta = angles[0] if angles else 0.0
+    for i in range(n_ref):
+        ax, ay = pts_2d[i]
+        bx, by = pts_2d[(i + 1) % n_ref]
+        L = math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+        if L > best_len_ref:
+            best_len_ref = L
+            ref_theta = math.atan2(by - ay, bx - ax)
+
     for theta in angles:
         positions = _pack_at_angle(
-            theta, pts_2d, stall_w, stall_d, aisle_w,
-            max_run, base_z, room
+            theta, pts_2d, holes_2d, stall_w, stall_d, aisle_w,
+            max_run, base_z, max_run_gap=max_run_gap
         )
         if len(positions) > len(best_inner) * TOL:
             best_inner = positions
             best_theta = theta
 
-    # Perimetral mode 1: add a boundary row along the reference edge.
-    # The boundary row and first inner row share the same drive aisle (no gap between them).
+    # Perimetral mode 1: boundary stalls along ALL edges first, then inner rows.
+    # _perimetral_all_edges uses world-space geometry with a skirt offset so
+    # corners are never exactly on the polygon boundary (avoids _pt_in_poly2d edge case).
+    # Inner rows use:
+    #   outer_depth = stall_d + aisle_w  (inset from reference/long edge)
+    #   x_inset = stall_d + aisle_w      (inset from short edges)
+    #   start_with_b = True              (first inner row faces the shared aisle)
+    skirt_m_val = params.get("skirt", 0.5)
     outer_positions = []
     if perimetral >= 1 and pts_2d:
-        # Reference edge = longest boundary edge
-        cx, cy = _centroid2d(pts_2d)
-        n = len(pts_2d)
-        best_len = -1
-        ref_theta = best_theta
-        for i in range(n):
-            ax, ay = pts_2d[i]
-            bx, by = pts_2d[(i + 1) % n]
-            L = math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
-            if L > best_len:
-                best_len = L
-                ref_theta = math.atan2(by - ay, bx - ax)
+        outer_positions = _perimetral_all_edges(
+            pts_2d, holes_2d, stall_w, stall_d, _ft(skirt_m_val),
+            base_z, max_run
+        )
 
-        # In the rotated frame aligned to the reference edge, the boundary row sits
-        # at y = min_y (bottom), body from min_y to min_y+stall_d, entry at min_y+stall_d.
-        # Pack it using _pack_at_angle with a single phase (no sweep needed).
-        rot_poly = [_rot2d(p[0], p[1], -ref_theta, cx, cy) for p in pts_2d]
-        min_x, min_y, max_x, max_y = _bbox2d(rot_poly)
+        # Filter boundary stalls to the main rectangular area only.
+        # In the rotated frame, keep positions within 75% of the total area depth.
+        # This drops stalls on curved/diagonal edges and the lower irregular extension.
+        if outer_positions:
+            _cx, _cy = _centroid2d(pts_2d)
+            _rp = [_rot2d(p[0], p[1], -ref_theta, _cx, _cy) for p in pts_2d]
+            _min_y_r = min(p[1] for p in _rp)
+            _max_depth = (max(p[1] for p in _rp) - _min_y_r) * 0.75
+            outer_positions = [
+                (pt, r) for pt, r in outer_positions
+                if 0.0 <= _rot2d(pt.X, pt.Y, -ref_theta, _cx, _cy)[1] - _min_y_r <= _max_depth
+            ]
 
-        rot_outer = math.pi + ref_theta   # Row A orientation
-        x = min_x
-        guard = 0
-        run = 0
-        while guard < 2000:
-            guard += 1
-            if x + stall_w > max_x + 0.5:
-                break
-            if max_run > 0 and run >= max_run:
-                x += stall_w; run = 0; continue
-            x0 = x
-            x += stall_w
-            y0_outer = min_y
-            valid = True
-            for crx, cry in [(x0, y0_outer), (x0 + stall_w, y0_outer),
-                             (x0 + stall_w, y0_outer + stall_d), (x0, y0_outer + stall_d)]:
-                wx_c, wy_c = _rot2d(crx, cry, ref_theta, cx, cy)
-                if not room.IsPointInRoom(DB.XYZ(wx_c, wy_c, chk_z)):
-                    valid = False; break
-            if not valid:
-                continue
-            stall_cx = x0 + stall_w * 0.5
-            wx, wy = _rot2d(stall_cx, y0_outer + stall_d, ref_theta, cx, cy)
-            outer_positions.append((DB.XYZ(wx, wy, base_z), rot_outer))
-            run += 1
-
-        # Re-pack inner rows starting AFTER the shared aisle
-        # (boundary stall depth + aisle already consumed from the bottom)
-        if outer_positions and best_inner:
-            # The inner packing already placed rows from min_y; we keep it as is.
-            # To avoid overlap, filter inner positions that are in the perimetral zone.
-            # Easiest: just keep both; any overlap is a minor visual issue in a first pass.
-            pass
+        perim_inset = stall_d + aisle_w
+        best_inner = _pack_at_angle(
+            ref_theta, pts_2d, holes_2d, stall_w, stall_d, aisle_w,
+            max_run, base_z,
+            outer_depth=perim_inset,
+            start_with_b=True,
+            x_inset=perim_inset,
+            max_run_gap=max_run_gap,
+        )
+        best_theta = ref_theta
 
     all_pos = []
     for pt, rot in outer_positions:
@@ -503,11 +687,11 @@ def _place_families(doc, positions, rows_data, room):
 
 
 def _clear_stalls_in_room(doc, room):
-    """Delete all OST_Parking elements whose location point is inside the room."""
-    bb = room.get_BoundingBox(None)
-    if bb is None:
+    """Delete all OST_Parking elements whose location point is inside the Room/Area boundary."""
+    outer_pts, _ = _get_room_boundary(room)
+    if len(outer_pts) < 3:
         return 0
-    chk_z = bb.Min.Z + _ft(0.5)
+    poly_2d = [(p.X, p.Y) for p in outer_pts]
     collector = (
         DB.FilteredElementCollector(doc)
         .OfCategory(DB.BuiltInCategory.OST_Parking)
@@ -523,7 +707,7 @@ def _clear_stalls_in_room(doc, room):
                 pt = loc.Curve.Evaluate(0.5, True)
             else:
                 continue
-            if _is_in_room(room, DB.XYZ(pt.X, pt.Y, chk_z)):
+            if _pt_in_poly2d(pt.X, pt.Y, poly_2d):
                 to_delete.append(elem.Id)
         except Exception:
             continue
@@ -591,6 +775,7 @@ def _show_dialog(doc, room, families):
     perimetral_combo = window.FindName("PerimetralCombo")
     rotation_text    = window.FindName("RotationText")
     max_run_text     = window.FindName("MaxRunText")
+    max_run_gap_text = window.FindName("MaxRunGapText")
     generate_btn     = window.FindName("GenerateButton")
     clear_btn        = window.FindName("ClearButton")
     close_btn        = window.FindName("CloseButton")
@@ -632,10 +817,10 @@ def _show_dialog(doc, room, families):
                 pass
         textbox.TextChanged += _chg
 
-    _sync_s(stall_w_slider, stall_w_text, "{:.2f}")
-    _sync_s(stall_d_slider, stall_d_text, "{:.2f}")
-    _sync_s(aisle_slider,   aisle_text,   "{:.2f}")
-    _sync_s(skirt_slider,   skirt_text,   "{:.2f}")
+    _sync_s(stall_w_slider, stall_w_text, "{:.1f}")
+    _sync_s(stall_d_slider, stall_d_text, "{:.1f}")
+    _sync_s(aisle_slider,   aisle_text,   "{:.1f}")
+    _sync_s(skirt_slider,   skirt_text,   "{:.1f}")
     _sync_t(stall_w_text, stall_w_slider)
     _sync_t(stall_d_text, stall_d_slider)
     _sync_t(aisle_text,   aisle_slider)
@@ -643,7 +828,70 @@ def _show_dialog(doc, room, families):
 
     for label_txt in ["0 - Inner spots only", "1 - Boundary spots + inner"]:
         perimetral_combo.Items.Add(label_txt)
-    perimetral_combo.SelectedIndex = 0
+    perimetral_combo.SelectedIndex = 1  # default: boundary spots + inner
+
+    # --- Load saved settings ---
+    _cfg = None
+    try:
+        _cfg = ProjectToolSettings(_SETTINGS_KEY, doc)
+        def _load_slider(slider, textbox, key, fmt="{:.1f}"):
+            try:
+                val = float(getattr(_cfg, key))
+                if slider.Minimum <= val <= slider.Maximum:
+                    slider.Value = val
+                    textbox.Text = fmt.format(val)
+            except AttributeError:
+                pass
+        _load_slider(stall_w_slider, stall_w_text, "stall_w")
+        _load_slider(stall_d_slider, stall_d_text, "stall_d")
+        _load_slider(aisle_slider,   aisle_text,   "aisle_w")
+        _load_slider(skirt_slider,   skirt_text,   "skirt")
+        try:
+            rotation_text.Text = str(getattr(_cfg, "rotation", 0))
+        except Exception:
+            pass
+        try:
+            max_run_text.Text = str(getattr(_cfg, "max_run", 0))
+            try:
+                max_run_gap_text.Text = str(getattr(_cfg, "max_run_gap", 0.0))
+            except Exception:
+                pass
+        except Exception:
+            pass
+        try:
+            idx = int(getattr(_cfg, "perimetral", 1))
+            if 0 <= idx < perimetral_combo.Items.Count:
+                perimetral_combo.SelectedIndex = idx
+        except AttributeError:
+            pass
+    except Exception:
+        _cfg = None
+
+    def _save_settings():
+        try:
+            cfg = ProjectToolSettings(_SETTINGS_KEY, doc)
+            cfg.stall_w   = float(stall_w_text.Text.replace(",", "."))
+            cfg.stall_d   = float(stall_d_text.Text.replace(",", "."))
+            cfg.aisle_w   = float(aisle_text.Text.replace(",", "."))
+            cfg.skirt     = float(skirt_text.Text.replace(",", "."))
+            cfg.perimetral = perimetral_combo.SelectedIndex
+            cfg.rotation  = float(rotation_text.Text.replace(",", "."))
+            cfg.max_run     = int(max_run_text.Text.strip() or "0")
+            cfg.max_run_gap = float(max_run_gap_text.Text.replace(",", ".") or "0")
+            saved_rows = []
+            for row in _rows:
+                fn = str(row["family_combo"].SelectedItem or "")
+                tn = str(row["type_combo"].SelectedItem or "")
+                try:
+                    cnt = int(row["count_text"].Text.strip())
+                except (ValueError, Exception):
+                    cnt = 0
+                if fn and tn:
+                    saved_rows.append({"fn": fn, "tn": tn, "cnt": cnt})
+            cfg.rows = saved_rows
+            cfg.save()
+        except Exception:
+            pass
 
     # Colours used for dynamically-created row controls
     sorted_families = sorted(families.keys())
@@ -726,10 +974,14 @@ def _show_dialog(doc, room, families):
                 return
             try:
                 w, d = _read_family_dims(doc, fn, tn)
-                if w is not None and stall_w_slider.Minimum <= w <= stall_w_slider.Maximum:
-                    stall_w_slider.Value = w
-                if d is not None and stall_d_slider.Minimum <= d <= stall_d_slider.Maximum:
-                    stall_d_slider.Value = d
+                if w is not None:
+                    w1 = round(w * 10) / 10.0  # snap to 0.1m
+                    if stall_w_slider.Minimum <= w1 <= stall_w_slider.Maximum:
+                        stall_w_slider.Value = w1
+                if d is not None:
+                    d1 = round(d * 10) / 10.0
+                    if stall_d_slider.Minimum <= d1 <= stall_d_slider.Maximum:
+                        stall_d_slider.Value = d1
             except Exception:
                 pass
 
@@ -760,7 +1012,36 @@ def _show_dialog(doc, room, families):
         db.Click += _on_del
 
     add_row_btn.Click += lambda s, e: _add_row()
-    _add_row()  # One default row on open
+
+    # Restore saved family rows, or add one default row
+    _rows_restored = False
+    try:
+        if _cfg is not None:
+            saved_rows = getattr(_cfg, "rows", None)
+            if saved_rows and isinstance(saved_rows, list):
+                for rd in saved_rows:
+                    fn = rd.get("fn", "")
+                    tn = rd.get("tn", "")
+                    cnt = rd.get("cnt", 0)
+                    if fn in families:
+                        _add_row()
+                        r = _rows[-1]
+                        if str(r["family_combo"].SelectedItem or "") != fn:
+                            try:
+                                r["family_combo"].SelectedItem = fn
+                            except Exception:
+                                pass
+                        if tn in families.get(fn, []):
+                            try:
+                                r["type_combo"].SelectedItem = tn
+                            except Exception:
+                                pass
+                        r["count_text"].Text = str(cnt)
+                        _rows_restored = True
+    except Exception:
+        pass
+    if not _rows_restored:
+        _add_row()  # One default row on open
 
     # --- Status helper ---
     def _set_status(msg, ok=True):
@@ -792,6 +1073,10 @@ def _show_dialog(doc, room, families):
             max_run_val = int(max_run_text.Text.strip())
         except (ValueError, Exception):
             max_run_val = 0
+        try:
+            max_run_gap_val = float(max_run_gap_text.Text.replace(",", ".")) if max_run_gap_text else 0.5
+        except (ValueError, Exception):
+            max_run_gap_val = 0.5
 
         perim = perimetral_combo.SelectedIndex if perimetral_combo.SelectedIndex >= 0 else 0
 
@@ -800,6 +1085,7 @@ def _show_dialog(doc, room, families):
             "skirt": sk, "perimetral": perim,
             "rotation_offset": rot_off,
             "max_run": max_run_val,
+            "max_run_gap": max_run_gap_val,
         }
 
         _set_status("Calculating positions...", ok=True)
@@ -847,6 +1133,7 @@ def _show_dialog(doc, room, families):
                 msg += " (partial errors)"
             _set_status(msg, ok=True)
             stall_count_text.Text = "{} placed".format(placed)
+            _save_settings()   # persist settings after a successful generate
 
     # --- Clear ---
     def _on_clear(s, e):
@@ -856,7 +1143,7 @@ def _show_dialog(doc, room, families):
 
     generate_btn.Click += _on_generate
     clear_btn.Click    += _on_clear
-    close_btn.Click    += lambda s, e: window.Close()
+    close_btn.Click    += lambda s, e: (_save_settings(), window.Close())
 
     window.ShowDialog()
 

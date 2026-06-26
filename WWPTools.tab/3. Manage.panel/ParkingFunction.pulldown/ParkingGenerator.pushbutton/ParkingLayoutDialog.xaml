@@ -124,7 +124,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Parking Layout Solver"
                        FontSize="17" FontWeight="SemiBold" Foreground="#17324D"/>
-            <TextBlock Text="Pick a Room boundary, configure spot types and layout, then Generate."
+            <TextBlock Text="Pick a Room or Area boundary, configure spot types and layout, then Generate."
                        FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
         </StackPanel>
 
@@ -141,7 +141,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="BOUNDARY ROOM"
+                    <TextBlock Text="BOUNDARY ROOM / AREA"
                                Style="{StaticResource SectionLabel}"
                                Margin="0,0,0,3"/>
                     <TextBlock x:Name="RoomNameText"
@@ -237,10 +237,10 @@
                             </Grid.ColumnDefinitions>
                             <Slider x:Name="StallWidthSlider" Grid.Column="0"
                                     Minimum="2.2" Maximum="3.5" Value="2.5"
-                                    SmallChange="0.05" LargeChange="0.25"
+                                    SmallChange="0.1" LargeChange="0.5" IsSnapToTickEnabled="True" TickFrequency="0.1"
                                     VerticalAlignment="Center"/>
                             <TextBox x:Name="StallWidthText" Grid.Column="1"
-                                     Text="2.50" TextAlignment="Right" Margin="5,0"/>
+                                     Text="2.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
@@ -256,10 +256,10 @@
                             </Grid.ColumnDefinitions>
                             <Slider x:Name="StallDepthSlider" Grid.Column="0"
                                     Minimum="4.5" Maximum="6.5" Value="5.0"
-                                    SmallChange="0.05" LargeChange="0.25"
+                                    SmallChange="0.1" LargeChange="0.5" IsSnapToTickEnabled="True" TickFrequency="0.1"
                                     VerticalAlignment="Center"/>
                             <TextBox x:Name="StallDepthText" Grid.Column="1"
-                                     Text="5.00" TextAlignment="Right" Margin="5,0"/>
+                                     Text="5.0" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
@@ -275,10 +275,10 @@
                             </Grid.ColumnDefinitions>
                             <Slider x:Name="AisleWidthSlider" Grid.Column="0"
                                     Minimum="5.0" Maximum="9.0" Value="6.5"
-                                    SmallChange="0.1" LargeChange="0.5"
+                                    SmallChange="0.1" LargeChange="0.5" IsSnapToTickEnabled="True" TickFrequency="0.1"
                                     VerticalAlignment="Center"/>
                             <TextBox x:Name="AisleWidthText" Grid.Column="1"
-                                     Text="6.50" TextAlignment="Right" Margin="5,0"/>
+                                     Text="6.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
@@ -299,10 +299,10 @@
                             </Grid.ColumnDefinitions>
                             <Slider x:Name="SkirtSlider" Grid.Column="0"
                                     Minimum="0.0" Maximum="2.0" Value="0.5"
-                                    SmallChange="0.05" LargeChange="0.25"
+                                    SmallChange="0.1" LargeChange="0.5" IsSnapToTickEnabled="True" TickFrequency="0.1"
                                     VerticalAlignment="Center"/>
                             <TextBox x:Name="SkirtText" Grid.Column="1"
-                                     Text="0.50" TextAlignment="Right" Margin="5,0"/>
+                                     Text="0.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
@@ -326,7 +326,7 @@
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                             <TextBox x:Name="RotationText" Grid.Column="1"
                                      Text="0" TextAlignment="Right" Margin="5,0"/>
-                            <TextBlock Grid.Column="2" Text="°"
+                            <TextBlock Grid.Column="2" Text="deg"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
                         </Grid>
@@ -346,6 +346,25 @@
                             <TextBox x:Name="MaxRunText" Grid.Column="1"
                                      Text="0" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="#"
+                                       VerticalAlignment="Center"
+                                       Foreground="#9CA3AF" FontSize="11"/>
+                        </Grid>
+
+                        <!-- Max run gap width -->
+                        <TextBlock Text="Max run gap width" Style="{StaticResource ParamLabel}" Margin="0,8,0,3"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="52"/>
+                                <ColumnDefinition Width="18"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Gap between runs (e.g. 0.5 m every N stalls)."
+                                       FontSize="11" Foreground="#9CA3AF"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBox x:Name="MaxRunGapText" Grid.Column="1"
+                                     Text="0.5" TextAlignment="Right" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
                                        Foreground="#9CA3AF" FontSize="11"/>
                         </Grid>
