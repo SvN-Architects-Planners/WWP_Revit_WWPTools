@@ -13,7 +13,7 @@ from WWP_settings import get_tool_settings
 TITLE = "Import Key Schedule from Excel"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
-TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
+TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule", "Door Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
 PROJECT_SETTINGS_PARAM = "! P_STATS_KeyScheduleMap"
@@ -895,10 +895,18 @@ def _is_bic_value(cat_id, bic):
         return False
 
 
+_TARGET_MAP = [
+    (TARGET_OPTIONS[0], DB.BuiltInCategory.OST_Areas,   "Area"),
+    (TARGET_OPTIONS[1], DB.BuiltInCategory.OST_Rooms,   "Room"),
+    (TARGET_OPTIONS[2], DB.BuiltInCategory.OST_Doors,   "Door"),
+]
+
 def resolve_schedule_target(selected_target_type):
-    if _normalize_name(selected_target_type) == _normalize_name(TARGET_OPTIONS[1]):
-        return {"bic": DB.BuiltInCategory.OST_Rooms, "label": "Room"}
-    return {"bic": DB.BuiltInCategory.OST_Areas, "label": "Area"}
+    key = _normalize_name(selected_target_type)
+    for option, bic, label in _TARGET_MAP:
+        if _normalize_name(option) == key:
+            return {"bic": bic, "label": label}
+    return {"bic": _TARGET_MAP[0][1], "label": _TARGET_MAP[0][2]}
 
 
 def add_lib_path():
@@ -994,7 +1002,7 @@ def get_category_parameter_options(doc, category_bic):
 
 
 def _get_schedulable_parameter_options(doc, category_bic):
-    # Read parameters from doc.ParameterBindings — no transaction needed and
+    # Read parameters from doc.ParameterBindings -- no transaction needed and
     # avoids the rolled-back ViewSchedule probe that corrupts Revit's undo stack.
     params = {}
     try:

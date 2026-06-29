@@ -5,6 +5,16 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Import Key Schedule: added **Door Key Schedule** as a third target category alongside Area and Room. The `resolve_schedule_target` function now uses an indexed lookup table (`_TARGET_MAP`) instead of a hard-coded if/else, making future category additions a one-liner.
+
+### Fixed
+
+- Import Key Schedule: replaced non-ASCII em dash in a source comment that caused IronPython to fail importing the script.
+
 ## [2.1.0] - 2026-06-23
 
 ### Added
