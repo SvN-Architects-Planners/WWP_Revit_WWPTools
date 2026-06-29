@@ -70,6 +70,7 @@ TARGET_OPTIONS = [
     ("Family names", "family_names"),
     ("Type names", "type_names"),
     ("Instance parameter values", "instance_params"),
+    ("Type parameter values", "type_params"),
 ]
 
 ELEMENT_SCOPE_OPTIONS = [
@@ -374,7 +375,42 @@ def _set_param_value(element, param_name, new_value):
     param.Set(new_value)
 
 
-def _get_params_by_family(current_doc, scope_key, cat_id=None):
+def _get_type_param_value(element, param_name):
+    """Read any writable parameter as a display string (all storage types except ElementId)."""
+    param = element.LookupParameter(param_name)
+    if param is None or param.IsReadOnly or param.StorageType == DB.StorageType.ElementId:
+        return None
+    if param.StorageType == DB.StorageType.String:
+        val = param.AsString()
+        return val if val is not None else ""
+    val = param.AsValueString()
+    return val if val is not None else ""
+
+
+def _set_type_param_value(element, param_name, new_value):
+    """Set any writable parameter from a string value (all storage types except ElementId)."""
+    param = element.LookupParameter(param_name)
+    if param is None or param.IsReadOnly:
+        raise Exception("Parameter '{}' not found or read-only".format(param_name))
+    if param.StorageType == DB.StorageType.String:
+        param.Set(new_value)
+    elif param.StorageType == DB.StorageType.Integer:
+        val_lower = new_value.strip().lower()
+        if val_lower in ("yes", "true", "1"):
+            param.Set(1)
+        elif val_lower in ("no", "false", "0"):
+            param.Set(0)
+        else:
+            param.Set(int(new_value.strip()))
+    elif param.StorageType == DB.StorageType.Double:
+        param.SetValueString(new_value.strip())
+    elif param.StorageType == DB.StorageType.ElementId:
+        raise Exception("ElementId parameters cannot be set by value string")
+    else:
+        raise Exception("Unsupported storage type for parameter '{}'".format(param_name))
+
+
+def _get_params_by_family(current_doc, scope_key, cat_id=None, target_key="instance_params"):
     """Returns (all_params_sorted, [(family_name, param_names_sorted)]) including both instance and type params."""
     all_params = set()
     family_params = {}  # family_name -> set of param names
@@ -403,7 +439,40 @@ def _get_params_by_family(current_doc, scope_key, cat_id=None):
         except Exception:
             pass
 
-    if scope_key == "Current Selection":
+    def _scan_type_element(element, family_name):
+        if family_name not in family_params:
+            family_params[family_name] = set()
+        try:
+            for param in element.Parameters:
+                try:
+                    if (not param.IsReadOnly and
+                            param.StorageType != DB.StorageType.ElementId):
+                        pname = param.Definition.Name
+                        all_params.add(pname)
+                        family_params[family_name].add(pname)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if target_key == "type_params":
+        if scope_key == "Current Selection":
+            types = _get_selected_types(current_doc)
+        else:
+            types = []
+            try:
+                types = list(
+                    DB.FilteredElementCollector(current_doc)
+                    .OfCategoryId(cat_id)
+                    .WhereElementIsElementType()
+                    .ToElements()
+                )
+            except Exception:
+                pass
+        for elem_type in types:
+            fname = _family_name_for_type(elem_type)
+            _scan_type_element(elem_type, fname)
+    elif scope_key == "Current Selection":  # instance_params with current selection
         try:
             selected_ids = list(__revit__.ActiveUIDocument.Selection.GetElementIds())
         except Exception:
@@ -544,6 +613,27 @@ def collect_elements_with_param(current_doc, scope_key, cat_id, param_name, igno
         except Exception:
             continue
         if _get_param_value(elem, param_name) is not None:
+            result.append(elem)
+    return result
+
+
+def collect_types_with_param(current_doc, scope_key, cat_id, param_name):
+    """Collect ElementTypes that have the given writable param, including unplaced types."""
+    if scope_key == "Current Selection":
+        candidates = _get_selected_types(current_doc)
+    else:
+        candidates = _collect_types_by_category(current_doc, cat_id)
+    result = []
+    seen_ids = set()
+    for elem in candidates:
+        try:
+            eid = _elem_id_int(elem.Id)
+            if eid in seen_ids:
+                continue
+            seen_ids.add(eid)
+        except Exception:
+            continue
+        if _get_type_param_value(elem, param_name) is not None:
             result.append(elem)
     return result
 
@@ -721,6 +811,50 @@ def apply_param_renames(current_doc, planned, param_name, transaction_title, sco
     return renamed, failed
 
 
+def plan_type_param_renames(elements, param_name, find_text, replace_text, prefix, suffix, overwrite_value=None):
+    """Plan renames for type parameters of any storage type (String, Integer, Double)."""
+    planned = []
+    skipped = []
+    for element in elements:
+        old_value = _get_type_param_value(element, param_name)
+        if old_value is None:
+            continue
+        if overwrite_value is not None:
+            new_value = overwrite_value
+        else:
+            new_value = _build_new_name(old_value, find_text, replace_text, prefix, suffix).strip()
+        if new_value == old_value:
+            continue
+        if len(new_value) > 255:
+            skipped.append((old_value, new_value, "value too long"))
+            continue
+        planned.append((element, old_value, new_value))
+    return planned, skipped
+
+
+def apply_type_param_renames(current_doc, planned, param_name, transaction_title, scope_name):
+    """Apply type parameter renames supporting all storage types (String, Integer, Double)."""
+    renamed = []
+    failed = []
+    transaction = DB.Transaction(current_doc, "{}: {} - {}".format(transaction_title, scope_name, param_name))
+    try:
+        transaction.Start()
+        for element, old_value, new_value in planned:
+            try:
+                _set_type_param_value(element, param_name, new_value)
+                renamed.append((old_value, new_value))
+            except Exception as ex:
+                failed.append((old_value, new_value, str(ex)))
+        transaction.Commit()
+    except Exception as ex:
+        try:
+            transaction.RollBack()
+        except Exception:
+            pass
+        return [], failed + [("<transaction>", "<commit>", str(ex))]
+    return renamed, failed
+
+
 def _ensure_theme(lib_path):
     try:
         ver = int(str(__revit__.Application.VersionNumber))
@@ -822,7 +956,7 @@ def show_dialog(script_dir, lib_path, mode):
             return str(item or "")
 
     def _is_param_mode():
-        return _target_key() == "instance_params"
+        return _target_key() in ("instance_params", "type_params")
 
     def _reset_param_panel():
         if pnl_parameters is not None:
@@ -884,7 +1018,7 @@ def show_dialog(script_dir, lib_path, mode):
         txt_source.Text = _source_label(_selected_key())
         # ignore-groups checkbox only relevant for param mode
         if chk_ignore_groups is not None:
-            chk_ignore_groups.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
+            chk_ignore_groups.Visibility = Visibility.Visible if _target_key() == "instance_params" else Visibility.Collapsed
 
     _refresh_target_controls()
 
@@ -909,7 +1043,7 @@ def show_dialog(script_dir, lib_path, mode):
         _reset_param_panel()
 
     def _on_load(sender, args):
-        all_params, families = _get_params_by_family(doc, _selected_key(), _selected_category_id())
+        all_params, families = _get_params_by_family(doc, _selected_key(), _selected_category_id(), _target_key())
         _populate_param_list(lst_parameters, all_params, families)
         if pnl_parameters is not None:
             pnl_parameters.Visibility = Visibility.Visible
@@ -1007,6 +1141,8 @@ def run(script_dir, lib_path, mode):
     # Collect elements
     if target_key == "instance_params":
         elements = collect_elements_with_param(doc, scope_key, cat_id, param_name, ignore_groups)
+    elif target_key == "type_params":
+        elements = collect_types_with_param(doc, scope_key, cat_id, param_name)
     else:
         elements = collect_target_elements(doc, target_key, scope_key, cat_id, ignore_groups)
 
@@ -1018,7 +1154,12 @@ def run(script_dir, lib_path, mode):
         ui.uiUtils_alert(msg, title=config["title"])
         return
 
-    if target_key == "instance_params":
+    if target_key == "type_params":
+        planned, skipped = plan_type_param_renames(
+            elements, param_name, find_text, replace_text, prefix, suffix,
+            overwrite_value=overwrite_value if is_overwrite else None,
+        )
+    elif target_key == "instance_params":
         planned, skipped = plan_param_renames(
             elements, param_name, find_text, replace_text, prefix, suffix,
             overwrite_value=overwrite_value if is_overwrite else None,
@@ -1040,7 +1181,7 @@ def run(script_dir, lib_path, mode):
         "Scope:     {}".format(scope_display),
         "Target:    {}".format(target_display),
     ]
-    if target_key == "instance_params":
+    if target_key in ("instance_params", "type_params"):
         lines.append("Parameter: {}".format(param_name))
     if is_overwrite:
         lines.append("Mode:      Overwrite  ->  \"{}\"".format(overwrite_value))
@@ -1070,7 +1211,11 @@ def run(script_dir, lib_path, mode):
     if not proceed:
         return
 
-    if target_key == "instance_params":
+    if target_key == "type_params":
+        renamed, failed = apply_type_param_renames(
+            doc, planned, param_name, config["transaction_title"], scope_display
+        )
+    elif target_key == "instance_params":
         renamed, failed = apply_param_renames(
             doc, planned, param_name, config["transaction_title"], scope_display
         )
