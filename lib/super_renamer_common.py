@@ -66,26 +66,32 @@ def _mode_config(mode):
 
 
 TARGET_OPTIONS = [
-    ("Element names", "element_names"),
-    ("Family names", "family_names"),
+    ("Element names  (Views, Sheets, Rooms...)", "element_names"),
     ("Type names", "type_names"),
     ("Instance parameter values", "instance_params"),
     ("Type parameter values", "type_params"),
 ]
 
+_TARGET_TOOLTIPS = {
+    "element_names":   "Rename views, sheets, levels, grids, rooms, materials, etc. -- pick the category below.",
+    "type_names":      "Rename a family type (e.g. '900 x 2100mm'). Tick 'Also rename family name' below to rename the parent family with the same transformation.",
+    "instance_params": "Find and replace a text parameter value on placed instances.",
+    "type_params":     "Find and replace a parameter value on element types.",
+}
+
 ELEMENT_SCOPE_OPTIONS = [
-    ("Materials", "Materials"),
-    ("Views", "Views"),
-    ("View Templates", "View Templates"),
-    ("Sheets", "Sheets"),
-    ("Levels", "Levels"),
-    ("Grids", "Grids"),
-    ("Rooms", "Rooms"),
-    ("Spaces", "Spaces"),
     ("Areas", "Areas"),
-    ("View Filters", "View Filters"),
+    ("Grids", "Grids"),
+    ("Levels", "Levels"),
+    ("Materials", "Materials"),
     ("Phases", "Phases"),
+    ("Rooms", "Rooms"),
+    ("Sheets", "Sheets"),
+    ("Spaces", "Spaces"),
     ("Types (Selection)", "Types (Selection)"),
+    ("View Filters", "View Filters"),
+    ("View Templates", "View Templates"),
+    ("Views", "Views"),
 ]
 
 
@@ -96,10 +102,31 @@ def _source_label(scope_key):
 
 
 def _get_name(element):
+    # DB.Element.Name getter is write-only (CanRead=False) for FamilySymbol in some
+    # IronPython 3 / Revit builds. Fall back to the built-in parameter for types.
     try:
-        return element.Name or ""
+        name = element.Name
+        if name is not None:
+            return str(name)
     except Exception:
-        return ""
+        pass
+    try:
+        p = element.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+        if p is not None:
+            v = p.AsString()
+            if v:
+                return v
+    except Exception:
+        pass
+    try:
+        p = element.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
+        if p is not None:
+            v = p.AsString()
+            if v:
+                return v
+    except Exception:
+        pass
+    return ""
 
 
 def _set_name(element, name):
@@ -302,15 +329,23 @@ def _get_selected_families(current_doc):
 def _get_category_options(current_doc):
     cats = {}
     try:
-        all_elems = (
-            DB.FilteredElementCollector(current_doc)
-            .WhereElementIsNotElementType()
-            .ToElements()
-        )
-        for element in all_elems:
+        _model = DB.CategoryType.Model
+        _annot = DB.CategoryType.Annotation
+        for element in (DB.FilteredElementCollector(current_doc)
+                        .WhereElementIsNotElementType().ToElements()):
             try:
                 cat = element.Category
-                if cat is not None and cat.CategoryType == DB.CategoryType.Model:
+                ct = cat.CategoryType if cat is not None else None
+                if (ct == _model or ct == _annot) and cat.Name and not cat.Name.startswith("<"):
+                    cats[cat.Name] = cat.Id
+            except Exception:
+                pass
+        for element in (DB.FilteredElementCollector(current_doc)
+                        .WhereElementIsElementType().ToElements()):
+            try:
+                cat = element.Category
+                ct = cat.CategoryType if cat is not None else None
+                if (ct == _model or ct == _annot) and cat.Name and not cat.Name.startswith("<"):
                     cats[cat.Name] = cat.Id
             except Exception:
                 pass
@@ -334,9 +369,10 @@ def _collect_instances_by_category(current_doc, cat_id, ignore_groups):
     return elements
 
 
-def _collect_types_by_category(current_doc, cat_id):
+def _collect_types_by_category(current_doc, cat_id, cat_name=None):
     targets = []
     seen_ids = set()
+    # Method 1: standard OfCategoryId filter
     try:
         for element_type in (
             DB.FilteredElementCollector(current_doc)
@@ -347,6 +383,46 @@ def _collect_types_by_category(current_doc, cat_id):
             _add_unique(targets, seen_ids, element_type)
     except Exception:
         pass
+    # Method 2: FamilySymbol scan with integer ID comparison
+    if not targets:
+        try:
+            cat_int = _elem_id_int(cat_id)
+            for element_type in (
+                DB.FilteredElementCollector(current_doc)
+                .OfClass(DB.FamilySymbol)
+                .ToElements()
+            ):
+                try:
+                    if (element_type.Category is not None and
+                            _elem_id_int(element_type.Category.Id) == cat_int):
+                        _add_unique(targets, seen_ids, element_type)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    # Method 3: scan DB.Family by category name string -- most reliable for loadable families
+    if not targets and cat_name:
+        try:
+            for family in (
+                DB.FilteredElementCollector(current_doc)
+                .OfClass(DB.Family)
+                .ToElements()
+            ):
+                try:
+                    if (family.Category is not None and
+                            family.Category.Name == cat_name):
+                        for type_id in family.GetFamilySymbolIds():
+                            try:
+                                sym = current_doc.GetElement(type_id)
+                                if sym is not None:
+                                    _add_unique(targets, seen_ids, sym)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    # Method 4: via placed instances
     for element in _collect_instances_by_category(current_doc, cat_id, ignore_groups=False):
         _add_type_for_instance(targets, seen_ids, current_doc, element)
     return targets
@@ -591,6 +667,12 @@ def collect_elements_with_param(current_doc, scope_key, cat_id, param_name, igno
                     candidates.append(t)
             except Exception:
                 pass
+    elif scope_key == "Views":
+        candidates = [v for v in DB.FilteredElementCollector(current_doc).OfClass(DB.View).ToElements()
+                      if not v.IsTemplate and v.ViewType not in (
+                          DB.ViewType.Schedule, DB.ViewType.DrawingSheet, DB.ViewType.Internal)]
+    elif scope_key == "Sheets":
+        candidates = list(DB.FilteredElementCollector(current_doc).OfClass(DB.ViewSheet).ToElements())
     else:
         candidates = _collect_instances_by_category(current_doc, cat_id, ignore_groups)
         for t in _collect_types_by_category(current_doc, cat_id):
@@ -619,6 +701,8 @@ def collect_elements_with_param(current_doc, scope_key, cat_id, param_name, igno
 
 def collect_types_with_param(current_doc, scope_key, cat_id, param_name):
     """Collect ElementTypes that have the given writable param, including unplaced types."""
+    if scope_key in ("Views", "Sheets"):
+        return []
     if scope_key == "Current Selection":
         candidates = _get_selected_types(current_doc)
     else:
@@ -704,7 +788,7 @@ def collect_target_elements(current_doc, target_key, scope_key, cat_id=None, ign
     if target_key == "type_names":
         if scope_key == "Current Selection":
             return _get_selected_types(current_doc)
-        return _collect_types_by_category(current_doc, cat_id)
+        return _collect_types_by_category(current_doc, cat_id, cat_name=scope_key)
     if target_key == "family_names":
         if scope_key == "Current Selection":
             return _get_selected_families(current_doc)
@@ -899,7 +983,6 @@ def show_dialog(script_dir, lib_path, mode):
     txt_subtitle      = window.FindName("TxtSubtitle")
     cmb_target        = window.FindName("CmbTarget")
     cmb_category      = window.FindName("CmbCategory")
-    btn_load          = window.FindName("BtnLoad")
     pnl_parameters    = window.FindName("PnlParameters")
     lst_parameters    = window.FindName("LstParameters")
     txt_source        = window.FindName("TxtSource")
@@ -912,8 +995,9 @@ def show_dialog(script_dir, lib_path, mode):
     txt_replace       = window.FindName("TxtReplace")
     txt_prefix        = window.FindName("TxtPrefix")
     txt_suffix        = window.FindName("TxtSuffix")
-    chk_ignore_groups = window.FindName("ChkIgnoreGroups")
-    btn_cancel        = window.FindName("BtnCancel")
+    chk_ignore_groups      = window.FindName("ChkIgnoreGroups")
+    chk_also_rename_family = window.FindName("ChkAlsoRenameFamily")
+    btn_cancel             = window.FindName("BtnCancel")
     btn_apply         = window.FindName("BtnApply")
 
     window.Title       = config["title"]
@@ -968,6 +1052,7 @@ def show_dialog(script_dir, lib_path, mode):
     for display_name, target_key in TARGET_OPTIONS:
         item = ComboBoxItem()
         item.Content = display_name
+        item.ToolTip = _TARGET_TOOLTIPS.get(target_key, "")
         cmb_target.Items.Add(item)
         target_keys.append(target_key)
     cmb_target.SelectedIndex = 0
@@ -997,28 +1082,36 @@ def show_dialog(script_dir, lib_path, mode):
                 category_ids.append(None)
                 category_names.append(display_name)
         else:
-            for cat_name, cat_id in _get_category_options(doc):
+            # Merge fixed scopes (Views, Sheets) with dynamic category list, sorted A-Z
+            all_opts = [("Sheets", "Sheets", None), ("Views", "Views", None)]
+            for name, cid in _get_category_options(doc):
+                all_opts.append((name, name, cid))
+            all_opts.sort(key=lambda x: x[0])
+            for disp, key, cid in all_opts:
                 item = ComboBoxItem()
-                item.Content = cat_name
+                item.Content = disp
                 cmb_category.Items.Add(item)
-                category_keys.append(cat_name)
-                category_ids.append(cat_id)
-                category_names.append(cat_name)
+                category_keys.append(key)
+                category_ids.append(cid)
+                category_names.append(disp)
         cmb_category.IsEnabled = config["selector_enabled"]
         if cmb_category.Items.Count > 0:
             cmb_category.SelectedIndex = 0
 
-    # --- show/hide Load button and param panel ---
+    def _do_load_params():
+        all_params, families = _get_params_by_family(doc, _selected_key(), _selected_category_id(), _target_key())
+        _populate_param_list(lst_parameters, all_params, families)
+        if pnl_parameters is not None:
+            pnl_parameters.Visibility = Visibility.Visible
+
     def _refresh_target_controls():
-        is_param = _is_param_mode()
-        if btn_load is not None:
-            btn_load.Visibility = Visibility.Visible if is_param else Visibility.Collapsed
         _reset_param_panel()
         _refresh_category_combo()
         txt_source.Text = _source_label(_selected_key())
-        # ignore-groups checkbox only relevant for param mode
         if chk_ignore_groups is not None:
             chk_ignore_groups.Visibility = Visibility.Visible if _target_key() == "instance_params" else Visibility.Collapsed
+        if chk_also_rename_family is not None:
+            chk_also_rename_family.Visibility = Visibility.Visible if _target_key() == "type_names" else Visibility.Collapsed
 
     _refresh_target_controls()
 
@@ -1041,12 +1134,8 @@ def show_dialog(script_dir, lib_path, mode):
     def _on_selector_changed(sender, args):
         txt_source.Text = _source_label(_selected_key())
         _reset_param_panel()
-
-    def _on_load(sender, args):
-        all_params, families = _get_params_by_family(doc, _selected_key(), _selected_category_id(), _target_key())
-        _populate_param_list(lst_parameters, all_params, families)
-        if pnl_parameters is not None:
-            pnl_parameters.Visibility = Visibility.Visible
+        if _is_param_mode():
+            _do_load_params()
 
     def _on_mode_changed(sender, args):
         _refresh_mode_panels()
@@ -1059,12 +1148,6 @@ def show_dialog(script_dir, lib_path, mode):
 
         param_name = ""
         if _is_param_mode():
-            if pnl_parameters is None or pnl_parameters.Visibility != Visibility.Visible:
-                ui.uiUtils_alert(
-                    "Click 'Load Params' first to load parameters for the selected category.",
-                    title=config["title"],
-                )
-                return
             selected_item = lst_parameters.SelectedItem if lst_parameters else None
             if selected_item is None or selected_item.Tag is None:
                 ui.uiUtils_alert("Select a parameter from the list.", title=config["title"])
@@ -1094,6 +1177,11 @@ def show_dialog(script_dir, lib_path, mode):
             "ignore_groups":  chk_ignore_groups.IsChecked == True,
             "is_overwrite":   is_overwrite,
             "overwrite_value": overwrite_value,
+            "also_rename_family": (
+                chk_also_rename_family is not None and
+                chk_also_rename_family.Visibility == Visibility.Visible and
+                chk_also_rename_family.IsChecked == True
+            ),
         }
         window.DialogResult = True
         window.Close()
@@ -1104,8 +1192,6 @@ def show_dialog(script_dir, lib_path, mode):
 
     cmb_target.SelectionChanged    += _on_target_changed
     cmb_category.SelectionChanged  += _on_selector_changed
-    if btn_load is not None:
-        btn_load.Click             += _on_load
     if rb_transform is not None:
         rb_transform.Checked       += _on_mode_changed
     if rb_overwrite is not None:
@@ -1135,8 +1221,9 @@ def run(script_dir, lib_path, mode):
     prefix         = inputs["prefix"]
     suffix         = inputs["suffix"]
     ignore_groups  = inputs["ignore_groups"]
-    is_overwrite   = inputs.get("is_overwrite", False)
-    overwrite_value = inputs.get("overwrite_value", None)
+    is_overwrite        = inputs.get("is_overwrite", False)
+    overwrite_value     = inputs.get("overwrite_value", None)
+    also_rename_family  = inputs.get("also_rename_family", False)
 
     # Collect elements
     if target_key == "instance_params":
@@ -1170,9 +1257,23 @@ def run(script_dir, lib_path, mode):
             overwrite_value=overwrite_value if is_overwrite else None,
         )
 
-    if not planned:
+    # Plan family renames alongside type renames when requested
+    fam_planned = []
+    fam_skipped = []
+    if target_key == "type_names" and also_rename_family:
+        if scope_key == "Current Selection":
+            fam_elements = _get_selected_families(doc)
+        else:
+            fam_elements = _collect_families_by_category(doc, cat_id)
+        if fam_elements:
+            fam_planned, fam_skipped = plan_renames(
+                fam_elements, find_text, replace_text, prefix, suffix,
+                overwrite_value=overwrite_value if is_overwrite else None,
+            )
+
+    if not planned and not fam_planned:
         ui.uiUtils_alert(
-            "No values matched the criteria.\nSkipped: {}".format(len(skipped)),
+            "No values matched the criteria.\nSkipped: {}".format(len(skipped) + len(fam_skipped)),
             title=config["title"],
         )
         return
@@ -1200,6 +1301,14 @@ def run(script_dir, lib_path, mode):
         for old_name, new_name, reason in skipped[:50]:
             lines.append("  {}  ->  {}  [{}]".format(old_name, new_name, reason))
 
+    if fam_planned:
+        lines.append("")
+        lines.append("--- Also renaming {} family name(s) ---".format(len(fam_planned)))
+        for _, old_name, new_name in fam_planned[:100]:
+            lines.append("{}  ->  {}".format(old_name, new_name))
+        if len(fam_planned) > 100:
+            lines.append("... and {} more".format(len(fam_planned) - 100))
+
     proceed = ui.uiUtils_show_text_report(
         "{} - Preview".format(config["title"]),
         "\n".join(lines),
@@ -1222,10 +1331,25 @@ def run(script_dir, lib_path, mode):
     else:
         renamed, failed = apply_renames(doc, planned, config["transaction_title"], scope_display)
 
-    result_lines = ["Updated: {}".format(len(renamed)), "Failed:  {}".format(len(failed))]
-    if failed:
+    fam_renamed = []
+    fam_failed = []
+    if fam_planned:
+        fam_renamed, fam_failed = apply_renames(
+            doc, fam_planned, config["transaction_title"], scope_display + " (families)"
+        )
+
+    all_failed = failed + fam_failed
+    if fam_planned:
+        result_lines = [
+            "Types updated:    {}".format(len(renamed)),
+            "Families updated: {}".format(len(fam_renamed)),
+            "Failed:           {}".format(len(all_failed)),
+        ]
+    else:
+        result_lines = ["Updated: {}".format(len(renamed)), "Failed:  {}".format(len(all_failed))]
+    if all_failed:
         result_lines += ["", "Failed (first 20):"]
-        for old_name, new_name, error_text in failed[:20]:
+        for old_name, new_name, error_text in all_failed[:20]:
             result_lines.append("  {}  ->  {}  ({})".format(old_name, new_name, error_text))
 
     ui.uiUtils_show_text_report(

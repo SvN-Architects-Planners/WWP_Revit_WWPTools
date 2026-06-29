@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Super Renamer: renamed "Element names" option to "Element names (Views, Sheets, Rooms...)" and added hover tooltips to all Rename dropdown options so users can tell at a glance which option covers views, sheets, levels, etc.
+- Super Renamer: merged "Family names" into "Type names" as an "Also rename family name" checkbox, so types and their parent family can be renamed in one pass. Family renames appear in the preview and results separately.
+- Super Renamer: category dropdown now includes families that are loaded but have no placed instances (e.g. Doors, Windows), and filters out internal `<...>` Revit categories.
+- Super Renamer: instance/type parameter modes now include Sheets and Views in the category list, and include Annotation categories (e.g. Title Blocks) alongside Model categories.
+
+### Fixed
+
+- Super Renamer: "Type names" returned no results for loadable families (Doors, Windows, etc.) because `OfCategoryId + WhereElementIsElementType` can silently return empty in IronPython 3. Added a `OfClass(DB.FamilySymbol)` fallback with integer-based category ID comparison. Also replaced `cat.CategoryType in (...)` tuple checks with explicit `==` comparisons for IronPython 3 enum reliability.
+- Super Renamer: added a third-stage fallback to "Type names" collection that scans `DB.Family` objects by category name string and collects types via `GetFamilySymbolIds()`. This is immune to `ElementId` comparison issues in IronPython 3 and ensures loadable families like Doors are always found.
+- Super Renamer: fixed `_get_name()` to fall back to `SYMBOL_NAME_PARAM` / `ALL_MODEL_TYPE_NAME` built-in parameters when `element.Name` raises `AttributeError`. Root cause: `DB.Element.Name` has no getter (`CanRead=False`) for `FamilySymbol` in this IronPython 3 / Revit build -- the property is write-only. The setter (`element.Name = ...`) continues to work and is unchanged.
+
+### Removed
+
+- Rename Param Value (by Category) and Rename Param Value (by Selections) ribbon buttons removed -- Super Renamer now covers all their functionality plus type params, auto-load, and the full category list.
+- Super Renamer: parameter list now loads automatically when the category changes in param mode -- the "Load Params" button has been removed.
 - Import Key Schedule: added **Door Key Schedule** as a third target category alongside Area and Room. The `resolve_schedule_target` function now uses an indexed lookup table (`_TARGET_MAP`) instead of a hard-coded if/else, making future category additions a one-liner.
 
 ### Fixed

@@ -75,21 +75,14 @@
             <ComboBox x:Name="CmbTarget" Grid.Column="1" />
         </Grid>
 
-        <!-- Category / scope + Load button -->
+        <!-- Category / scope -->
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="80" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Label x:Name="LblSelector" Grid.Column="0" Content="Category:" />
-            <ComboBox x:Name="CmbCategory" Grid.Column="1" Margin="0,0,8,0" />
-            <Button x:Name="BtnLoad"
-                    Grid.Column="2"
-                    Width="76"
-                    Content="Load Params"
-                    Visibility="Collapsed"
-                    Style="{StaticResource SecondaryButtonStyle}" />
+            <ComboBox x:Name="CmbCategory" Grid.Column="1" />
         </Grid>
 
         <!-- Parameters panel (shown after Load) -->
@@ -192,13 +185,20 @@
             </StackPanel>
         </Border>
 
-        <!-- Ignore groups -->
-        <CheckBox x:Name="ChkIgnoreGroups"
-                  Grid.Row="12"
-                  IsChecked="True"
-                  Content="Ignore elements in groups"
-                  VerticalAlignment="Center"
-                  Foreground="{StaticResource TextBrush}" />
+        <!-- Options checkboxes -->
+        <StackPanel Grid.Row="12" Orientation="Vertical" VerticalAlignment="Top">
+            <CheckBox x:Name="ChkIgnoreGroups"
+                      IsChecked="True"
+                      Content="Ignore elements in groups"
+                      VerticalAlignment="Center"
+                      Foreground="{StaticResource TextBrush}" />
+            <CheckBox x:Name="ChkAlsoRenameFamily"
+                      Visibility="Collapsed"
+                      Content="Also rename family name"
+                      Margin="0,6,0,0"
+                      VerticalAlignment="Center"
+                      Foreground="{StaticResource TextBrush}" />
+        </StackPanel>
 
         <!-- Buttons -->
         <DockPanel Grid.Row="14" Margin="0,16,0,0">
