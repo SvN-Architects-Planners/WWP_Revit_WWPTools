@@ -1,0 +1,6 @@
+title: "Mass Stats\nCA"
+tooltip: |
+  Open Mass Stats for Canadian projects (Toronto). Reads mass floor areas,
+  auto-discovers program types from a selected parameter, and reports GFA,
+  NSA, units, population and jobs - total and by program.
+author: "Jason Tian"

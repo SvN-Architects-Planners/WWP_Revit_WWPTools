@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Mass Stats CA: new tool under the MassStats pulldown for Canadian/Toronto projects. Reads mass floor areas from selected mass elements, auto-discovers program types from any user-selected instance parameter, and reports GFA, NSA, unit counts, population and jobs -- total and by program. Supports up to 5 grouping parameters that sort and subtotal results. Settings (program GFA ratio, job rate, NSA ratio, unit size, PPU) persist locally via XML and can be edited in a dedicated Program Settings dialog.
+- Mass Stats (UK): fixed numbers in the MASS SETTINGS right panel being clipped in the BoH section. Removed WPF local height/padding overrides from dynamically created TextBoxes so the FlatTheme minimum height (34px) takes effect.
+
 - Super Renamer: renamed "Element names" option to "Element names (Views, Sheets, Rooms...)" and added hover tooltips to all Rename dropdown options so users can tell at a glance which option covers views, sheets, levels, etc.
 - Super Renamer: merged "Family names" into "Type names" as an "Also rename family name" checkbox, so types and their parent family can be renamed in one pass. Family renames appear in the preview and results separately.
 - Super Renamer: category dropdown now includes families that are loaded but have no placed instances (e.g. Doors, Windows), and filters out internal `<...>` Revit categories.
