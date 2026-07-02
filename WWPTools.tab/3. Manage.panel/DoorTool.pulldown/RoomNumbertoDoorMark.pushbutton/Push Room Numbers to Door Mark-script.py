@@ -1,5 +1,5 @@
 from __future__ import division
-
+import ctypes
 import math
 from pyrevit import revit, DB
 
@@ -47,13 +47,29 @@ def get_active_phase(document):
 
 def get_room_for_door(door, phase):
     """Return the ToRoom for a door in the given phase (or active phase)."""
+    lowPrioritySpaces = ["CIRC", "CIRCULATION", "LOBBY", "CORRIDOR", "CAR PARK"]
+
+    def is_low_priority(room):
+        if room is None:
+            return True
+        nameParam = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME)
+        depParam = room.get_Parameter(DB.BuiltInParameter.ROOM_DEPARTMENT)
+        roomName = nameParam.AsString() if nameParam else ""
+        roomDep = depParam.AsString() if depParam else ""
+        comb = (roomName or "").upper() + (roomDep or "").upper()
+        return any(x in comb for x in lowPrioritySpaces)
+
     try:
         if phase:
-            return door.get_ToRoom(phase)
-    except Exception:
-        pass
-    try:
-        return door.ToRoom
+            doorRoom = door.get_ToRoom(phase)
+            if is_low_priority(doorRoom):
+                doorRoom = door.get_FromRoom(phase)
+            return doorRoom
+        else:
+            doorRoom = door.ToRoom
+            if is_low_priority(doorRoom):
+                doorRoom = door.FromRoom
+            return doorRoom
     except Exception:
         return None
 
@@ -249,6 +265,43 @@ def main():
         uiUtils_alert("No doors matched the name filter.", title="Push Room Numbers to Door Mark")
         return
 
+    # --- Prefix / separator options ---
+    use_prefix = uiUtils_confirm(
+        "Add a prefix and/or separator to the door Mark values?",
+        title="Push Room Numbers to Door Mark",
+    )
+
+    prefix_text = ""
+    separator_text = ""
+    if use_prefix:
+        prefix_text = uiUtils_prompt_text(
+            title="Door Mark Prefix",
+            prompt="Enter a prefix to prepend to the room number (leave blank for none).",
+            default_value="",
+            ok_text="OK",
+            cancel_text="Cancel",
+            width=520,
+            height=240,
+        ) or ""
+
+        separator_options = ["None", "-", "_", ".", "/"]
+        separator_indices = uiUtils_select_indices(
+            separator_options,
+            title="Door Mark Separator",
+            prompt="Choose a separator between the prefix and room number.",
+            multiselect=False,
+            width=520,
+            height=420,
+        )
+        separator_choice = separator_options[separator_indices[0]] if separator_indices else "None"
+        separator_text = "" if separator_choice == "None" else separator_choice
+
+    def build_mark(room_number, suffix=""):
+        if suffix:
+            return "{}{}{}{}{}".format(prefix_text, separator_text, room_number, separator_text, suffix)
+        return "{}{}{}".format(prefix_text, separator_text, room_number)
+    # --- end prefix / separator options ---
+
     by_room_id = {}
     skipped = []
 
@@ -292,9 +345,11 @@ def main():
                 doors_for_room = [d for _, d in sortable] + [d for _, d in unsortable]
 
             if len(doors_for_room) == 1:
-                target_values = [room_number]
+                target_values = [build_mark(room_number)]
             else:
-                target_values = ["{}{}".format(room_number, index_to_suffix(i)) for i in range(len(doors_for_room))]
+                target_values = [
+                    build_mark(room_number, index_to_suffix(i)) for i in range(len(doors_for_room))
+                ]
 
             for door, target in zip(doors_for_room, target_values):
                 param = door.LookupParameter("Mark")
