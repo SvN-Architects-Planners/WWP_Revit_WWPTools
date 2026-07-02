@@ -21,7 +21,6 @@ def _show_level_picker(level_names, title="Propagate Views To Levels"):
     from System.Windows.Markup import XamlReader
     from System.Windows.Interop import WindowInteropHelper
     from System import IntPtr
-    from System.Diagnostics import Process
 
     if Application.Current is None:
         app = Application()
@@ -65,6 +64,7 @@ def _show_level_picker(level_names, title="Propagate Views To Levels"):
         target_list.Items.Add(name)
 
     try:
+        from System.Diagnostics import Process
         owner = Process.GetCurrentProcess().MainWindowHandle
         if owner != IntPtr.Zero:
             WindowInteropHelper(window).Owner = owner
