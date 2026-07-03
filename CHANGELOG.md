@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Super Editor: the Preview & Apply report is now an interactive checklist instead of read-only text. Every planned change gets its own checkbox (checked by default), with Select All/Select None buttons, so you can exclude specific elements from a batch without cancelling the whole operation. Skipped (invalid/conflicting) items remain a read-only list. Family renames (from "Also rename family name") appear as their own checkable section.
+
 ## [2.2.0] - 2026-07-03
 
 ### Added

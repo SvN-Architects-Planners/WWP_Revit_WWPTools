@@ -10,8 +10,8 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import DB
 from System.IO import File
-from System.Windows import FontWeights, Thickness, Visibility
-from System.Windows.Controls import ComboBoxItem, ListBoxItem, TextBlock
+from System.Windows import FontWeights, TextWrapping, Thickness, Visibility
+from System.Windows.Controls import CheckBox, ComboBoxItem, ListBoxItem, TextBlock
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import Color, SolidColorBrush
@@ -1340,6 +1340,107 @@ def show_dialog(script_dir, lib_path, mode):
     return result[0]
 
 
+def show_preview_selection(script_dir, title, header_lines, main_label, main_rows, family_label, family_rows, skipped_lines):
+    xaml_path = os.path.join(script_dir, "PreviewSelect.xaml")
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing XAML file: {}".format(xaml_path))
+
+    window = XamlReader.Parse(File.ReadAllText(xaml_path))
+    _set_owner(window)
+
+    txt_header      = window.FindName("TxtHeader")
+    lst_items       = window.FindName("LstPreviewItems")
+    btn_select_all  = window.FindName("BtnSelectAll")
+    btn_select_none = window.FindName("BtnSelectNone")
+    btn_cancel      = window.FindName("BtnCancel")
+    btn_apply       = window.FindName("BtnApply")
+
+    window.Title = title
+    txt_header.Text = "\n".join(header_lines)
+
+    muted_brush = SolidColorBrush(Color.FromRgb(0x71, 0x71, 0x7A))
+
+    def _add_section_header(text):
+        tb = TextBlock()
+        tb.Text = text.upper()
+        tb.FontSize = 10
+        tb.FontWeight = FontWeights.SemiBold
+        tb.Foreground = muted_brush
+        item = ListBoxItem()
+        item.Content = tb
+        item.IsEnabled = False
+        item.IsHitTestVisible = False
+        item.Padding = Thickness(8, 7, 8, 2)
+        lst_items.Items.Add(item)
+
+    def _add_checkbox_rows(rows):
+        checks = []
+        for index, text in enumerate(rows):
+            cb = CheckBox()
+            cb.Content = text
+            cb.IsChecked = True
+            cb.Tag = index
+            cb.Margin = Thickness(16, 3, 8, 3)
+            lst_items.Items.Add(cb)
+            checks.append(cb)
+        return checks
+
+    main_checks = []
+    if main_rows:
+        _add_section_header("{} ({})".format(main_label, len(main_rows)))
+        main_checks = _add_checkbox_rows(main_rows)
+
+    family_checks = []
+    if family_rows:
+        _add_section_header("{} ({})".format(family_label, len(family_rows)))
+        family_checks = _add_checkbox_rows(family_rows)
+
+    if skipped_lines:
+        _add_section_header("Skipped ({})".format(len(skipped_lines)))
+        for text in skipped_lines:
+            tb = TextBlock()
+            tb.Text = text
+            tb.TextWrapping = TextWrapping.Wrap
+            tb.Foreground = muted_brush
+            item = ListBoxItem()
+            item.Content = tb
+            item.IsEnabled = False
+            item.IsHitTestVisible = False
+            item.Padding = Thickness(16, 3, 8, 3)
+            lst_items.Items.Add(item)
+
+    result = [None]
+
+    def _on_select_all(sender, args):
+        for cb in main_checks + family_checks:
+            cb.IsChecked = True
+
+    def _on_select_none(sender, args):
+        for cb in main_checks + family_checks:
+            cb.IsChecked = False
+
+    def _on_apply(sender, args):
+        main_selected = set(cb.Tag for cb in main_checks if cb.IsChecked == True)
+        family_selected = set(cb.Tag for cb in family_checks if cb.IsChecked == True)
+        result[0] = (main_selected, family_selected)
+        window.DialogResult = True
+        window.Close()
+
+    def _on_cancel(sender, args):
+        window.DialogResult = False
+        window.Close()
+
+    btn_select_all.Click  += _on_select_all
+    btn_select_none.Click += _on_select_none
+    btn_apply.Click       += _on_apply
+    btn_cancel.Click      += _on_cancel
+
+    if window.ShowDialog() != True:
+        return False, None, None
+    main_selected, family_selected = result[0]
+    return True, main_selected, family_selected
+
+
 def run(script_dir, lib_path, mode):
     config = _mode_config(mode)
     inputs = show_dialog(script_dir, lib_path, mode)
@@ -1419,53 +1520,51 @@ def run(script_dir, lib_path, mode):
         )
         return
 
-    lines = [
+    header_lines = [
         "Scope:     {}".format(scope_display),
         "Target:    {}".format(target_display),
     ]
     if target_key in ("instance_params", "type_params"):
-        lines.append("Parameter: {}".format(param_name))
+        header_lines.append("Parameter: {}".format(param_name))
     if target_key == "workset":
-        lines.append("Workset:   {}".format(_get_workset_name(doc, workset_id)))
+        header_lines.append("Workset:   {}".format(_get_workset_name(doc, workset_id)))
     if is_overwrite:
-        lines.append("Mode:      Overwrite  ->  \"{}\"".format(overwrite_value))
-    lines += [
-        "To update: {}".format(len(planned)),
-        "Skipped:   {}".format(len(skipped)),
-        "",
-    ]
+        header_lines.append("Mode:      Overwrite  ->  \"{}\"".format(overwrite_value))
+    header_lines.append("Skipped:   {}".format(len(skipped)))
+
     show_parent_name = target_key in ("instance_params", "type_params", "workset")
-    for element, old_name, new_name in planned[:300]:
+    main_rows = []
+    for element, old_name, new_name in planned:
         if show_parent_name:
-            lines.append("{}: {}  ->  {}".format(_get_name(element) or "(unnamed)", old_name, new_name))
+            main_rows.append("{}: {}  ->  {}".format(_get_name(element) or "(unnamed)", old_name, new_name))
         else:
-            lines.append("{}  ->  {}".format(old_name, new_name))
-    if len(planned) > 300:
-        lines.append("... and {} more".format(len(planned) - 300))
-    if skipped:
-        lines.append("")
-        lines.append("Skipped (conflicts / invalid):")
-        for old_name, new_name, reason in skipped[:50]:
-            lines.append("  {}  ->  {}  [{}]".format(old_name, new_name, reason))
+            main_rows.append("{}  ->  {}".format(old_name, new_name))
 
-    if fam_planned:
-        lines.append("")
-        lines.append("--- Also renaming {} family name(s) ---".format(len(fam_planned)))
-        for _, old_name, new_name in fam_planned[:100]:
-            lines.append("{}  ->  {}".format(old_name, new_name))
-        if len(fam_planned) > 100:
-            lines.append("... and {} more".format(len(fam_planned) - 100))
+    family_rows = [
+        "{}  ->  {}".format(old_name, new_name)
+        for _, old_name, new_name in fam_planned
+    ]
 
-    proceed = ui.uiUtils_show_text_report(
+    skipped_lines = [
+        "{}  ->  {}  [{}]".format(old_name, new_name, reason)
+        for old_name, new_name, reason in skipped
+    ]
+
+    proceed, main_selected, family_selected = show_preview_selection(
+        script_dir,
         "{} - Preview".format(config["title"]),
-        "\n".join(lines),
-        ok_text="Apply",
-        cancel_text="Cancel",
-        width=720,
-        height=520,
+        header_lines,
+        "To update",
+        main_rows,
+        "Also renaming families",
+        family_rows,
+        skipped_lines,
     )
     if not proceed:
         return
+
+    planned = [p for i, p in enumerate(planned) if i in main_selected]
+    fam_planned = [p for i, p in enumerate(fam_planned) if i in family_selected]
 
     if target_key == "type_params":
         renamed, failed = apply_type_param_renames(
