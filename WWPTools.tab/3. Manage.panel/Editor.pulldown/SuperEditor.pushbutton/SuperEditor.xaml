@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Super Renamer"
+        Title="Super Editor"
         Width="520"
         Height="740"
         MinWidth="420"
@@ -54,7 +54,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0">
             <TextBlock x:Name="TxtHeader"
-                       Text="Super Renamer"
+                       Text="Super Editor"
                        FontSize="18"
                        FontWeight="Bold"
                        Foreground="{StaticResource TextBrush}" />
@@ -130,7 +130,7 @@
             <StackPanel>
 
                 <!-- Mode: Transform vs Overwrite -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <StackPanel x:Name="PnlModeToggle" Orientation="Horizontal" Margin="0,0,0,10">
                     <RadioButton x:Name="RbTransform"
                                  Content="Transform"
                                  IsChecked="True"
@@ -181,6 +181,33 @@
                     <Label Grid.Column="0" Content="Set to:" />
                     <TextBox x:Name="TxtOverwrite" Grid.Column="1" />
                 </Grid>
+
+                <!-- Workset: target workset list -->
+                <Border x:Name="PnlWorkset"
+                        Visibility="Collapsed"
+                        Background="{StaticResource PanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="TARGET WORKSET"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="10,8,10,4" />
+                        <ListBox x:Name="LstWorksets"
+                                 Grid.Row="1"
+                                 Height="172"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Padding="4,0,4,6" />
+                    </Grid>
+                </Border>
 
             </StackPanel>
         </Border>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-07-03
+
 ### Added
 
 - Mass Stats CA: new tool under the MassStats pulldown for Canadian/Toronto projects. Reads mass floor areas from selected mass elements; auto-discovers program combinations from up to three user-selected Revit parameters (e.g. Program, Mass Category, Mass Name) whose column header labels are editable; reports GCA (raw Revit area), GFA, NSA, unit counts, population and jobs -- total and by program. Supports up to 5 grouping parameters with subtotals; repeated group values are suppressed (shown only on change) with a blank spacer row after each subtotal. Settings (ratios per classifier combination) saved to AppData XML and also embedded in the Revit project via ExtensibleStorage so they sync with the model during cloud/central worksharing.
@@ -16,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Super Renamer: merged "Family names" into "Type names" as an "Also rename family name" checkbox, so types and their parent family can be renamed in one pass. Family renames appear in the preview and results separately.
 - Super Renamer: category dropdown now includes families that are loaded but have no placed instances (e.g. Doors, Windows), and filters out internal `<...>` Revit categories.
 - Super Renamer: instance/type parameter modes now include Sheets and Views in the category list, and include Annotation categories (e.g. Title Blocks) alongside Model categories.
+- Super Editor: added "Assign workset" as a new target mode -- reassign placed instances in a category (or the current selection) to a different user-created workset, with the same preview/apply flow used for renaming. Only appears in workshared documents.
+- Super Editor: the preview report for parameter value changes (instance and type) and workset assignment now shows the owning element's name alongside each old -> new value, so identical value changes across many elements can be told apart.
+
+### Changed
+
+- Renamed "Super Renamer" to "Super Editor" (by Category / by Selections) to reflect parameter and workset editing beyond simple renaming.
+- Super Editor: expanded the pulldown tooltip to describe all three capabilities (renaming, parameter editing, workset assignment) instead of just renaming.
 
 ### Fixed
 

@@ -1,0 +1,7 @@
+title: "Super\nEditor"
+tooltip: |
+  Bulk-edit names, parameter values, and worksets across a category or the current selection.
+
+  Rename element and type names (with an option to also rename the parent family), find/replace or overwrite instance and type parameter values, and reassign placed instances to a different user-created workset in workshared projects.
+author: "Jason Tian"
+help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/renamer"

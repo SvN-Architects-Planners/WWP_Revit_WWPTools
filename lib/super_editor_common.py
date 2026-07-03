@@ -30,20 +30,27 @@ def _elem_id_int(eid):
         return int(eid.IntegerValue)
 
 
+def _workset_id_int(workset_id):
+    try:
+        return int(workset_id.IntegerValue)
+    except AttributeError:
+        return int(workset_id.Value)
+
+
 def _mode_config(mode):
     if mode == "selection":
         return {
-            "title": "Super Renamer(by Selections)",
-            "header": "Super Renamer(by Selections)",
+            "title": "Super Editor(by Selections)",
+            "header": "Super Editor(by Selections)",
             "subtitle": "Find and replace names for the current Revit selection.",
             "selector_label": "Selection:",
             "options": [("Current Selection", "Current Selection")],
             "selector_enabled": False,
-            "transaction_title": "Super Renamer(by Selections)",
+            "transaction_title": "Super Editor(by Selections)",
         }
     return {
-        "title": "Super Renamer(by Category)",
-        "header": "Super Renamer(by Category)",
+        "title": "Super Editor(by Category)",
+        "header": "Super Editor(by Category)",
         "subtitle": "Find and replace names across your project.",
         "selector_label": "Category:",
         "options": [
@@ -61,7 +68,7 @@ def _mode_config(mode):
             ("Types (Selection)", "Types (Selection)"),
         ],
         "selector_enabled": True,
-        "transaction_title": "Super Renamer(by Category)",
+        "transaction_title": "Super Editor(by Category)",
     }
 
 
@@ -77,6 +84,7 @@ _TARGET_TOOLTIPS = {
     "type_names":      "Rename a family type (e.g. '900 x 2100mm'). Tick 'Also rename family name' below to rename the parent family with the same transformation.",
     "instance_params": "Find and replace a text parameter value on placed instances.",
     "type_params":     "Find and replace a parameter value on element types.",
+    "workset":         "Move placed instances to a different user-created workset.",
 }
 
 ELEMENT_SCOPE_OPTIONS = [
@@ -434,6 +442,88 @@ def _collect_families_by_category(current_doc, cat_id):
     for element_type in _collect_types_by_category(current_doc, cat_id):
         _add_unique(targets, seen_ids, _get_family_from_element_type(element_type))
     return targets
+
+
+def _get_user_worksets(current_doc):
+    """Return [(name, WorksetId), ...] for user-created worksets, sorted by name."""
+    worksets = []
+    try:
+        for ws in DB.FilteredWorksetCollector(current_doc).OfKind(DB.WorksetKind.UserWorkset):
+            worksets.append((ws.Name, ws.Id))
+    except Exception:
+        return []
+    worksets.sort(key=lambda item: item[0].lower())
+    return worksets
+
+
+def _get_workset_name(current_doc, workset_id):
+    try:
+        ws = current_doc.GetWorksetTable().GetWorkset(workset_id)
+        return ws.Name if ws is not None else "(unknown workset)"
+    except Exception:
+        return "(unknown workset)"
+
+
+def collect_instances_for_workset(current_doc, scope_key, cat_id, ignore_groups):
+    """Collect placed instances eligible for workset reassignment -- every workshared
+    element has a workset, so unlike collect_elements_with_param there's no param filter."""
+    if scope_key == "Current Selection":
+        return _get_selected_instances(current_doc, ignore_groups)
+    if scope_key == "Views":
+        return [v for v in DB.FilteredElementCollector(current_doc).OfClass(DB.View).ToElements()
+                if not v.IsTemplate and v.ViewType not in (
+                    DB.ViewType.Schedule, DB.ViewType.DrawingSheet, DB.ViewType.Internal)]
+    if scope_key == "Sheets":
+        return list(DB.FilteredElementCollector(current_doc).OfClass(DB.ViewSheet).ToElements())
+    return _collect_instances_by_category(current_doc, cat_id, ignore_groups)
+
+
+def plan_workset_changes(current_doc, elements, target_workset_id):
+    """Plan workset reassignment. Skips elements already on the target workset and
+    elements that don't support worksets at all (their WorksetId comes back invalid)."""
+    planned = []
+    skipped = []
+    target_id_int = _workset_id_int(target_workset_id)
+    target_name = _get_workset_name(current_doc, target_workset_id)
+    for element in elements:
+        try:
+            current_ws_id = element.WorksetId
+        except Exception:
+            current_ws_id = None
+        if current_ws_id is None or current_ws_id == DB.WorksetId.InvalidWorksetId:
+            skipped.append((_get_name(element) or "(unnamed)", "", "no workset support"))
+            continue
+        if _workset_id_int(current_ws_id) == target_id_int:
+            continue
+        old_name = _get_workset_name(current_doc, current_ws_id)
+        planned.append((element, old_name, target_name))
+    return planned, skipped
+
+
+def apply_workset_changes(current_doc, planned, target_workset_id, transaction_title, scope_name):
+    renamed = []
+    failed = []
+    target_id_int = _workset_id_int(target_workset_id)
+    transaction = DB.Transaction(current_doc, "{}: {} - Workset".format(transaction_title, scope_name))
+    try:
+        transaction.Start()
+        for element, old_name, new_name in planned:
+            try:
+                param = element.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
+                if param is None or param.IsReadOnly:
+                    raise Exception("Workset parameter not found or read-only")
+                param.Set(target_id_int)
+                renamed.append((old_name, new_name))
+            except Exception as ex:
+                failed.append((old_name, new_name, str(ex)))
+        transaction.Commit()
+    except Exception as ex:
+        try:
+            transaction.RollBack()
+        except Exception:
+            pass
+        return [], failed + [("<transaction>", "<commit>", str(ex))]
+    return renamed, failed
 
 
 def _get_param_value(element, param_name):
@@ -969,7 +1059,7 @@ def show_dialog(script_dir, lib_path, mode):
     config = _mode_config(mode)
     _ensure_theme(lib_path)
 
-    xaml_path = os.path.join(script_dir, "SuperRenamer.xaml")
+    xaml_path = os.path.join(script_dir, "SuperEditor.xaml")
     if not os.path.isfile(xaml_path):
         raise Exception("Missing XAML file: {}".format(xaml_path))
 
@@ -991,6 +1081,9 @@ def show_dialog(script_dir, lib_path, mode):
     pnl_transform     = window.FindName("PnlTransform")
     pnl_overwrite     = window.FindName("PnlOverwrite")
     txt_overwrite     = window.FindName("TxtOverwrite")
+    pnl_mode_toggle   = window.FindName("PnlModeToggle")
+    pnl_workset       = window.FindName("PnlWorkset")
+    lst_worksets      = window.FindName("LstWorksets")
     txt_find          = window.FindName("TxtFind")
     txt_replace       = window.FindName("TxtReplace")
     txt_prefix        = window.FindName("TxtPrefix")
@@ -1049,7 +1142,10 @@ def show_dialog(script_dir, lib_path, mode):
             lst_parameters.Items.Clear()
 
     # --- populate target combo ---
-    for display_name, target_key in TARGET_OPTIONS:
+    target_options = list(TARGET_OPTIONS)
+    if doc is not None and getattr(doc, "IsWorkshared", False):
+        target_options.append(("Assign workset", "workset"))
+    for display_name, target_key in target_options:
         item = ComboBoxItem()
         item.Content = display_name
         item.ToolTip = _TARGET_TOOLTIPS.get(target_key, "")
@@ -1104,17 +1200,6 @@ def show_dialog(script_dir, lib_path, mode):
         if pnl_parameters is not None:
             pnl_parameters.Visibility = Visibility.Visible
 
-    def _refresh_target_controls():
-        _reset_param_panel()
-        _refresh_category_combo()
-        txt_source.Text = _source_label(_selected_key())
-        if chk_ignore_groups is not None:
-            chk_ignore_groups.Visibility = Visibility.Visible if _target_key() == "instance_params" else Visibility.Collapsed
-        if chk_also_rename_family is not None:
-            chk_also_rename_family.Visibility = Visibility.Visible if _target_key() == "type_names" else Visibility.Collapsed
-
-    _refresh_target_controls()
-
     # --- mode toggle (Transform vs Overwrite) ---
     def _refresh_mode_panels():
         is_overwrite = (rb_overwrite is not None and rb_overwrite.IsChecked == True)
@@ -1123,7 +1208,48 @@ def show_dialog(script_dir, lib_path, mode):
         if pnl_overwrite is not None:
             pnl_overwrite.Visibility = Visibility.Visible if is_overwrite else Visibility.Collapsed
 
-    _refresh_mode_panels()
+    def _populate_workset_list():
+        if lst_worksets is None:
+            return
+        lst_worksets.Items.Clear()
+        worksets = _get_user_worksets(doc)
+        if not worksets:
+            item = ListBoxItem()
+            item.Content = "(no user worksets found in this document)"
+            item.IsEnabled = False
+            item.Padding = Thickness(10, 6, 10, 6)
+            lst_worksets.Items.Add(item)
+            return
+        for name, workset_id in worksets:
+            item = ListBoxItem()
+            item.Content = name
+            item.Tag = workset_id
+            item.Padding = Thickness(10, 6, 10, 6)
+            lst_worksets.Items.Add(item)
+
+    def _refresh_target_controls():
+        _reset_param_panel()
+        _refresh_category_combo()
+        txt_source.Text = _source_label(_selected_key())
+        if chk_ignore_groups is not None:
+            chk_ignore_groups.Visibility = Visibility.Visible if _target_key() in ("instance_params", "workset") else Visibility.Collapsed
+        if chk_also_rename_family is not None:
+            chk_also_rename_family.Visibility = Visibility.Visible if _target_key() == "type_names" else Visibility.Collapsed
+        is_workset = (_target_key() == "workset")
+        if pnl_mode_toggle is not None:
+            pnl_mode_toggle.Visibility = Visibility.Collapsed if is_workset else Visibility.Visible
+        if pnl_workset is not None:
+            pnl_workset.Visibility = Visibility.Visible if is_workset else Visibility.Collapsed
+        if is_workset:
+            if pnl_transform is not None:
+                pnl_transform.Visibility = Visibility.Collapsed
+            if pnl_overwrite is not None:
+                pnl_overwrite.Visibility = Visibility.Collapsed
+            _populate_workset_list()
+        else:
+            _refresh_mode_panels()
+
+    _refresh_target_controls()
 
     result = [None]
 
@@ -1146,6 +1272,15 @@ def show_dialog(script_dir, lib_path, mode):
         if is_overwrite:
             overwrite_value = txt_overwrite.Text if txt_overwrite else ""
 
+        is_workset = (_target_key() == "workset")
+        workset_id = None
+        if is_workset:
+            selected_item = lst_worksets.SelectedItem if lst_worksets else None
+            if selected_item is None or selected_item.Tag is None:
+                ui.uiUtils_alert("Select a target workset from the list.", title=config["title"])
+                return
+            workset_id = selected_item.Tag
+
         param_name = ""
         if _is_param_mode():
             selected_item = lst_parameters.SelectedItem if lst_parameters else None
@@ -1154,7 +1289,7 @@ def show_dialog(script_dir, lib_path, mode):
                 return
             param_name = str(selected_item.Tag)
 
-        if not is_overwrite and not any([
+        if not is_workset and not is_overwrite and not any([
             txt_find.Text, txt_prefix.Text, txt_suffix.Text
         ]):
             ui.uiUtils_alert(
@@ -1170,6 +1305,7 @@ def show_dialog(script_dir, lib_path, mode):
             "scope_display":  _selected_display(),
             "cat_id":         _selected_category_id(),
             "param_name":     param_name,
+            "workset_id":     workset_id,
             "find":           txt_find.Text or "",
             "replace":        txt_replace.Text or "",
             "prefix":         txt_prefix.Text or "",
@@ -1216,6 +1352,7 @@ def run(script_dir, lib_path, mode):
     target_display = inputs["target_display"]
     cat_id         = inputs["cat_id"]
     param_name     = inputs["param_name"]
+    workset_id     = inputs.get("workset_id")
     find_text      = inputs["find"]
     replace_text   = inputs["replace"]
     prefix         = inputs["prefix"]
@@ -1230,6 +1367,8 @@ def run(script_dir, lib_path, mode):
         elements = collect_elements_with_param(doc, scope_key, cat_id, param_name, ignore_groups)
     elif target_key == "type_params":
         elements = collect_types_with_param(doc, scope_key, cat_id, param_name)
+    elif target_key == "workset":
+        elements = collect_instances_for_workset(doc, scope_key, cat_id, ignore_groups)
     else:
         elements = collect_target_elements(doc, target_key, scope_key, cat_id, ignore_groups)
 
@@ -1251,6 +1390,8 @@ def run(script_dir, lib_path, mode):
             elements, param_name, find_text, replace_text, prefix, suffix,
             overwrite_value=overwrite_value if is_overwrite else None,
         )
+    elif target_key == "workset":
+        planned, skipped = plan_workset_changes(doc, elements, workset_id)
     else:
         planned, skipped = plan_renames(
             elements, find_text, replace_text, prefix, suffix,
@@ -1284,6 +1425,8 @@ def run(script_dir, lib_path, mode):
     ]
     if target_key in ("instance_params", "type_params"):
         lines.append("Parameter: {}".format(param_name))
+    if target_key == "workset":
+        lines.append("Workset:   {}".format(_get_workset_name(doc, workset_id)))
     if is_overwrite:
         lines.append("Mode:      Overwrite  ->  \"{}\"".format(overwrite_value))
     lines += [
@@ -1291,8 +1434,12 @@ def run(script_dir, lib_path, mode):
         "Skipped:   {}".format(len(skipped)),
         "",
     ]
-    for _, old_name, new_name in planned[:300]:
-        lines.append("{}  ->  {}".format(old_name, new_name))
+    show_parent_name = target_key in ("instance_params", "type_params", "workset")
+    for element, old_name, new_name in planned[:300]:
+        if show_parent_name:
+            lines.append("{}: {}  ->  {}".format(_get_name(element) or "(unnamed)", old_name, new_name))
+        else:
+            lines.append("{}  ->  {}".format(old_name, new_name))
     if len(planned) > 300:
         lines.append("... and {} more".format(len(planned) - 300))
     if skipped:
@@ -1328,6 +1475,8 @@ def run(script_dir, lib_path, mode):
         renamed, failed = apply_param_renames(
             doc, planned, param_name, config["transaction_title"], scope_display
         )
+    elif target_key == "workset":
+        renamed, failed = apply_workset_changes(doc, planned, workset_id, config["transaction_title"], scope_display)
     else:
         renamed, failed = apply_renames(doc, planned, config["transaction_title"], scope_display)
 
