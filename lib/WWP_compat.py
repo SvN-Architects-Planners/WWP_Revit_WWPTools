@@ -30,6 +30,10 @@ try:
     import urllib.parse as urllib_parse
 except Exception:
     import urllib as urllib_parse
+    import urlparse as _urlparse_compat
+    urllib_parse.urlparse = _urlparse_compat.urlparse
+    urllib_parse.parse_qs = _urlparse_compat.parse_qs
+    urllib_parse.parse_qsl = _urlparse_compat.parse_qsl
 
 
 try:
