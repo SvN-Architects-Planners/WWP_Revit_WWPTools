@@ -1,9 +1,9 @@
 title: "Parameter\nManager"
 tooltip: |
-  Import project parameters or create parameter import templates
+  Bulk import shared parameters or create parameter import templates
 help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/1-setup/add-project-parameter"
 layout:
-  - "Import Parameter from Excel"
+  - "Bulk Import Shared Parameters"
   - "Create Parameter Importor Excel"
   - separator
   - "Convert Shared to Project Parameter"

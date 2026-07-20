@@ -1,0 +1,301 @@
+# This is a Revit shared parameter file.
+# Do not edit manually.
+*META	VERSION	MINVERSION
+META	2	1
+*GROUP	ID	NAME
+GROUP	1	Titleblocks
+GROUP	2	Maxwell Object Parameters
+GROUP	3	Unit Parameters
+GROUP	4	Sheets/Views
+GROUP	5	Urban Design
+GROUP	6	Parking
+GROUP	7	Massing
+GROUP	8	Images
+GROUP	9	Dimensions
+GROUP	10	Annotations
+GROUP	11	Walls
+GROUP	12	Exported Parameters
+GROUP	13	Model Groups
+GROUP	14	Areas
+GROUP	15	Rooms
+GROUP	16	Schedules
+GROUP	17	Grids
+GROUP	18	Doors
+GROUP	19	Rating
+GROUP	20	Sheet Issue Stages
+GROUP	21	INFO
+GROUP	22	STATS
+GROUP	23	LIM Landscape Data
+*PARAM	GUID	NAME	DATATYPE	DATACATEGORY	GROUP	VISIBLE	DESCRIPTION	USERMODIFIABLE	HIDEWHENNOVALUE
+PARAM	9c273f00-e4be-4357-9cb9-0a520d1998bb	Mass Category	TEXT		7	1		1	0
+PARAM	805cf400-3883-4512-b9a8-3d2f18801b62	WWP_03_SALABLE	YESNO		14	1		1	0
+PARAM	0e43a104-0b65-486d-a892-c93346beca7f	! S_STATS_ParkingCounts_Text	TEXT		22	1		1	0
+PARAM	ca9cae04-5d10-4abb-a1d9-d1d90aa33d1c	Text Override	YESNO		18	1		1	0
+PARAM	0d00cc04-b298-40c4-a862-953a73698631	Mass Height	LENGTH		7	1		1	0
+PARAM	382cb208-e9a2-4486-82fe-a417ca3c7e01	! S_STATS_Building_Text	TEXT		17	1		1	0
+PARAM	1c6fe00d-19b3-4b17-897a-ea0b452240a1	Unit Width	LENGTH		7	1		1	0
+PARAM	bea8070f-da4f-4164-b713-4a31d1f6d6c1	Clearance	TEXT		6	1		1	0
+PARAM	8b743d0f-b18b-4ffa-b567-609d92b81cdb	MassStoreys_PodiumA	INTEGER		7	1		1	0
+PARAM	ed8b9d10-f2ef-46f6-8170-427ee9835dc7	FRR Doors	TEXT		12	1		1	0
+PARAM	1f107012-b1fa-46b2-bafc-e4c7bb417332	HW: Cardreader	YESNO		18	1		1	0
+PARAM	e0ab7712-3b1f-4037-81f3-78899f1fcff7	MassHeight_PodiumB	LENGTH		7	1		1	0
+PARAM	eba34f16-8e89-4527-93c6-1546f76cdc24	! S_DOORS_Panel_Length	LENGTH		18	1		1	0
+PARAM	855ca616-89da-4bc0-9d57-c09058c1e25b	Doors: Thickness	LENGTH		18	1		1	0
+PARAM	e9da3417-1aad-4a6b-8b92-5a5b7eba09cb	HW: Lock Hardware	YESNO		18	1		1	0
+PARAM	7b55b518-ab97-4bdd-b495-5354fa5bc54b	SheetIssue_11_PERMIT	YESNO		20	1		1	0
+PARAM	c71c3e19-628c-45fa-b76a-272c4f6097d0	SvN_Spaces	INTEGER		14	1		1	0
+PARAM	4368241a-1f3d-4d86-a474-77e751b8b283	Line Type Label	TEXT		10	1		1	0
+PARAM	cbba711a-3f8d-43c3-a08e-a9daecb210d2	Sheet Category	TEXT		4	1		1	0
+PARAM	2a98521c-3d34-44f3-bf0c-f9160d8f58a9	Material: Door Panel	MATERIAL		18	1		1	0
+PARAM	43d5051d-3d33-43c5-9aad-33c76bede680	Issued for	TEXT		1	1		1	0
+PARAM	b3bb8d1d-a8cb-4acc-9e23-979eb4ab165e	Client_Address	TEXT		1	1		1	0
+PARAM	ad1a4d1f-5672-4cb1-8754-0126ae586c1a	Address	MULTILINETEXT		1	1		1	0
+PARAM	2fb15520-7f52-46ac-9c3a-e04121312cf2	HW: Auto Open	YESNO		18	1		1	0
+PARAM	2cbcb220-562a-4be1-bd0c-63f430dba8ee	SvN_Floor Offset	LENGTH		9	1		1	0
+PARAM	fe85e220-9359-4b73-b602-eb18418c4025	Visible to Z-clip Planes	YESNO		2	1		1	0
+PARAM	aef4d321-5339-4ef2-9169-565c637f5ccc	WWP_01_GCA	YESNO		14	1		1	0
+PARAM	47305d24-1b9b-417f-bccf-a2ba0a9ca039	Name_Filled Region	TEXT		10	1		1	0
+PARAM	fa9c6724-afe9-4306-9584-92f466d7d01c	! S_TB_RevisonDetail_Left	MULTILINETEXT		1	1		1	0
+PARAM	87e5f924-ebc6-4ba5-a4ef-dbabd7c16fb4	Doors: Wall Opening Height	LENGTH		18	1		1	0
+PARAM	afb04427-a17f-4b82-afa2-6062729537d6	WWP_03_NSA	YESNO		14	1		1	0
+PARAM	37e18727-da85-4162-a9a1-87fb3f2931df	! S_PK_ParkingCategory_Text	TEXT		6	1		1	0
+PARAM	70b8a729-24bb-452d-8a49-b0b743dc4b4e	Stall Number	TEXT		6	1		1	0
+PARAM	eb95462b-5e02-474a-a0ad-0a291d08f075	HW: Frame Protector	YESNO		18	1		1	0
+PARAM	fea5612c-142f-405e-8df8-9556e27bb1b3	Checkbox	YESNO		1	1		1	0
+PARAM	4add2a2d-4d58-47d8-bcab-b98c26268c0a	! S_MASS_HighestLevel_Number	NUMBER		7	1		1	0
+PARAM	9d1c742d-3ad6-4406-a6f8-2d39441560b2	Length	LENGTH		9	1		1	0
+PARAM	ee63e62d-1c07-4bc4-b6bd-9acff27b7914	FRR Walls	TEXT		12	1		1	0
+PARAM	7a704a2e-96f8-4502-a66a-4bcdbff57746	Doors Width	LENGTH		18	1		1	0
+PARAM	0feaf02e-3f76-4d2b-a3cc-7a3aa9eaa356	Text: Panel Material	TEXT		18	1		1	0
+PARAM	94b2472f-9d80-4a14-a569-ca7e5231900c	Material	MATERIAL		11	1		1	0
+PARAM	c13e8330-5e07-4c49-995f-492406083e04	Doors: Panel Type	TEXT		18	1		1	0
+PARAM	4045a630-abc6-482b-8241-66248ff431e1	Material: Door Hardware	MATERIAL		18	1		1	0
+PARAM	38348731-117b-46b4-a89b-2632f6b2398a	View Category	TEXT		4	1		1	0
+PARAM	088e0132-5e95-41a4-ad38-a4b1d577c2cb	! S_DOORS_PanelMaterial_Text	TEXT		18	1		1	0
+PARAM	5808a832-d1c9-46d0-85f0-224b3ec10fbb	! S_MASS_TypicalFloor_Area	AREA		7	1		1	0
+PARAM	40c13e34-b9cf-4e21-9a7a-a055746dac1e	Doors: Even Door	YESNO		18	1		1	0
+PARAM	b0fddd34-2b4f-4fbf-a421-a19c27bf3d76	Door Number_Override	TEXT		18	1		1	0
+PARAM	34ad1236-a3c9-4166-9f51-35603625e45b	! S_SHEET_ProjectPhase_Text	TEXT		4	1		1	0
+PARAM	f444c137-b01c-46de-8cd8-3097c037f4fa	Sheet SubCategory	TEXT		4	1		1	0
+PARAM	d8a72d38-e6d9-47e1-a30d-12c4e626a75d	Doors: Suite Door Type	TEXT		18	1		1	0
+PARAM	a43f5639-68f1-4274-b262-c87f7b35757d	Doors_Repeating	YESNO		18	1		1	0
+PARAM	c0a29639-579b-493a-b721-1aed756c1f1d	STC Walls	TEXT		19	1		1	0
+PARAM	4c7a0d3b-f424-4e59-9af4-febdea06050b	Schedule Category	TEXT		16	1		1	0
+PARAM	e0dc413b-4abc-46c8-bc29-21b798da5bc7	Doors: Panel Finish	TEXT		18	1		1	0
+PARAM	f6752e3e-702e-4ba9-9139-1dbe9be4a5d5	Doors Number Count	TEXT		18	1		1	0
+PARAM	293f5f3e-9cff-4c18-bf1a-0cc304182857	! S_STATS_Counts_Number	NUMBER		22	1		1	0
+PARAM	98e4dc3e-8ec6-4443-b320-e6995b0d9692	Sheet Scale	NUMBER		1	1		1	0
+PARAM	7593e93e-cae0-45e0-8489-65d4bff8a70a	SheetIssue_06_60%DD	YESNO		20	1		1	0
+PARAM	164a563f-fa8e-4a82-a69c-8f52ca48e451	Wall Finish - East	TEXT		15	1		1	0
+PARAM	a3925941-5944-4810-9b6a-d54d583ed298	L	LENGTH		6	1		1	0
+PARAM	87df9642-31f5-4590-ad8c-e2646e8ed1fa	! S_STATS_Site_Text	TEXT		17	1		1	0
+PARAM	c6aaa942-64e6-4caf-86ef-d5b8a8c79082	SheetIssue_01_CONCEPT	YESNO		20	1		1	0
+PARAM	986eec43-9e69-4860-a491-cad345c16fe3	Room Name	TEXT		7	1		1	0
+PARAM	ebd91346-2d28-492a-a994-8df8a8c14e99	! S_SHEET_Classification_Text	TEXT		4	1		1	0
+PARAM	d58e8c46-a265-4ab4-99a0-77a7d0470c50	ROOM BOUNDARY - ENVELOPE	YESNO		15	1		1	0
+PARAM	92300948-970e-40cc-8854-f2177d8fdbd0	Mass Floor - Number	TEXT		7	1		1	0
+PARAM	da187448-db99-422b-9952-b7efb842c1d4	! S_PK_ParkingType_Text	TEXT		6	1		1	0
+PARAM	cf0c4f49-4043-4fb5-83ea-a49192891f69	Unit Area	AREA		10	1		1	0
+PARAM	626fc449-8297-495f-80a0-be1bdc10f989	Space Category	TEXT		7	1		1	0
+PARAM	466f5d4a-3320-4696-b8e3-8cbfc149ef61	Text: Frame Finish	TEXT		18	1		1	0
+PARAM	672cdc4a-7320-43d0-8eba-73b03b1985c2	HW: Weather Stripping	YESNO		18	1		1	0
+PARAM	9c0a7c4b-4bd5-4658-95b0-66bfea44b646	Unit	YESNO		13	1		1	0
+PARAM	b997b84c-1826-4302-b823-353aa889f1c3	! S_BIM_FamilyVersion_Num	TEXT		21	1		1	0
+PARAM	b8f2ce4c-2adc-4465-bc79-a11e00d15ef8	Material: Door Glazing	MATERIAL		18	1		1	0
+PARAM	14ff824e-5ea3-49e0-80b2-a82b1ad10b75	Wall Finish - South	TEXT		15	1		1	0
+PARAM	7545c14e-9b9d-4938-aa8b-e63291a41a33	Wall Material - South	TEXT		15	1		1	0
+PARAM	11b5fb4f-4953-46d2-9333-b5141628f39d	Fill Area	AREA		9	1		1	0
+PARAM	6800e151-634e-4f52-ad9f-af6dfd3265b1	Unit Type	TEXT		3	1		1	0
+PARAM	c6de2b52-ebb9-4b02-8676-1fdc4a91bb45	! S_DOORS_Panel_Width	LENGTH		18	1		1	0
+PARAM	bad98652-7035-4fdf-9370-38cea9a81e23	Mass Area	AREA		7	1		1	0
+PARAM	723aab52-a072-4c08-8356-f61754c7acaa	! S_DOORS_Opening_Area	AREA		18	1		1	0
+PARAM	82016653-8927-428f-8ade-58bac94f3dd6	! S_DOORS_PanelFinish_Text	TEXT		18	1		1	0
+PARAM	789bd653-b553-408f-95c1-c8b823ac67fe	Doors: Room to	TEXT		18	1		1	0
+PARAM	e42afb55-b1e5-410d-a0a4-1a7357145de1	Unit Depth	LENGTH		7	1		1	0
+PARAM	29c61e58-d0c8-4320-8424-93191ff12d2c	STC Doors	TEXT		19	1		1	0
+PARAM	e103ef58-6341-42b0-86cc-12d3010687c4	SVN_APPLICATION	TEXT		11	1		1	0
+PARAM	cdd0135a-3e7f-4e30-a3fb-809fa973c771	Base Material	TEXT		15	1		1	0
+PARAM	de20535a-2861-4d08-8cbf-e7168ce2d22b	SvN FRR	TEXT		11	1		1	0
+PARAM	6f2bad5b-3cf7-40f1-bb55-38d3df07ace0	SheetIssue_10_60%CD	YESNO		20	1		1	0
+PARAM	e3fab65b-8ddf-4245-8034-ef09d857f5eb	Balcony	YESNO		3	1		1	0
+PARAM	dd592e5c-b87e-4537-ac6a-3762834b8ec4	Mass ID	TEXT		7	1		1	0
+PARAM	e894f45c-4843-488e-99d3-9001fff7cd1a	Unit Height	LENGTH		7	1		1	0
+PARAM	9c65bd61-f3fe-4dbb-a4a4-8512fa486e89	! S_DOORS_PanelType_Text	TEXT		18	1		1	0
+PARAM	1fef0862-754f-4f90-88e7-ca154994c489	SheetIssue_COMMENTS	MULTILINETEXT		20	1		1	0
+PARAM	f1ff9963-676e-47d8-a123-10d8244be0aa	! S_TB_RevisonDate_Left	MULTILINETEXT		1	1		1	0
+PARAM	0a06db63-2dc2-4487-927b-1181fcd7f725	SvN_Unit Count	NUMBER		7	1		1	0
+PARAM	12384364-5776-474b-a7fb-b6957140a628	Doors: Frame Material	TEXT		18	1		1	0
+PARAM	0f086166-1c2c-4abe-9285-cef8e6ff8bd8	NET SITE AREA	AREA		7	1		1	0
+PARAM	d5506768-ad47-4822-a550-0112c932eeb1	MassStoreys_PodiumB	INTEGER		7	1		1	0
+PARAM	970b6d69-c1de-4724-b9eb-e39647d88e4b	Floor Material	TEXT		15	1		1	0
+PARAM	be24216b-5b6f-42e1-a0e3-cbe84b75c99b	Doors: Suite	YESNO		18	1		1	0
+PARAM	ddec9c6b-7f6e-4eb2-93e9-1bb2a13c1866	ULC Design	TEXT		11	1		1	0
+PARAM	959fc86b-7366-4907-a278-b1e11d8decf3	! S_DOORS_Panel_Height	LENGTH		18	1		1	0
+PARAM	f6ee1170-3238-4f03-bb40-751fae1b4440	SpotElev_Total	LENGTH		9	1		1	0
+PARAM	24266b70-1d56-4a98-b69f-3c52bc6ebeb1	Doors: Swing Angle Marketing	ANGLE		18	1		1	0
+PARAM	2310c171-bc6b-4ca0-aaf6-c735dd19b1fd	Print Set	TEXT		4	1		1	0
+PARAM	7c2fbc72-949f-46c5-95ec-e1f035a5fa85	Loading Type	TEXT		6	1		1	0
+PARAM	43e75973-0d42-4285-b0fc-f00d2447ebd3	SvN_Area Type	TEXT		14	1		1	0
+PARAM	3e81c473-46c0-4a89-bd8d-171960ebba1d	! S_DOORS_RpeatingDoor_YesNo	YESNO		18	1		1	0
+PARAM	f9285574-3ab7-40a8-96d8-8f503d3c7732	! S_TB_ConsultantName_Text	TEXT		1	1		1	0
+PARAM	0aeb9774-d8ca-40e0-9743-483793f381b9	SheetIssue_03_OPA/ZBA	YESNO		20	1		1	0
+PARAM	3c0c7b75-1f7d-47c4-a628-1d59849d8fe8	SvN_BUILDINGID	TEXT		14	1		1	0
+PARAM	3c0a6076-2e06-4d1a-a435-0e075e2f2dbe	Sheet Subtitle	TEXT		4	1		1	0
+PARAM	2232d176-e4b6-417a-ad25-7db6dc677d9d	EV	YESNO		6	1		1	0
+PARAM	e5d2f976-1e14-442d-9f9c-513f1679113e	Doors Height	LENGTH		18	1		1	0
+PARAM	c5979177-399f-441e-8a1a-14530cc4995d	Schedule List	TEXT		16	1		1	0
+PARAM	81316c78-a1d6-43a5-9a0e-f9245f206462	Parking Occupancy	TEXT		6	1		1	0
+PARAM	51ba8e78-a45c-4491-97da-88159bcf2c4a	Nominal height	LENGTH		12	1		1	0
+PARAM	a4f5b579-4683-44ae-b031-0f306d2809af	DISPLAY CATEGORY	TEXT		14	1		1	0
+PARAM	8795b87a-44cc-45c3-845a-dea46170d2ae	Nominal Width	NUMBER		12	1		1	0
+PARAM	f4a7fa7b-17fa-455e-9d18-d610dcad3588	View Subcategory	TEXT		4	1		1	0
+PARAM	9725de7c-54da-40b9-9bc2-c7af243c7d00	Podium Storeys	INTEGER		7	1		1	0
+PARAM	079df37c-beb4-49f0-b27b-465456190ba7	Wall Material - North	TEXT		15	1		1	0
+PARAM	0a83427e-9a46-4fe9-9fe0-59dba77c99f2	Stat Path	TEXT		16	1		1	0
+PARAM	c0676e7e-5bbd-4de2-a615-0d53f1f59d42	Doors_Override Height	LENGTH		18	1		1	0
+PARAM	fb54b57e-aa32-410c-8b0a-dacd119c0a86	MassHeight_PodiumA	LENGTH		7	1		1	0
+PARAM	0a25387f-c848-4a7a-bd62-871e5ad70f93	SheetIssue_02_PRELIMINARY	YESNO		20	1		1	0
+PARAM	4e0d547f-9cf2-4bd2-9cae-9b8cd054cb47	SheetIssue_04_30%DD	YESNO		20	1		1	0
+PARAM	82386a81-4944-4006-8d77-c64e9d45ffeb	HW: Self Closure	YESNO		18	1		1	0
+PARAM	b75a2782-f8b9-4ce2-a333-10563114f2f8	Parking Count	INTEGER		6	1		1	0
+PARAM	c3a9ca83-7071-4b8f-a3bd-76e74ef71f50	SvN_Width	LENGTH		9	1		1	0
+PARAM	3819db83-d9ac-42a8-a318-22b4471dabdb	SheetIssue_07_90%DD	YESNO		20	1		1	0
+PARAM	cf551686-b8e7-4b8d-9b9b-89ddb75f587d	Visible to Reflections/Refractions	YESNO		2	1		1	0
+PARAM	98192686-4036-4e44-be04-4675edc16c1b	Doors: Width	LENGTH		18	1		1	0
+PARAM	8d405087-dd86-4f1a-b86a-359ede9d9425	ROOM - BUILDING ID	TEXT		15	1		1	0
+PARAM	80b98387-ddc7-4f44-be10-2e2103bd8c0c	FRR	TEXT		19	1		1	0
+PARAM	584aff88-a08e-40a3-8143-5900ff9227e5	HW: Latch Type	TEXT		18	1		1	0
+PARAM	16cd9389-875e-46a7-b8d7-def73bc7ee5a	BUILDING ID	TEXT		7	1		1	0
+PARAM	dc6e978a-a091-4e60-b148-a30dba77c490	! S_MASS_MassFloorCounts_Int	INTEGER		7	1		1	0
+PARAM	b813588c-2fbc-4c6c-a9d4-fe52218d7084	PHASE	TEXT		7	1		1	0
+PARAM	753aa58c-30ed-4600-aba5-a0a9f243e7e1	SvN_Bedroom Type	TEXT		14	1		1	0
+PARAM	3a9d438d-ef1b-4a53-8a3e-96679e24c9dc	WWP_FAR	YESNO		14	1		1	0
+PARAM	6ee0e58d-4608-4da2-acbe-08884592800f	! S_TB_ConsultantAdress_MultilineText	MULTILINETEXT		1	1		1	0
+PARAM	502a228e-d06b-47e9-9d9c-fcb90640c2ab	! S_INFO_ProjectElevation_Length	LENGTH		21	1		1	0
+PARAM	8a29848e-4dc5-4434-9300-dae0b6a3adb7	! S_TB_ClientAddress_MultilineText	MULTILINETEXT		1	1		1	0
+PARAM	de3dc58e-8ba6-47d0-b61a-20680179c9d6	Mass Storeys	INTEGER		7	1		1	0
+PARAM	4907678f-d168-410e-8ebf-b6700eb664e4	DISPLAY NAME	TEXT		15	1		1	0
+PARAM	ec8b4790-3527-4069-a1ad-7b3924b7c202	HW: Kick Plate	YESNO		18	1		1	0
+PARAM	98a60e93-e7ec-468b-81e2-7db2a665c877	SITE	TEXT		7	1		1	0
+PARAM	74042894-87dd-4baf-bae5-82ac213fdb87	Area - Phase	TEXT		14	1		1	0
+PARAM	44bcf596-2603-42e4-9f6a-8ccde7078c18	Image	YESNO		1	1		1	0
+PARAM	e9cb4897-c1db-4385-94c4-08976bb63a7b	SvN_Lower Type Mark	TEXT		10	1		1	0
+PARAM	404db497-1f10-4b38-8709-0b9b5bf0d578	! S_DOORS_Opening_Wdith	LENGTH		18	1		1	0
+PARAM	1cb0cb97-ace0-48b2-afb9-9832d504d3b0	! S_SHEET_Sub-Class_Text	TEXT		4	1		1	0
+PARAM	2db72298-3ad7-4f83-93f4-393c4f528202	Area Type	TEXT		7	1		1	0
+PARAM	6a849d98-1b50-467e-a08d-cd0a1565c7d6	Sheet Index	TEXT		1	1		1	0
+PARAM	41fa609b-b5c0-43f0-a0d0-c4d48e1e1c1a	ROOM - PHASE	TEXT		15	1		1	0
+PARAM	46f9939c-0980-48c3-85dc-b49cc3ca2926	SvN_FAR Calculation	YESNO		14	1	For BC Projects&#xD&#xAUnticked = FAR Exclusion&#xD&#xANone (Grey Ticked) = FAR &#xD&#xATicked = FAR 	1	0
+PARAM	6df9079d-ae58-4f96-9e65-65a6f582ff23	! S_STATS_Block_Text	TEXT		17	1		1	0
+PARAM	69df159d-aa4d-44c9-a946-c902700ae32d	SvN_Suite Type	TEXT		14	1		1	0
+PARAM	f944a59f-9162-4d6d-a6d8-25e2ace91d04	Grid - Building ID	TEXT		17	1		1	0
+PARAM	13e4ac9f-ac67-479a-aa3f-84d4e905ea0d	Doors_Override Width	LENGTH		18	1		1	0
+PARAM	09f61aa0-9428-4106-b2de-27bdf40aefe0	! S_RATING_STCRating_Text	TEXT		19	1		1	0
+PARAM	6e03c4a0-40a1-46df-ae1c-64e287171462	Doors: Room from	TEXT		18	1		1	0
+PARAM	14cab3a3-26bf-42ba-bee7-0175e1aa537e	Unit Exterior Area	AREA		3	1		1	0
+PARAM	88781aa4-2ddd-4670-b4e4-acd32c81cfd4	SvN_Length	LENGTH		9	1		1	0
+PARAM	7c559ca4-d4c6-4b86-b966-f4972baa52c3	SvN_Floor Offset From Level	LENGTH		15	1		1	0
+PARAM	a9e8f5a5-023a-4e93-9ae7-7a3a15da62ef	SvN_EXTERIOR TYPE	TEXT		14	1		1	0
+PARAM	c403dba6-b71e-4874-9171-d0a0e3722a97	Wall Material - West	TEXT		15	1		1	0
+PARAM	309de7a7-8665-4847-a81a-6b254605c723	Frame finish	TEXT		12	1		1	0
+PARAM	591a67a8-5e50-4c93-9890-22add1338a08	Wall Finish - West	TEXT		15	1		1	0
+PARAM	6a48c8a8-ddbb-4893-bee0-b8a6aaeb746c	BLOCK	TEXT		7	1		1	0
+PARAM	5d4f51a9-cc00-459c-94e9-5a6511a5ed8f	Unit Type - Linked	TEXT		7	1		1	0
+PARAM	dbf21daa-ca51-4e5a-ab8a-05f6b235bf19	HW: Temperature Rise Label	YESNO		18	1		1	0
+PARAM	6d4d63aa-74b0-47a0-b77a-4c7fa28f0f74	Text: Panel Finish	TEXT		18	1		1	0
+PARAM	223cedac-b5b8-4e5a-a107-888dc4c3f32d	Land Use	TEXT		5	1		1	0
+PARAM	57f5ffac-4d6b-45b7-8bed-864477c63bbd	Width	LENGTH		6	1		1	0
+PARAM	42ba98ad-2e52-45d0-8a97-9dcd0031f90d	Text: Frame Material	TEXT		18	1		1	0
+PARAM	85b0b3af-ecdf-4b74-8577-4d11ef7601ab	MassStoreys_PodiumC	INTEGER		7	1		1	0
+PARAM	676ac2af-aec9-4c8f-9ceb-b01bad050c73	GFA-RSA PARAMETER	TEXT		15	1		1	0
+PARAM	858942b0-7206-4ea0-9cf2-254346e5dddd	Doors: Frame Type	TEXT		18	1		1	0
+PARAM	799b91b0-70e4-4257-bd6f-d534fce36518	SVN_BLOCK	TEXT		14	1		1	0
+PARAM	337da3b0-72ab-4cea-b279-ad7e07839a99	! S_DOORS_Overall_Width	LENGTH		18	1		1	0
+PARAM	1c7f02b1-4871-4c6a-aebb-e10fe05a1cbf	HW: Threshold	YESNO		18	1		1	0
+PARAM	9ded9bb1-e57e-4e27-b44e-aa440867f502	Ceiling Material	TEXT		15	1		1	0
+PARAM	deb955b4-327e-4c7f-ba5e-b6fb17f51eac	Area - Building ID	TEXT		14	1		1	0
+PARAM	4aaa27b6-215e-4b51-9938-4550314fcfd1	Stall Area	AREA		6	1		1	0
+PARAM	41180db7-0dc0-424f-9e71-a31b2ea3f6bb	Rating_Unit	TEXT		19	1		1	0
+PARAM	6dbb68b7-a779-4296-b059-632669ffc155	Elevation (Project Zero)	LENGTH		9	1		1	0
+PARAM	4af379b7-8fc3-4e6b-8e5a-22974cac4c4c	Visibility	YESNO		8	1		1	0
+PARAM	c7d7e1b8-bc6a-4ba3-86a1-35e4b8ce8e47	Doors_Repeating Type	TEXT		18	1		1	0
+PARAM	90da2aba-538a-4c12-a837-a5c7d92b2bb3	Traffic Zone	TEXT		7	1		1	0
+PARAM	caa804bb-1402-43b3-b28e-cb409764bba7	Issue	TEXT		1	1		1	0
+PARAM	d56f9ebc-0922-4000-a70c-b5472878d0af	Nominal Height 02	NUMBER		12	1		1	0
+PARAM	3d10e6bc-5052-446f-b79a-9684b6c43a3b	WWP_02_GFA	YESNO		14	1		1	0
+PARAM	7c6c69bf-704a-4d21-b4aa-2cf4e5377665	Project Version	TEXT		1	1		1	0
+PARAM	ad15dabf-dc83-4185-ab7e-12f5976896d9	Wall Finish - North	TEXT		15	1		1	0
+PARAM	94b17cc0-8d36-4510-a5e6-f8fe03425a2e	Wall Material - East	TEXT		15	1		1	0
+PARAM	9cdf1dc1-9286-49c4-82b0-cb7ccc84496a	! S_DOORS_SidePanel_Width	LENGTH		18	1		1	0
+PARAM	ac5cb7c1-767e-4338-aeed-4acef39be25c	HW: Insulated	YESNO		18	1		1	0
+PARAM	7c99fac1-0aa5-4e69-945c-e3ec1b674245	Podium Height	LENGTH		7	1		1	0
+PARAM	6cbd8fc2-f00b-4467-9f3d-89667ee9d928	! S_BIM_LastUpdated_Date	TEXT		21	1		1	0
+PARAM	21c0ddc2-3126-4efd-bbc8-eb713776c2fb	SvN_Count	NUMBER		6	1		1	0
+PARAM	da3b15c4-f719-4f3c-ae49-899eb5a810b0	Ceiling Height	LENGTH		15	1		1	0
+PARAM	00db3cc4-54f8-46bf-816f-51784596d41a	! S_TB_RevisonDate_Right	MULTILINETEXT		1	1		1	0
+PARAM	174b25c5-bca0-4c68-a328-1e20050f38e9	North Arrow	YESNO		1	1		1	0
+PARAM	ea6731c5-038d-48d8-a7c3-c09ebc081095	HW: Electric Strike	YESNO		18	1		1	0
+PARAM	ba8b23c8-3560-4c54-853c-ab81c3fcaff3	! S_DOORS_FrameType_Text	TEXT		18	1		1	0
+PARAM	23a347c8-cf47-4c89-8889-fcd1613bd261	Floor Offset	LENGTH		15	1		1	0
+PARAM	b835d9c8-c452-4359-97a3-9fe4e33e38ec	Doors: Height	LENGTH		18	1		1	0
+PARAM	78a7c4ca-bb21-4bee-b9f7-a724afc8ea7f	Door Width 2nd Panel	LENGTH		18	1		1	0
+PARAM	b47ec7ca-c4fe-4cbe-a40b-a6e7389c7861	Visible to Global Illumination	YESNO		2	1		1	0
+PARAM	48c5a1cb-df9a-4851-a08d-74d63b8ae12f	SvN_Area Parameter	TEXT		14	1		1	0
+PARAM	921419cd-c76a-4fe6-8a7b-0a742cf436cb	Unit Count	INTEGER		7	1		1	0
+PARAM	41ad3dce-2ca6-4fdc-9e4f-7137fdba40b9	Doors: Swing Angle	ANGLE		18	1		1	0
+PARAM	756fe1ce-a0d4-4516-bf52-280db7db5996	! S_MASS_UnitCount_Int	INTEGER		7	1		1	0
+PARAM	9492ebd0-8511-4501-ae73-98817e6812e1	SheetIssue_09_30%CD	YESNO		20	1		1	0
+PARAM	4dd06ad1-6f90-4644-9de6-a674c79aa9ee	BLOCK_AREA	AREA		7	1		1	0
+PARAM	1b602cd3-b997-4eb7-ab13-844e813bb78c	! S_TB_RevisonDetail_Right	MULTILINETEXT		1	1		1	0
+PARAM	c50987d3-573d-42ea-ae1a-a62b4a9a7f80	SvN_Depth	LENGTH		9	1		1	0
+PARAM	6c69f8d3-04e9-43da-8afe-d61745ec183a	! S_DOORS_Panel_Material	MATERIAL		18	1		1	0
+PARAM	399332d4-eead-440b-9abb-ebfdd2bd3a31	Mass Sub-Category	TEXT		7	1		1	0
+PARAM	58b4aad5-553d-4c37-b800-8b8017e360cc	MassHeight_PodiumC	LENGTH		7	1		1	0
+PARAM	21a299d6-2837-4767-9e0d-a14c8c232cc9	SpotElev_Storeys	INTEGER		9	1		1	0
+PARAM	358642d8-04a8-4414-b937-2a920c9ec3c8	ADA Compliant	YESNO		16	1		1	0
+PARAM	19b544d8-f1bd-4038-af4e-021b0ce0d9a4	Doors: Panel Material	TEXT		18	1		1	0
+PARAM	6c2509d9-b4ae-41b6-8425-c1e3de0b6375	Issuance	TEXT		4	1		1	0
+PARAM	c08eead9-622d-4db7-812c-50c14a456142	WWP_BOMA_Category	TEXT		14	1		1	0
+PARAM	ebe9f0d9-ede7-4136-9b18-ce16c6b5be0c	SheetIssue_05_SPA	YESNO		20	1		1	0
+PARAM	ef6a0dda-ee48-4da0-aafc-2f72d9b7a2e8	HW: Push Button	YESNO		18	1		1	0
+PARAM	831a1ddc-113a-4d4a-a5aa-c187547cade2	SvN_Upper Type Mark	TEXT		10	1		1	0
+PARAM	89ce92dc-8979-4b2d-a67d-44c582bd2926	Material: Door Frame	MATERIAL		18	1		1	0
+PARAM	15f7efdc-3d55-4d2a-8f2d-0a9d319acd9a	STC	TEXT		19	1		1	0
+PARAM	f28591df-f56b-4404-bd58-380f4ed8ad88	Option Title	TEXT		4	1		1	0
+PARAM	4fa69bdf-9c89-45ee-8fcf-04ab67e8806b	SvN_Required Area	AREA		14	1		1	0
+PARAM	8679c9e1-37d4-4640-b64f-6d2d5139f7a1	! S_DOORS_FrameMaterial_Text	TEXT		18	1		1	0
+PARAM	f45732e3-6998-475a-8913-3f1d572cfcec	Stall Type	TEXT		6	1		1	0
+PARAM	abab67e3-f2bc-4eea-b6c1-d4e20f7f2fc7	SheetIssue_08_BIDDING	YESNO		20	1		1	0
+PARAM	ce218fe3-ba37-40e0-9d55-8fb37543fd13	HW: Power Door Operator	YESNO		18	1		1	0
+PARAM	c00714e4-b679-4cd7-ac81-065301ec94fd	HW: Panic Hardware	YESNO		18	1		1	0
+PARAM	7b1524e6-a6e3-4f94-b22b-6385ebae66c3	Doors: Wall Opening Width	LENGTH		18	1		1	0
+PARAM	3af456e6-0817-4aff-8c52-995db2783466	Visible to Camera	YESNO		2	1		1	0
+PARAM	94a148e8-b7a1-4490-81ba-94fe4c351bea	SvN_Area Name	TEXT		14	1		1	0
+PARAM	22d5ece9-5e75-408a-b3c0-dbbf835c85af	SvN_Height	LENGTH		9	1		1	0
+PARAM	6d1ca1ea-642a-4cad-ae02-25f41a041d63	Sheet_Info	MULTILINETEXT		1	1		1	0
+PARAM	952ea3ec-7277-4597-be39-ee9b5814cd46	! S_DOORS_FrameFinish_Text	TEXT		18	1		1	0
+PARAM	480faaec-fbed-49dc-9ffc-8ff49c2a134e	GFA-RSA PARAMETER - Areas	TEXT		14	1		1	0
+PARAM	7dc089ee-927f-4b47-92b2-11e91c526426	! S_RATING_FireRating_Text	TEXT		19	1		1	0
+PARAM	07e4fbef-97e4-4733-a334-b8e0e1c1fcf4	SheetIssue_12_90%CD	YESNO		20	1		1	0
+PARAM	ea550bf0-650c-40e5-949b-352e6f4cda86	! S_SHEET_TrueNorthArrow_YesNo	YESNO		4	1		1	0
+PARAM	40b12df1-5feb-471b-a624-30901638c814	! S_DOORS_Opening_Height	LENGTH		18	1		1	0
+PARAM	6062f3f2-81ee-43d1-9fcc-565baa3d5517	SvN_Accessible	YESNO		14	1		1	0
+PARAM	da397ff3-d51a-4f50-8de0-5b93b3e55294	Doors: Frame Finish	TEXT		18	1		1	0
+PARAM	88bbe4f5-ab2c-4d68-8d9b-d77467e0b4b7	Mass Floor - Typical	YESNO		7	1		1	0
+PARAM	1d2718f6-82df-48ad-8130-0b4a42485d6b	PROGRAM	TEXT		7	1		1	0
+PARAM	15090df9-3b1b-4c04-abaf-d5248307c0a4	! S_TB_ScaleFactor_Number	INTEGER		1	1		1	0
+PARAM	8b5716f9-ed86-4c03-bfa1-663b6eff1dfb	! S_TB_NorthArrow_Angle	ANGLE		1	1		1	0
+PARAM	3ec3bcfa-5ec5-47da-a151-ed56e7081e4e	Unit - Scheme	TEXT		15	1		1	0
+PARAM	1dd122fb-9105-471b-8a2c-88428d8ed61e	SvN_MULTIPLIER	NUMBER		14	1		1	0
+PARAM	f282ebc4-916b-4858-b5b6-8ff535bcda4d	WWP_LDS_CalculationType	TEXT		23	1	Calculation mode used to distinguish trees from area-based landscape types.	1	0
+PARAM	2e77b8d3-0556-46b7-a970-44633df41ba4	WWP_LDS_Category	TEXT		23	1	Primary LIM landscape classification.	1	0
+PARAM	fdfaf27e-3804-4322-a243-45fde3685d29	WWP_LDS_SubCategory	TEXT		23	1	Secondary LIM landscape classification or species/type label.	1	0
+PARAM	215f80f4-066e-45d9-99f8-67604efc0bed	WWP_Avoided_Water_Runoff	NUMBER		23	1	Annual avoided water runoff coefficient.	1	0
+PARAM	f09c0521-5fb9-4484-8079-4dbea0e5fbe1	WWP_Carbon_Dioxide_Sequestration	NUMBER		23	1	Annual carbon dioxide sequestration coefficient.	1	0
+PARAM	b28d5e1f-9950-4451-bb73-148d193ec8e6	WWP_Oxygen_Levels	NUMBER		23	1	Annual oxygen-production coefficient.	1	0
+PARAM	15a48c00-3cb6-4365-91e3-22bb62aa8aad	WWP_Pollutants_Removed	NUMBER		23	1	Annual pollutants-removed coefficient.	1	0
+PARAM	edc29613-1ee3-4703-a560-6052e7e70a02	WWP_Maintenance_Cost	CURRENCY		23	1	Annual landscape maintenance cost.	1	0
+PARAM	be9d393a-b87f-4bb8-9832-c2ca0bd2dae5	WWP_Cost_Saved	CURRENCY		23	1	Annual landscape cost savings.	1	0
+PARAM	9fe65b71-869c-436e-bdfd-2f9a0dd9ae50	WWP_Total_GWP	NUMBER		23	1	Total global-warming-potential value used by the LIM workflow.	1	0
+PARAM	53fe0e63-7605-4a94-b0ae-b808453218ec	Maxi_Height	LENGTH		23	1	Maximum mature planting height.	1	0
+PARAM	49607ee8-7e05-4731-90c8-4b8bacb62a8d	Maxi_Width	LENGTH		23	1	Maximum mature planting width.	1	0
