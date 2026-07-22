@@ -5,8 +5,11 @@ clr.AddReference('System.Data')
 clr.AddReference('PresentationFramework')
 
 import os
+import posixpath
 import re
 import traceback
+import zipfile
+import xml.etree.ElementTree as ET
 
 import Autodesk.Revit.DB as DB
 import System
@@ -26,6 +29,7 @@ app = doc.Application
 DEFAULT_SHARED_PARAMETERS_PATH = (
     r"N:\Library\Design Software\Autodesk\Revit\Shared Parameters\SharedParameters.txt"
 )
+DEFAULT_EXCEL_SHEET_NAME = "Project Parameters"
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +92,206 @@ def _choose_shared_parameter_file(current_path=""):
         multiselect=False,
         initial_directory=initial_dir if os.path.isdir(initial_dir) else "",
     )
+
+
+def _choose_excel_file(current_path=""):
+    initial_dir = ""
+    try:
+        initial_dir = os.path.dirname(current_path or "")
+    except Exception:
+        pass
+    return ui.uiUtils_open_file_dialog(
+        title="Import Parameter Rows from Excel",
+        filter_text="Excel Workbooks (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir if os.path.isdir(initial_dir) else "",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Excel row reader (Open XML; Microsoft Excel is not required)
+# ---------------------------------------------------------------------------
+
+def _xml_children(element, local_name):
+    if element is None:
+        return []
+    return [child for child in element.iter() if child.tag.split("}")[-1] == local_name]
+
+
+def _excel_column_index(cell_reference):
+    letters = "".join(char for char in _safe_str(cell_reference) if char.isalpha())
+    result = 0
+    for char in letters.upper():
+        result = (result * 26) + (ord(char) - ord("A") + 1)
+    return result - 1
+
+
+def _excel_cell_text(cell, shared_strings):
+    cell_type = cell.attrib.get("t", "")
+    if cell_type == "inlineStr":
+        return "".join(node.text or "" for node in _xml_children(cell, "t"))
+
+    values = _xml_children(cell, "v")
+    raw = values[0].text if values and values[0].text is not None else ""
+    if cell_type == "s" and raw:
+        try:
+            return shared_strings[int(raw)]
+        except Exception:
+            return raw
+    if cell_type == "b":
+        return "TRUE" if raw == "1" else "FALSE"
+    return raw
+
+
+def _workbook_part_path(target):
+    target = _safe_str(target).replace("\\", "/")
+    if target.startswith("/"):
+        return target.lstrip("/")
+    if target.startswith("xl/"):
+        return target
+    return posixpath.normpath(posixpath.join("xl", target))
+
+
+def _read_excel_rows(file_path, preferred_sheet=DEFAULT_EXCEL_SHEET_NAME):
+    if not file_path or not os.path.isfile(file_path):
+        raise Exception("Excel workbook not found:\n{}".format(file_path or "(none)"))
+
+    with zipfile.ZipFile(file_path, "r") as workbook:
+        names = set(workbook.namelist())
+        shared_strings = []
+        if "xl/sharedStrings.xml" in names:
+            shared_root = ET.fromstring(workbook.read("xl/sharedStrings.xml"))
+            for shared_item in _xml_children(shared_root, "si"):
+                shared_strings.append(
+                    "".join(node.text or "" for node in _xml_children(shared_item, "t"))
+                )
+
+        workbook_root = ET.fromstring(workbook.read("xl/workbook.xml"))
+        relationships_root = ET.fromstring(
+            workbook.read("xl/_rels/workbook.xml.rels")
+        )
+        relationships = {}
+        for relationship in _xml_children(relationships_root, "Relationship"):
+            relationships[relationship.attrib.get("Id", "")] = relationship.attrib.get(
+                "Target", ""
+            )
+
+        relationship_attribute = (
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+        )
+        sheets = []
+        for sheet in _xml_children(workbook_root, "sheet"):
+            name = sheet.attrib.get("name", "")
+            relationship_id = sheet.attrib.get(relationship_attribute, "")
+            target = relationships.get(relationship_id, "")
+            if name and target:
+                sheets.append((name, _workbook_part_path(target)))
+
+        if not sheets:
+            raise Exception("The workbook contains no readable worksheets.")
+
+        selected_sheet = None
+        for sheet_name, part_path in sheets:
+            if sheet_name.lower() == preferred_sheet.lower():
+                selected_sheet = (sheet_name, part_path)
+                break
+        if selected_sheet is None:
+            selected_sheet = sheets[0]
+
+        sheet_name, part_path = selected_sheet
+        if part_path not in names:
+            raise Exception("Worksheet data could not be found for '{}'.".format(sheet_name))
+        sheet_root = ET.fromstring(workbook.read(part_path))
+
+        rows = []
+        for row_node in _xml_children(sheet_root, "row"):
+            values_by_column = {}
+            max_column = -1
+            for cell in [node for node in row_node if node.tag.split("}")[-1] == "c"]:
+                column = _excel_column_index(cell.attrib.get("r", ""))
+                if column < 0:
+                    continue
+                values_by_column[column] = _excel_cell_text(cell, shared_strings)
+                max_column = max(max_column, column)
+            if max_column >= 0:
+                rows.append([values_by_column.get(index, "") for index in range(max_column + 1)])
+            else:
+                rows.append([])
+
+    return sheet_name, rows
+
+
+def _normalized_excel_header(value):
+    return "".join(char for char in _safe_str(value).lower() if char.isalnum())
+
+
+def _excel_column(header_row, aliases):
+    normalized = [_normalized_excel_header(value) for value in header_row]
+    for alias in aliases:
+        key = _normalized_excel_header(alias)
+        if key in normalized:
+            return normalized.index(key)
+    return None
+
+
+def _excel_value(row, column):
+    if column is None or column < 0 or column >= len(row):
+        return ""
+    return _safe_str(row[column])
+
+
+def _excel_binding_value(raw_value):
+    normalized = _safe_str(raw_value).lower()
+    if normalized in ("1", "true", "yes", "y", "instance", "instance parameter"):
+        return "Instance"
+    if normalized in ("0", "false", "no", "n", "type", "type parameter"):
+        return "Type"
+    return ""
+
+
+def _extract_excel_entries(rows):
+    aliases = {
+        "parameter": ("Parameter Name", "Shared Parameter", "Parameter", "Name"),
+        "shared_group": ("Group Name", "Shared Parameter Group", "Shared Group"),
+        "binding": ("Instance Parameter", "Instance / Type", "Binding", "Binding Type"),
+        "group": ("Parameter Group", "Revit Parameter Group", "Revit Group", "Group"),
+        "category": ("Category", "Revit Category", "Category Name"),
+        "category_api": ("Category API", "Built In Category", "BuiltInCategory"),
+    }
+
+    best = None
+    for row_index, candidate in enumerate(rows[:20]):
+        columns = dict(
+            (field, _excel_column(candidate, field_aliases))
+            for field, field_aliases in aliases.items()
+        )
+        score = sum(1 for value in columns.values() if value is not None)
+        if best is None or score > best[0]:
+            best = (score, row_index, columns)
+
+    if best is None or best[0] == 0:
+        raise Exception(
+            "No recognized headers were found. Include at least a Parameter Name, "
+            "Instance/Type, Group, or Category column."
+        )
+
+    header_index = best[1]
+    columns = best[2]
+    entries = []
+    for source_row_number, row in enumerate(rows[header_index + 1:], start=header_index + 2):
+        category_name = _excel_value(row, columns["category"])
+        category_api = _excel_value(row, columns["category_api"])
+        entry = {
+            "source_row": source_row_number,
+            "parameter": _excel_value(row, columns["parameter"]),
+            "shared_group": _excel_value(row, columns["shared_group"]),
+            "binding_raw": _excel_value(row, columns["binding"]),
+            "group": _excel_value(row, columns["group"]),
+            "category": category_name or category_api,
+        }
+        if any(entry[field] for field in ("parameter", "shared_group", "binding_raw", "group", "category")):
+            entries.append(entry)
+    return entries
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +471,7 @@ class BulkImportWindow(forms.WPFWindow):
         forms.WPFWindow.__init__(self, "BulkImportSharedParameters.xaml")
         self.result_rows = None
         self.shared_parameter_path = ""
+        self._excel_path = ""
         self._parameter_lookup = {}
 
         self._group_labels, self._group_lookup, self._default_group = _parameter_group_choices()
@@ -283,6 +488,7 @@ class BulkImportWindow(forms.WPFWindow):
         self._table.Columns.Add("Binding", System.String)
         self._table.Columns.Add("Group", System.String)
         self._table.Columns.Add("Category", System.String)
+        self._table.Columns.Add("ImportNotes", System.String)
         self.ParameterGrid.ItemsSource = self._table.DefaultView
 
         self.ParameterGrid.Columns[1].ItemsSource = _net_string_list(self._binding_labels)
@@ -291,6 +497,7 @@ class BulkImportWindow(forms.WPFWindow):
 
     def _wire_events(self):
         self.BrowseButton.Click += self._browse_click
+        self.ExcelImportButton.Click += self._excel_import_click
         self.AddRowButton.Click += self._add_click
         self.DuplicateRowButton.Click += self._duplicate_click
         self.RemoveRowButton.Click += self._remove_click
@@ -313,12 +520,21 @@ class BulkImportWindow(forms.WPFWindow):
             self._table.Clear()
             self._add_row()
 
-    def _add_row(self, parameter="", binding="Instance", group="", category=""):
+    def _add_row(
+        self,
+        parameter="",
+        binding="Instance",
+        group="",
+        category="",
+        import_notes="",
+        use_defaults=True,
+    ):
         row = self._table.NewRow()
         row["Parameter"] = parameter
-        row["Binding"] = binding or "Instance"
-        row["Group"] = group or self._default_group
+        row["Binding"] = (binding or "Instance") if use_defaults else binding
+        row["Group"] = (group or self._default_group) if use_defaults else group
         row["Category"] = category
+        row["ImportNotes"] = import_notes
         self._table.Rows.Add(row)
         return row
 
@@ -331,6 +547,7 @@ class BulkImportWindow(forms.WPFWindow):
             _safe_str(selected["Binding"]),
             _safe_str(selected["Group"]),
             _safe_str(selected["Category"]),
+            _safe_str(selected["ImportNotes"]),
         )
 
     def _commit_grid(self):
@@ -346,6 +563,171 @@ class BulkImportWindow(forms.WPFWindow):
             self.StatusText.Text = "Loaded a new Shared Parameters file. Add binding rows below."
         except Exception as exc:
             TaskDialog.Show("Bulk Import Shared Parameters", str(exc))
+
+    def _normalized_option(self, value, prefixes=()):
+        normalized = _normalized_excel_header(value)
+        for prefix in prefixes:
+            normalized_prefix = _normalized_excel_header(prefix)
+            if normalized.startswith(normalized_prefix):
+                normalized = normalized[len(normalized_prefix):]
+                break
+        return normalized
+
+    def _match_parameter(self, raw_name, raw_group=""):
+        name_key = self._normalized_option(raw_name)
+        group_key = self._normalized_option(raw_group)
+        if not name_key:
+            return ""
+
+        matches = []
+        grouped_matches = []
+        for label, definition in self._parameter_lookup.items():
+            if self._normalized_option(definition.Name) != name_key:
+                continue
+            matches.append(label)
+            if group_key:
+                try:
+                    owner_group = definition.OwnerGroup.Name
+                except Exception:
+                    owner_group = ""
+                if self._normalized_option(owner_group) == group_key:
+                    grouped_matches.append(label)
+
+        if len(grouped_matches) == 1:
+            return grouped_matches[0]
+        if len(matches) == 1:
+            return matches[0]
+        return ""
+
+    def _match_group(self, raw_group):
+        raw_key = self._normalized_option(raw_group, ("PG_",))
+        if not raw_key:
+            return ""
+        matches = []
+        for label, group_id in self._group_lookup.items():
+            aliases = [label, _safe_str(group_id)]
+            try:
+                type_id = _safe_str(group_id.TypeId)
+                aliases.append(type_id)
+                aliases.append(type_id.split(":")[-1].split("-")[0])
+            except Exception:
+                pass
+            alias_keys = set(self._normalized_option(alias, ("PG_",)) for alias in aliases)
+            if raw_key in alias_keys:
+                matches.append(label)
+        return matches[0] if len(matches) == 1 else ""
+
+    def _match_category(self, raw_category):
+        raw_key = self._normalized_option(raw_category, ("OST_",))
+        if not raw_key:
+            return ""
+        matches = []
+        for label, category in self._category_lookup.items():
+            aliases = [label, _safe_str(category.Name)]
+            try:
+                aliases.append(_safe_str(category.BuiltInCategory))
+            except Exception:
+                try:
+                    aliases.append(_safe_str(Enum.GetName(DB.BuiltInCategory, _id_value(category.Id))))
+                except Exception:
+                    pass
+            alias_keys = set(self._normalized_option(alias, ("OST_",)) for alias in aliases)
+            if raw_key in alias_keys:
+                matches.append(label)
+        return matches[0] if len(matches) == 1 else ""
+
+    def _has_meaningful_rows(self):
+        for row in self._table.Rows:
+            if _safe_str(row["Parameter"]) or _safe_str(row["Category"]):
+                return True
+            if _safe_str(row["Binding"]) not in ("", "Instance"):
+                return True
+            if _safe_str(row["Group"]) not in ("", self._default_group):
+                return True
+        return False
+
+    def _excel_import_click(self, sender, args):
+        selected = _choose_excel_file(self._excel_path)
+        if not selected:
+            return
+
+        try:
+            sheet_name, excel_rows = _read_excel_rows(selected)
+            entries = _extract_excel_entries(excel_rows)
+        except Exception as exc:
+            TaskDialog.Show(
+                "Import Rows from Excel",
+                "Rows could not be read from the workbook.\n\n{}".format(exc),
+            )
+            return
+
+        if not entries:
+            TaskDialog.Show(
+                "Import Rows from Excel",
+                "No data rows were found on worksheet '{}'.".format(sheet_name),
+            )
+            return
+
+        self._commit_grid()
+        if not self._has_meaningful_rows():
+            self._table.Clear()
+
+        review_count = 0
+        for entry in entries:
+            notes = []
+            parameter = self._match_parameter(entry["parameter"], entry["shared_group"])
+            binding = _excel_binding_value(entry["binding_raw"])
+            group = self._match_group(entry["group"])
+            category = self._match_category(entry["category"])
+
+            if not parameter:
+                if entry["parameter"]:
+                    notes.append("Parameter '{}' was not found in the selected shared file".format(entry["parameter"]))
+                else:
+                    notes.append("Parameter is missing")
+            if not binding:
+                if entry["binding_raw"]:
+                    notes.append("Binding '{}' was not recognized".format(entry["binding_raw"]))
+                else:
+                    notes.append("Instance/Type is missing")
+            if not group:
+                if entry["group"]:
+                    notes.append("Group '{}' was not recognized".format(entry["group"]))
+                else:
+                    notes.append("Parameter group is missing")
+            if not category:
+                if entry["category"]:
+                    notes.append("Category '{}' was not recognized".format(entry["category"]))
+                else:
+                    notes.append("Category is missing")
+
+            note_text = ""
+            if notes:
+                note_text = "Excel row {}: {}".format(
+                    entry["source_row"],
+                    "; ".join(notes),
+                )
+            if note_text:
+                review_count += 1
+            self._add_row(
+                parameter,
+                binding,
+                group,
+                category,
+                note_text,
+                use_defaults=False,
+            )
+
+        self._excel_path = selected
+        self.ParameterGrid.ScrollIntoView(self.ParameterGrid.Items[self.ParameterGrid.Items.Count - 1])
+        message = "Imported {} row(s) from '{}' in {}.".format(
+            len(entries), sheet_name, os.path.basename(selected)
+        )
+        if review_count:
+            message += " {} row(s) need review; use the dropdowns to complete them.".format(review_count)
+        else:
+            message += " All imported values matched available dropdown options."
+        self.StatusText.Text = message
 
     def _add_click(self, sender, args):
         self._commit_grid()
@@ -396,8 +778,11 @@ class BulkImportWindow(forms.WPFWindow):
             if category_label not in self._category_lookup:
                 missing.append("category")
             if missing:
+                row["ImportNotes"] = "Still required: {}".format(", ".join(missing))
                 errors.append("Row {}: select {}.".format(index, ", ".join(missing)))
                 continue
+
+            row["ImportNotes"] = ""
 
             valid.append({
                 "parameter_label": parameter_label,

@@ -1,7 +1,7 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bulk Import Shared Parameters"
-        Width="1080"
+        Width="1180"
         Height="680"
         MinWidth="820"
         MinHeight="520"
@@ -119,7 +119,7 @@
             <TextBlock Margin="0,5,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        TextWrapping="Wrap"
-                       Text="Create one row per parameter/category binding. Duplicate a row to apply the same parameter to another category."/>
+                       Text="Create rows manually or import them from Excel. Every imported row remains editable before anything is added to Revit."/>
         </StackPanel>
 
         <Border Grid.Row="1"
@@ -194,6 +194,10 @@
                                                 SelectedValueBinding="{Binding Category, UpdateSourceTrigger=PropertyChanged}"
                                                 EditingElementStyle="{StaticResource GridComboStyle}"
                                                 Width="2.2*"/>
+                        <DataGridTextColumn Header="Import notes"
+                                            Binding="{Binding ImportNotes}"
+                                            IsReadOnly="True"
+                                            Width="2.8*"/>
                     </DataGrid.Columns>
                 </DataGrid>
 
@@ -201,6 +205,7 @@
                             Margin="14,0,14,14"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
+                    <Button x:Name="ExcelImportButton" Content="Import rows from Excel..." Margin="0,0,8,0"/>
                     <Button x:Name="AddRowButton" Content="+ Add row" Margin="0,0,8,0"/>
                     <Button x:Name="DuplicateRowButton" Content="Duplicate selected" Margin="0,0,8,0"/>
                     <Button x:Name="RemoveRowButton" Content="Remove selected"/>
@@ -212,7 +217,7 @@
                    Grid.Row="3"
                    Margin="2,10,2,10"
                    Foreground="{StaticResource MutedBrush}"
-                   Text="Existing bindings keep their current categories; the selected categories are added."/>
+                   Text="Excel rows are editable. Existing bindings keep their current categories; selected categories are added."/>
 
         <StackPanel Grid.Row="4"
                     Orientation="Horizontal"
