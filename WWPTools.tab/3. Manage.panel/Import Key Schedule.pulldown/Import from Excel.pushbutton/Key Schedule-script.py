@@ -13,7 +13,18 @@ from WWP_settings import get_tool_settings
 TITLE = "Import Key Schedule from Excel"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
-TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule", "Door Key Schedule"]
+TARGET_OPTIONS = [
+    "Area Key Schedule",
+    "Ceiling Key Schedule",
+    "Door Key Schedule",
+    "Floor Key Schedule",
+    "Parking Key Schedule",
+    "Planting Key Schedule",
+    "Roof Key Schedule",
+    "Room Key Schedule",
+    "Wall Key Schedule",
+    "Window Key Schedule",
+]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
 PROJECT_SETTINGS_PARAM = "! P_STATS_KeyScheduleMap"
@@ -896,9 +907,16 @@ def _is_bic_value(cat_id, bic):
 
 
 _TARGET_MAP = [
-    (TARGET_OPTIONS[0], DB.BuiltInCategory.OST_Areas,   "Area"),
-    (TARGET_OPTIONS[1], DB.BuiltInCategory.OST_Rooms,   "Room"),
-    (TARGET_OPTIONS[2], DB.BuiltInCategory.OST_Doors,   "Door"),
+    ("Area Key Schedule",     DB.BuiltInCategory.OST_Areas,    "Area"),
+    ("Ceiling Key Schedule",  DB.BuiltInCategory.OST_Ceilings, "Ceiling"),
+    ("Door Key Schedule",     DB.BuiltInCategory.OST_Doors,    "Door"),
+    ("Floor Key Schedule",    DB.BuiltInCategory.OST_Floors,   "Floor"),
+    ("Parking Key Schedule",  DB.BuiltInCategory.OST_Parking,  "Parking"),
+    ("Planting Key Schedule", DB.BuiltInCategory.OST_Planting, "Planting"),
+    ("Roof Key Schedule",     DB.BuiltInCategory.OST_Roofs,    "Roof"),
+    ("Room Key Schedule",     DB.BuiltInCategory.OST_Rooms,    "Room"),
+    ("Wall Key Schedule",     DB.BuiltInCategory.OST_Walls,    "Wall"),
+    ("Window Key Schedule",   DB.BuiltInCategory.OST_Windows,  "Window"),
 ]
 
 def resolve_schedule_target(selected_target_type):

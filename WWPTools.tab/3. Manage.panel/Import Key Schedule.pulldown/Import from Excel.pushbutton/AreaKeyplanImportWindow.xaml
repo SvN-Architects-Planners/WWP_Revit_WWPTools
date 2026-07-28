@@ -170,7 +170,7 @@
                 <ComboBox x:Name="TargetTypeCombo"
                           Grid.Row="1"
                           Grid.Column="1"
-                          Width="240"
+                          Width="260"
                           MinHeight="32" />
             </Grid>
         </Border>
