@@ -135,6 +135,10 @@ def _useful_selection_count(selections):
 def _show_area_keyplan_import_dialog(
     title="Import Area Key Schedule",
     file_path="",
+    sheet_names=None,
+    selected_sheet="",
+    loaded_sheet="",
+    loaded_file_path="",
     column_names=None,
     target_types=None,
     selected_target_type="",
@@ -171,6 +175,7 @@ def _show_area_keyplan_import_dialog(
     file_path_box = window.FindName("FilePathBox")
     browse_button = window.FindName("BrowseButton")
     load_button = window.FindName("LoadButton")
+    sheet_combo = window.FindName("SheetCombo")
     target_combo = window.FindName("TargetTypeCombo")
     mapping_grid = window.FindName("MappingGrid")
     ok_button = window.FindName("OkButton")
@@ -184,6 +189,16 @@ def _show_area_keyplan_import_dialog(
 
     if file_path_box is not None:
         file_path_box.Text = file_path or ""
+
+    sheets = [str(name) for name in (sheet_names or [])]
+    if sheet_combo is not None:
+        for name in sheets:
+            sheet_combo.Items.Add(name)
+        if selected_sheet and selected_sheet in sheets:
+            sheet_combo.SelectedItem = selected_sheet
+        elif sheet_combo.Items.Count > 0:
+            sheet_combo.SelectedIndex = 0
+        sheet_combo.IsEnabled = sheet_combo.Items.Count > 0
 
     target_types = [str(t) for t in (target_types or [])]
     if target_combo is not None:
@@ -230,13 +245,34 @@ def _show_area_keyplan_import_dialog(
         except Exception:
             pass
 
+    def _current_sheet():
+        return str(sheet_combo.SelectedItem or "") if sheet_combo is not None else ""
+
+    def _current_file_path():
+        value = str(file_path_box.Text or "") if file_path_box is not None else ""
+        return os.path.expandvars(value)
+
+    def _update_ok_state():
+        if ok_button is None:
+            return
+        has_data = mappings.Count > 0
+        selected = _current_sheet()
+        current_file = _normalize_path(_current_file_path())
+        loaded_file = _normalize_path(loaded_file_path or "")
+        ok_button.IsEnabled = (
+            has_data
+            and bool(selected)
+            and selected == str(loaded_sheet or "")
+            and bool(current_file)
+            and current_file == loaded_file
+        )
+
     if mapping_grid is not None:
         mapping_grid.Tag = net_options
         mapping_grid.ItemsSource = mappings
         has_data = mappings.Count > 0
         mapping_grid.IsEnabled = has_data
-        if ok_button is not None:
-            ok_button.IsEnabled = has_data
+        _update_ok_state()
 
     result_state = {"load_requested": False}
 
@@ -493,6 +529,12 @@ def _show_area_keyplan_import_dialog(
         result_state["load_requested"] = True
         window.DialogResult = True
 
+    def on_sheet_changed(sender, e):
+        _update_ok_state()
+
+    def on_file_path_changed(sender, e):
+        _update_ok_state()
+
     def on_cancel(sender, e):
         window.DialogResult = False
 
@@ -501,10 +543,14 @@ def _show_area_keyplan_import_dialog(
 
     if browse_button is not None:
         browse_button.Click += on_browse
+    if file_path_box is not None:
+        file_path_box.TextChanged += on_file_path_changed
     if ok_button is not None:
         ok_button.Click += on_ok
     if load_button is not None:
         load_button.Click += on_load
+    if sheet_combo is not None:
+        sheet_combo.SelectionChanged += on_sheet_changed
     if cancel_button is not None:
         cancel_button.Click += on_cancel
     if load_set_button is not None:
@@ -551,6 +597,7 @@ def _show_area_keyplan_import_dialog(
     return {
         "load_requested": result_state["load_requested"],
         "selected_target_type": result_target_type,
+        "selected_sheet": _current_sheet(),
         "file_path": result_file_path,
         "column_names": column_names_out,
         "selected_options": selected_options,
@@ -1127,8 +1174,21 @@ def _excel_column_letter(index):
     return letters
 
 
-def extract_excel_data(workbook):
-    sheet = workbook.active
+def get_workbook_sheet_names(workbook):
+    return [str(name) for name in (getattr(workbook, "sheetnames", None) or [])]
+
+
+def get_workbook_sheet(workbook, sheet_name=None):
+    sheet_names = get_workbook_sheet_names(workbook)
+    if sheet_name and sheet_name in sheet_names:
+        return workbook[sheet_name]
+    return workbook.active
+
+
+def extract_excel_data(workbook, sheet_name=None):
+    sheet = get_workbook_sheet(workbook, sheet_name)
+    if sheet is None:
+        return [], [], []
     rows = list(sheet.iter_rows(values_only=True))
     if not rows:
         return [], [], []
@@ -1899,9 +1959,14 @@ def main():
         _write_saved_setting_sets(doc, config, saved_setting_sets)
 
     last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
+    last_sheet_name = _safe_config_get(config, "area_key_import_sheet_name", "") or ""
 
     state = {
         "file_path": last_file_path,
+        "loaded_file_path": "",
+        "sheet_names": [],
+        "selected_sheet": "",
+        "loaded_sheet": "",
         "headers": [],
         "column_labels": [],
         "rows": [],
@@ -1915,7 +1980,18 @@ def main():
     if state["file_path"] and (_is_url(state["file_path"]) or os.path.exists(state["file_path"])):
         workbook = read_workbook(state["file_path"], ui)
         if workbook is not None:
-            headers, column_labels, rows = extract_excel_data(workbook)
+            sheet_names = get_workbook_sheet_names(workbook)
+            active_sheet = getattr(getattr(workbook, "active", None), "title", "") or ""
+            selected_sheet = last_sheet_name if last_sheet_name in sheet_names else active_sheet
+            headers, column_labels, rows = extract_excel_data(workbook, selected_sheet)
+            state.update(
+                {
+                    "sheet_names": sheet_names,
+                    "selected_sheet": selected_sheet,
+                    "loaded_sheet": selected_sheet,
+                    "loaded_file_path": state["file_path"],
+                }
+            )
             if column_labels:
                 signature = _header_signature(headers)
                 auto_defaults = build_default_selections(headers, param_names)
@@ -1950,6 +2026,10 @@ def main():
         result = _show_area_keyplan_import_dialog(
             title=TITLE,
             file_path=state["file_path"],
+            sheet_names=state["sheet_names"],
+            selected_sheet=state["selected_sheet"],
+            loaded_sheet=state["loaded_sheet"],
+            loaded_file_path=state["loaded_file_path"],
             column_names=state["column_labels"],
             target_types=TARGET_OPTIONS,
             selected_target_type=state.get("selected_target_type", TARGET_OPTIONS[0]),
@@ -1986,7 +2066,9 @@ def main():
             ) or _default_schedule_name(state.get("file_path", ""), category_label)
 
         file_path = result.get("file_path") or ""
+        selected_sheet = result.get("selected_sheet") or ""
         state["file_path"] = file_path
+        state["selected_sheet"] = selected_sheet
         state["selected_target_type"] = selected_target_type
 
         current_selections = result.get("selected_options") or []
@@ -1998,6 +2080,8 @@ def main():
             _safe_config_set(config, _mapping_selection_key(category_key), current_selections)
         _safe_config_set(config, "area_key_import_target", selected_target_type)
         _safe_config_set(config, "area_key_import_file_path", _normalize_path(file_path))
+        if selected_sheet:
+            _safe_config_set(config, "area_key_import_sheet_name", selected_sheet)
         _save_config()
 
         if result.get("load_requested"):
@@ -2013,9 +2097,35 @@ def main():
             workbook = read_workbook(file_path, ui)
             if workbook is None:
                 continue
-            headers, column_labels, rows = extract_excel_data(workbook)
+            sheet_names = get_workbook_sheet_names(workbook)
+            active_sheet = getattr(getattr(workbook, "active", None), "title", "") or ""
+            if selected_sheet not in sheet_names:
+                selected_sheet = last_sheet_name if last_sheet_name in sheet_names else active_sheet
+            headers, column_labels, rows = extract_excel_data(workbook, selected_sheet)
+            state.update(
+                {
+                    "sheet_names": sheet_names,
+                    "selected_sheet": selected_sheet,
+                    "loaded_sheet": selected_sheet,
+                    "loaded_file_path": file_path,
+                    "headers": headers,
+                    "column_labels": column_labels,
+                    "rows": rows,
+                    "defaults": [],
+                    "auto_defaults": [],
+                }
+            )
+            if selected_sheet:
+                last_sheet_name = selected_sheet
+                _safe_config_set(config, "area_key_import_sheet_name", selected_sheet)
             if not column_labels:
-                ui.uiUtils_alert("No data found in the Excel file.", title=TITLE)
+                ui.uiUtils_alert(
+                    "No data found on worksheet '{}'. Select another Excel sheet and click Load.".format(
+                        selected_sheet or "(unknown)"
+                    ),
+                    title=TITLE,
+                )
+                _save_config()
                 continue
             signature = _header_signature(headers)
             auto_defaults = build_default_selections(headers, param_names)
@@ -2057,6 +2167,12 @@ def main():
 
         if not state["column_labels"]:
             ui.uiUtils_alert("Load an Excel file first.", title=TITLE)
+            continue
+        if not state.get("loaded_sheet") or state.get("selected_sheet") != state.get("loaded_sheet"):
+            ui.uiUtils_alert("Select an Excel sheet and click Load before importing.", title=TITLE)
+            continue
+        if _normalize_path(state.get("file_path", "")) != _normalize_path(state.get("loaded_file_path", "")):
+            ui.uiUtils_alert("The Excel file changed. Click Load before importing.", title=TITLE)
             continue
 
         selections = result.get("selected_options") or []

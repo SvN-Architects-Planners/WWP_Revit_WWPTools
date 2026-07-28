@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bulk Import Shared Parameters: added a multi-select parameter picker and a selected-row bulk editor for Instance/Type, Parameter Group, and Category. Bulk edits fill missing values only by default, with an option to overwrite existing selected-row values.
+- Import Key Schedule: added an Excel worksheet selector. The chosen sheet is remembered, and the importer requires reloading whenever the workbook path or sheet changes so mappings cannot be applied to stale data from another tab.
 - Super Editor: the Preview & Apply report is now an interactive checklist instead of read-only text. Every planned change gets its own checkbox (checked by default), with Select All/Select None buttons, so you can exclude specific elements from a batch without cancelling the whole operation. Skipped (invalid/conflicting) items remain a read-only list. Family renames (from "Also rename family name") appear as their own checkable section.
 
 ## [2.2.0] - 2026-07-03

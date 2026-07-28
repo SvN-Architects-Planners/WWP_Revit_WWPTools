@@ -473,10 +473,16 @@ class BulkImportWindow(forms.WPFWindow):
         self.shared_parameter_path = ""
         self._excel_path = ""
         self._parameter_lookup = {}
+        self._parameter_labels = []
 
         self._group_labels, self._group_lookup, self._default_group = _parameter_group_choices()
         self._category_labels, self._category_lookup = _category_choices()
         self._binding_labels = ["Instance", "Type"]
+        self._bulk_fields = {
+            "Instance / Type": ("Binding", self._binding_labels),
+            "Parameter group": ("Group", self._group_labels),
+            "Category": ("Category", self._category_labels),
+        }
 
         self._setup_grid()
         self._wire_events()
@@ -494,13 +500,21 @@ class BulkImportWindow(forms.WPFWindow):
         self.ParameterGrid.Columns[1].ItemsSource = _net_string_list(self._binding_labels)
         self.ParameterGrid.Columns[2].ItemsSource = _net_string_list(self._group_labels)
         self.ParameterGrid.Columns[3].ItemsSource = _net_string_list(self._category_labels)
+        self.BulkFieldCombo.ItemsSource = _net_string_list(
+            ["Instance / Type", "Parameter group", "Category"]
+        )
+        self.BulkFieldCombo.SelectedIndex = 0
+        self._refresh_bulk_value_options()
 
     def _wire_events(self):
         self.BrowseButton.Click += self._browse_click
         self.ExcelImportButton.Click += self._excel_import_click
+        self.AddParametersButton.Click += self._add_parameters_click
         self.AddRowButton.Click += self._add_click
         self.DuplicateRowButton.Click += self._duplicate_click
         self.RemoveRowButton.Click += self._remove_click
+        self.BulkFieldCombo.SelectionChanged += self._bulk_field_changed
+        self.ApplySelectedButton.Click += self._apply_selected_click
         self.CancelButton.Click += self._cancel_click
         self.ImportButton.Click += self._import_click
 
@@ -513,6 +527,7 @@ class BulkImportWindow(forms.WPFWindow):
         self.shared_parameter_path = file_path
         self.SharedFileBox.Text = file_path
         self._parameter_lookup = lookup
+        self._parameter_labels = list(labels)
         self.ParameterGrid.Columns[0].ItemsSource = _net_string_list(labels)
         self.ParameterCountText.Text = "{} shared parameter(s) available".format(len(labels))
 
@@ -553,6 +568,61 @@ class BulkImportWindow(forms.WPFWindow):
     def _commit_grid(self):
         self.ParameterGrid.CommitEdit(DataGridEditingUnit.Cell, True)
         self.ParameterGrid.CommitEdit(DataGridEditingUnit.Row, True)
+
+    def _refresh_bulk_value_options(self):
+        field_label = _safe_str(self.BulkFieldCombo.SelectedItem)
+        field_data = self._bulk_fields.get(field_label)
+        values = field_data[1] if field_data else []
+        self.BulkValueCombo.ItemsSource = _net_string_list(values)
+        self.BulkValueCombo.SelectedIndex = -1
+
+    def _bulk_field_changed(self, sender, args):
+        self._refresh_bulk_value_options()
+
+    def _refresh_row_notes(self, row):
+        missing = []
+        if _safe_str(row["Parameter"]) not in self._parameter_lookup:
+            missing.append("parameter")
+        if _safe_str(row["Binding"]) not in self._binding_labels:
+            missing.append("Instance/Type")
+        if _safe_str(row["Group"]) not in self._group_lookup:
+            missing.append("group")
+        if _safe_str(row["Category"]) not in self._category_lookup:
+            missing.append("category")
+        row["ImportNotes"] = "Still required: {}".format(", ".join(missing)) if missing else ""
+
+    def _apply_selected_click(self, sender, args):
+        self._commit_grid()
+        selected_items = list(self.ParameterGrid.SelectedItems)
+        if not selected_items:
+            self.StatusText.Text = "Select one or more rows to bulk edit."
+            return
+
+        field_label = _safe_str(self.BulkFieldCombo.SelectedItem)
+        field_data = self._bulk_fields.get(field_label)
+        value = _safe_str(self.BulkValueCombo.SelectedItem)
+        if field_data is None or not value:
+            self.StatusText.Text = "Choose a field and value before applying the bulk edit."
+            return
+
+        column_name = field_data[0]
+        only_missing = bool(self.OnlyMissingCheckBox.IsChecked)
+        updated = 0
+        skipped = 0
+        for selected in selected_items:
+            if only_missing and _safe_str(selected[column_name]):
+                skipped += 1
+                continue
+            selected[column_name] = value
+            self._refresh_row_notes(selected)
+            updated += 1
+
+        message = "Set {} to '{}' on {} selected row(s).".format(
+            field_label, value, updated
+        )
+        if skipped:
+            message += " Preserved {} row(s) that already had a value.".format(skipped)
+        self.StatusText.Text = message
 
     def _browse_click(self, sender, args):
         selected = _choose_shared_parameter_file(self.shared_parameter_path)
@@ -733,6 +803,51 @@ class BulkImportWindow(forms.WPFWindow):
         self._commit_grid()
         self._add_row()
         self.ParameterGrid.ScrollIntoView(self.ParameterGrid.Items[self.ParameterGrid.Items.Count - 1])
+
+    def _add_parameters_click(self, sender, args):
+        selected_labels = forms.SelectFromList.show(
+            self._parameter_labels,
+            title="Add Shared Parameters",
+            multiselect=True,
+            button_name="Add parameters",
+        )
+        if not selected_labels:
+            return
+
+        self._commit_grid()
+        if not self._has_meaningful_rows():
+            self._table.Clear()
+
+        existing_labels = set(
+            _safe_str(row["Parameter"]) for row in self._table.Rows
+            if _safe_str(row["Parameter"])
+        )
+        first_new_index = self.ParameterGrid.Items.Count
+        added = 0
+        skipped = 0
+        for label in selected_labels:
+            label = _safe_str(label)
+            if not label or label in existing_labels:
+                skipped += 1
+                continue
+            self._add_row(parameter=label)
+            existing_labels.add(label)
+            added += 1
+
+        if added:
+            self.ParameterGrid.SelectedItems.Clear()
+            for index in range(first_new_index, self.ParameterGrid.Items.Count):
+                self.ParameterGrid.SelectedItems.Add(self.ParameterGrid.Items[index])
+            self.ParameterGrid.ScrollIntoView(
+                self.ParameterGrid.Items[self.ParameterGrid.Items.Count - 1]
+            )
+
+        message = "Added and selected {} parameter row(s).".format(added)
+        if skipped:
+            message += " Skipped {} parameter(s) already in the grid.".format(skipped)
+        if added:
+            message += " Use Bulk edit selected rows to assign their shared values."
+        self.StatusText.Text = message
 
     def _duplicate_click(self, sender, args):
         self._commit_grid()

@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bulk Import Shared Parameters"
         Width="1180"
-        Height="680"
+        Height="760"
         MinWidth="820"
         MinHeight="520"
         WindowStartupLocation="CenterOwner"
@@ -161,6 +161,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <Grid Margin="14,12,14,10">
@@ -201,11 +202,77 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <StackPanel Grid.Row="2"
+                <Border Grid.Row="2"
+                        Margin="14,0,14,10"
+                        Padding="10"
+                        Background="#FFF7F9FC"
+                        BorderBrush="{StaticResource PanelBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontWeight="SemiBold"
+                                       Foreground="{StaticResource TitleBrush}"
+                                       Text="Bulk edit selected rows"/>
+                            <TextBlock Margin="10,0,0,0"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Text="Ctrl/Shift-click rows in the table, then choose one value to apply."/>
+                        </StackPanel>
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="190"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Margin="0,0,6,0"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Text="Field"/>
+                            <ComboBox x:Name="BulkFieldCombo"
+                                      Grid.Column="1"
+                                      MinHeight="32"
+                                      Margin="0,0,12,0"
+                                      AutomationProperties.Name="Bulk edit field"/>
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Text="Value"/>
+                            <ComboBox x:Name="BulkValueCombo"
+                                      Grid.Column="3"
+                                      MinHeight="32"
+                                      Margin="0,0,10,0"
+                                      IsTextSearchEnabled="True"
+                                      AutomationProperties.Name="Bulk edit value"/>
+                            <CheckBox x:Name="OnlyMissingCheckBox"
+                                      Grid.Column="4"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,10,0"
+                                      IsChecked="True"
+                                      Content="Only fill missing values"/>
+                            <Button x:Name="ApplySelectedButton"
+                                    Grid.Column="5"
+                                    Content="Apply to selected"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Row="3"
                             Margin="14,0,14,14"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
                     <Button x:Name="ExcelImportButton" Content="Import rows from Excel..." Margin="0,0,8,0"/>
+                    <Button x:Name="AddParametersButton"
+                            Content="+ Add parameters..."
+                            Margin="0,0,8,0"
+                            ToolTip="Choose several shared parameters at once and add one selected row for each."/>
                     <Button x:Name="AddRowButton" Content="+ Add row" Margin="0,0,8,0"/>
                     <Button x:Name="DuplicateRowButton" Content="Duplicate selected" Margin="0,0,8,0"/>
                     <Button x:Name="RemoveRowButton" Content="Remove selected"/>

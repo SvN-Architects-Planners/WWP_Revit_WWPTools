@@ -109,7 +109,7 @@
                            FontSize="22"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TitleBrush}" />
-                <TextBlock Text="Choose an Excel file, load the source columns, then map each column to a Revit parameter."
+                <TextBlock Text="Choose an Excel file and worksheet, load the source columns, then map each column to a Revit parameter."
                            Margin="0,8,0,0"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource MutedBrush}" />
@@ -131,22 +131,31 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
+                           Grid.ColumnSpan="2"
                            Text="Excel File"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TitleBrush}"
                            Margin="0,0,0,6" />
-                <TextBlock Grid.Row="0"
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Text="Excel Sheet"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TitleBrush}"
+                           Margin="0,12,0,6" />
+                <TextBlock Grid.Row="2"
                            Grid.Column="1"
                            Text="Target Type"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TitleBrush}"
-                           Margin="14,0,0,6" />
+                           Margin="14,12,0,6" />
 
-                <Grid Grid.Row="1" Grid.Column="0" Margin="0,0,14,0">
+                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -167,11 +176,18 @@
                             Style="{StaticResource PrimaryButtonStyle}" />
                 </Grid>
 
+                <ComboBox x:Name="SheetCombo"
+                          Grid.Row="3"
+                          Grid.Column="0"
+                          MinHeight="32"
+                          ToolTip="Select a worksheet, then click Load to refresh its columns." />
+
                 <ComboBox x:Name="TargetTypeCombo"
-                          Grid.Row="1"
+                          Grid.Row="3"
                           Grid.Column="1"
                           Width="260"
-                          MinHeight="32" />
+                          MinHeight="32"
+                          Margin="14,0,0,0" />
             </Grid>
         </Border>
 
