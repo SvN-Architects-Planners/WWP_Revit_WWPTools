@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Telemetry: unhandled command errors now also file (or update) a deduplicated GitHub issue via a new, independent reporting endpoint -- separate from the existing Neon-backed usage log, so a bug reporting outage never affects usage telemetry or vice versa.
+
 ### Changed
 
 - Bulk Import Shared Parameters: added a multi-select parameter picker and a selected-row bulk editor for Instance/Type, Parameter Group, and Category. Bulk edits fill missing values only by default, with an option to overwrite existing selected-row values.

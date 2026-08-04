@@ -23,6 +23,23 @@ _APPDATA = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "A
 
 _ENDPOINT = "https://wwp-revit-wwp-tools-logger.vercel.app/api/addin-config?key=c5ce6b85-9619-4b24-8db5-6c133534b9f0"
 
+_ERROR_REPORT_ENDPOINT = "https://error-report-service.vercel.app/api/report-error?key=8a89afa51c328e98d5e0a056719408aa9d7784f2b6d64c77"
+
+
+def _post_error_report(entry):
+    payload = {
+        "script_name": entry.get("script_name"),
+        "error_msg": entry.get("error_msg"),
+        "user_name": entry.get("user_name"),
+        "revit_version": entry.get("revit_version"),
+        "details": entry.get("details"),
+    }
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = Request(_ERROR_REPORT_ENDPOINT, data=data, headers={"Content-Type": "application/json"})
+    req.get_method = lambda: "POST"
+    urlopen(req, timeout=5)
+
+
 _PENDING_PATH   = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")
 _LOCAL_LOG_PATH = os.path.join(_APPDATA, "pyRevit", "WWPTools", "script_log.jsonl")
 _PREFS_PATH     = os.path.join(_APPDATA, "pyRevit", _APP_NAME, "user_prefs.json")
@@ -254,6 +271,11 @@ def _fire(script_name, script_type="python", event_type="tool_use", success=True
     }
     _write_local_log(entry)
     _worker(entry)
+    if event_type == "error" and not success and error_msg:
+        try:
+            _post_error_report(entry)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
