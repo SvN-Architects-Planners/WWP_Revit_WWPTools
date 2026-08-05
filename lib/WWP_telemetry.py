@@ -37,7 +37,7 @@ def _post_error_report(entry):
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = Request(_ERROR_REPORT_ENDPOINT, data=data, headers={"Content-Type": "application/json"})
     req.get_method = lambda: "POST"
-    urlopen(req, timeout=5)
+    urlopen(req, timeout=3)
 
 
 _PENDING_PATH   = os.path.join(_APPDATA, "pyRevit", "WWPTools", "pending_script_logs.jsonl")

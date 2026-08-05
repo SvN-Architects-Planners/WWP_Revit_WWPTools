@@ -9,13 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Telemetry: unhandled command errors now also file (or update) a deduplicated GitHub issue via a new, independent reporting endpoint -- separate from the existing Neon-backed usage log, so a bug reporting outage never affects usage telemetry or vice versa.
+- Telemetry: unhandled command errors are now also filed (or updated) as a deduplicated GitHub issue, detected the next time Revit starts (via the existing pyRevit telemetry replay in app-init.py, not in real time) -- via a new, independent reporting endpoint separate from the existing Neon-backed usage log, so a bug reporting outage never affects usage telemetry or vice versa.
 
 ### Changed
 
 - Bulk Import Shared Parameters: added a multi-select parameter picker and a selected-row bulk editor for Instance/Type, Parameter Group, and Category. Bulk edits fill missing values only by default, with an option to overwrite existing selected-row values.
 - Import Key Schedule: added an Excel worksheet selector. The chosen sheet is remembered, and the importer requires reloading whenever the workbook path or sheet changes so mappings cannot be applied to stale data from another tab.
 - Super Editor: the Preview & Apply report is now an interactive checklist instead of read-only text. Every planned change gets its own checkbox (checked by default), with Select All/Select None buttons, so you can exclude specific elements from a batch without cancelling the whole operation. Skipped (invalid/conflicting) items remain a read-only list. Family renames (from "Also rename family name") appear as their own checkable section.
+
+### Fixed
+
+- Error reporting service: the "match found" branch in report-error.js no longer throws if a GitHub issue's body is null/absent -- introduced a single `body` local (`existing.body || ''`) used consistently for both the marker match and the marker replace.
+- app-init.py: the telemetry replay loop now respects the user's telemetry opt-out (`WWP_telemetry.is_telemetry_enabled()`) before sending the usage-log worker post or the deduplicated error report; the local debug log write remains unconditional since it never leaves the machine.
 
 ## [2.2.0] - 2026-07-03
 

@@ -70,6 +70,7 @@ try:
 		sys.path.insert(0, _lib_path)
 	import WWP_telemetry as _wwp_tel
 
+	_reported_signatures = set()
 	for _tel_file in glob.glob(os.path.join(_wwp_dir, "*_telemetry.json")):
 		if os.path.normpath(_tel_file) == _current_tel:
 			continue
@@ -113,7 +114,16 @@ try:
 				import io as _io
 				with _io.open(_log_path, "a", encoding="utf-8") as _lf:
 					_lf.write(json.dumps(_entry, ensure_ascii=False) + u"\n")
-				_wwp_tel._worker(_entry)
+				if _wwp_tel.is_telemetry_enabled():
+					_wwp_tel._worker(_entry)
+					if _evt_type == "error" and _err:
+						try:
+							_dedup_key = (_script_name, _err)
+							if _dedup_key not in _reported_signatures:
+								_reported_signatures.add(_dedup_key)
+								_wwp_tel._post_error_report(_entry)
+						except Exception:
+							pass
 			shutil.move(_tel_file, os.path.join(_done_dir, os.path.basename(_tel_file)))
 		except BaseException as _exc:
 			try:
