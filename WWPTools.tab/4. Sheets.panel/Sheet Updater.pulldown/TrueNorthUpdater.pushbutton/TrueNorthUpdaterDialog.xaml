@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="True North Updater"
         Width="980"
-        Height="640"
+        Height="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         FontFamily="Segoe UI"
@@ -211,7 +211,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Target Parameter"
+                        <TextBlock Text="True North Angle Parameter"
                                    Margin="0,0,0,6"
                                    Style="{StaticResource FieldLabelStyle}" />
                         <ComboBox x:Name="ParameterCombo"
@@ -240,10 +240,47 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <CheckBox x:Name="SetVisibilityCheckBox"
-                                  Content="Also set a visibility parameter on the titleblock"
+                                  Content="Also set a True North visibility parameter on the titleblock"
                                   VerticalAlignment="Center"
                                   Style="{StaticResource ToggleSwitchCheckBox}"/>
                         <ComboBox x:Name="VisibilityParamCombo"
+                                  Grid.Column="2"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="True"
+                                  StaysOpenOnEdit="True"
+                                  IsEnabled="False"
+                                  Style="{StaticResource FlatComboBox}"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="EnableProjectNorthCheckBox"
+                                  Content="Also update a Project North angle parameter"
+                                  VerticalAlignment="Center"
+                                  Style="{StaticResource ToggleSwitchCheckBox}"/>
+                        <ComboBox x:Name="ProjectNorthParameterCombo"
+                                  Grid.Column="2"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="True"
+                                  StaysOpenOnEdit="True"
+                                  IsEnabled="False"
+                                  Style="{StaticResource FlatComboBox}"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="SetProjectNorthVisibilityCheckBox"
+                                  Content="Also set a Project North visibility parameter on the titleblock"
+                                  VerticalAlignment="Center"
+                                  IsEnabled="False"
+                                  Style="{StaticResource ToggleSwitchCheckBox}"/>
+                        <ComboBox x:Name="ProjectNorthVisibilityParamCombo"
                                   Grid.Column="2"
                                   IsEditable="True"
                                   IsTextSearchEnabled="True"

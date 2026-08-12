@@ -186,6 +186,15 @@ def _resolve_target_parameter(sheet, titleblock_instance, target_param_name, tar
         return candidates[0][1], candidates[0][0]
     return None, None
 
+def _get_north_angle_for_view(view, north_vector):
+    """Angle (deg, CCW from view up) from north_vector to the view's up direction."""
+    up = view.UpDirection
+    right = view.RightDirection
+    north_up = north_vector.DotProduct(up)
+    north_right = north_vector.DotProduct(right)
+    # Negate north_right to get CCW angle from view up (matches Revit's convention)
+    return round(math.degrees(math.atan2(-north_right, north_up)) % 360.0, 4)
+
 def _get_true_north_angle_for_view(doc, view):
     """
     Returns the True North angle (degrees) as seen in the given view.
@@ -201,15 +210,19 @@ def _get_true_north_angle_for_view(doc, view):
     tn = DB.XYZ(-math.sin(angle_rad), math.cos(angle_rad), 0)
 
     try:
-        up = view.UpDirection
-        right = view.RightDirection
-        north_up = tn.DotProduct(up)
-        north_right = tn.DotProduct(right)
-        # Negate north_right to get CCW angle from view up (matches Revit's convention)
-        angle_deg = math.degrees(math.atan2(-north_right, north_up))
-        return round(angle_deg % 360.0, 4)
+        return _get_north_angle_for_view(view, tn)
     except Exception:
         return round(math.degrees(angle_rad) % 360.0, 4)
+
+def _get_project_north_angle_for_view(view):
+    """
+    Returns the Project North angle (degrees) as seen in the given view.
+    Project North is always the model's +Y axis in internal coordinates.
+    """
+    try:
+        return _get_north_angle_for_view(view, DB.XYZ(0, 1, 0))
+    except Exception:
+        return 0.0
 
 def _elem_id_int(element_id):
     if element_id is None:
@@ -239,6 +252,9 @@ def _show_true_north_dialog(
     default_label=None,
     yesno_param_labels=None,
     default_visibility_label=None,
+    project_north_enabled_default=False,
+    default_project_north_label=None,
+    default_project_north_visibility_label=None,
 ):
     if not sheet_items:
         return None
@@ -285,39 +301,48 @@ def _show_true_north_dialog(
     set_visibility_checkbox = window.FindName("SetVisibilityCheckBox")
     visibility_param_combo = window.FindName("VisibilityParamCombo")
     hide_elev_section_checkbox = window.FindName("HideElevSectionCheckBox")
+    enable_project_north_checkbox = window.FindName("EnableProjectNorthCheckBox")
+    project_north_parameter_combo = window.FindName("ProjectNorthParameterCombo")
+    set_project_north_visibility_checkbox = window.FindName("SetProjectNorthVisibilityCheckBox")
+    project_north_visibility_param_combo = window.FindName("ProjectNorthVisibilityParamCombo")
 
     prompt_text.Text = prompt or ""
     selected_indices = set(prechecked_indices or [])
 
+    def _populate_parameter_combo(combo, default_for_combo):
+        for i, (family_name, keys) in enumerate(param_groups or []):
+            if not keys:
+                continue
+            if i > 0:
+                combo.Items.Add(Separator())
+            header = ComboBoxItem()
+            header.Content = family_name
+            header.IsEnabled = False
+            header.FontWeight = FontWeights.Bold
+            combo.Items.Add(header)
+            for key in keys:
+                ci = ComboBoxItem()
+                ci.Content = key
+                ci.Tag = key
+                ci.Padding = Thickness(24, 3, 8, 3)
+                combo.Items.Add(ci)
+        default_set = False
+        if default_for_combo:
+            for item in combo.Items:
+                if hasattr(item, 'Tag') and str(item.Tag or '') == default_for_combo:
+                    combo.SelectedItem = item
+                    default_set = True
+                    break
+        if not default_set:
+            for item in combo.Items:
+                if hasattr(item, 'Tag') and item.Tag is not None:
+                    combo.SelectedItem = item
+                    break
+
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
-    for i, (family_name, keys) in enumerate(param_groups or []):
-        if not keys:
-            continue
-        if i > 0:
-            parameter_combo.Items.Add(Separator())
-        header = ComboBoxItem()
-        header.Content = family_name
-        header.IsEnabled = False
-        header.FontWeight = FontWeights.Bold
-        parameter_combo.Items.Add(header)
-        for key in keys:
-            ci = ComboBoxItem()
-            ci.Content = key
-            ci.Tag = key
-            ci.Padding = Thickness(24, 3, 8, 3)
-            parameter_combo.Items.Add(ci)
-    _default_set = [False]
-    if default_label:
-        for _item in parameter_combo.Items:
-            if hasattr(_item, 'Tag') and str(_item.Tag or '') == default_label:
-                parameter_combo.SelectedItem = _item
-                _default_set[0] = True
-                break
-    if not _default_set[0]:
-        for _item in parameter_combo.Items:
-            if hasattr(_item, 'Tag') and _item.Tag is not None:
-                parameter_combo.SelectedItem = _item
-                break
+    _populate_parameter_combo(parameter_combo, default_label)
+    if project_north_parameter_combo is not None:
+        _populate_parameter_combo(project_north_parameter_combo, default_project_north_label)
 
     if all_sheets_checkbox is not None:
         all_sheets_checkbox.IsChecked = True
@@ -326,32 +351,85 @@ def _show_true_north_dialog(
 
     for label in (yesno_param_labels or []):
         visibility_param_combo.Items.Add(label)
+        if project_north_visibility_param_combo is not None:
+            project_north_visibility_param_combo.Items.Add(label)
     if default_visibility_label and default_visibility_label in (yesno_param_labels or []):
         visibility_param_combo.SelectedItem = default_visibility_label
     elif visibility_param_combo.Items.Count > 0:
         visibility_param_combo.SelectedIndex = 0
+    if project_north_visibility_param_combo is not None:
+        if default_project_north_visibility_label and default_project_north_visibility_label in (yesno_param_labels or []):
+            project_north_visibility_param_combo.SelectedItem = default_project_north_visibility_label
+        elif project_north_visibility_param_combo.Items.Count > 0:
+            project_north_visibility_param_combo.SelectedIndex = 0
     if set_visibility_checkbox is not None:
         set_visibility_checkbox.IsChecked = False
+    if set_project_north_visibility_checkbox is not None:
+        set_project_north_visibility_checkbox.IsChecked = False
+        set_project_north_visibility_checkbox.IsEnabled = False
+    if enable_project_north_checkbox is not None:
+        enable_project_north_checkbox.IsChecked = bool(project_north_enabled_default)
+        if project_north_parameter_combo is not None:
+            project_north_parameter_combo.IsEnabled = bool(project_north_enabled_default)
+        if set_project_north_visibility_checkbox is not None:
+            set_project_north_visibility_checkbox.IsEnabled = bool(project_north_enabled_default)
     if hide_elev_section_checkbox is not None:
         hide_elev_section_checkbox.IsChecked = False
         hide_elev_section_checkbox.IsEnabled = False
 
+    def _update_hide_elev_section_availability():
+        any_visibility_enabled = bool(
+            (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) or
+            (set_project_north_visibility_checkbox is not None and set_project_north_visibility_checkbox.IsChecked)
+        )
+        if hide_elev_section_checkbox is not None:
+            hide_elev_section_checkbox.IsEnabled = any_visibility_enabled
+            if not any_visibility_enabled:
+                hide_elev_section_checkbox.IsChecked = False
+
     def _on_visibility_checked(sender, args):
         if visibility_param_combo is not None:
             visibility_param_combo.IsEnabled = True
-        if hide_elev_section_checkbox is not None:
-            hide_elev_section_checkbox.IsEnabled = True
+        _update_hide_elev_section_availability()
 
     def _on_visibility_unchecked(sender, args):
         if visibility_param_combo is not None:
             visibility_param_combo.IsEnabled = False
-        if hide_elev_section_checkbox is not None:
-            hide_elev_section_checkbox.IsChecked = False
-            hide_elev_section_checkbox.IsEnabled = False
+        _update_hide_elev_section_availability()
+
+    def _on_project_north_checked(sender, args):
+        if project_north_parameter_combo is not None:
+            project_north_parameter_combo.IsEnabled = True
+        if set_project_north_visibility_checkbox is not None:
+            set_project_north_visibility_checkbox.IsEnabled = True
+
+    def _on_project_north_unchecked(sender, args):
+        if project_north_parameter_combo is not None:
+            project_north_parameter_combo.IsEnabled = False
+        if set_project_north_visibility_checkbox is not None:
+            set_project_north_visibility_checkbox.IsChecked = False
+            set_project_north_visibility_checkbox.IsEnabled = False
+        _update_hide_elev_section_availability()
+
+    def _on_project_north_visibility_checked(sender, args):
+        if project_north_visibility_param_combo is not None:
+            project_north_visibility_param_combo.IsEnabled = True
+        _update_hide_elev_section_availability()
+
+    def _on_project_north_visibility_unchecked(sender, args):
+        if project_north_visibility_param_combo is not None:
+            project_north_visibility_param_combo.IsEnabled = False
+        _update_hide_elev_section_availability()
 
     if set_visibility_checkbox is not None:
         set_visibility_checkbox.Checked += _on_visibility_checked
         set_visibility_checkbox.Unchecked += _on_visibility_unchecked
+    if enable_project_north_checkbox is not None:
+        enable_project_north_checkbox.Checked += _on_project_north_checked
+        enable_project_north_checkbox.Unchecked += _on_project_north_unchecked
+    if set_project_north_visibility_checkbox is not None:
+        set_project_north_visibility_checkbox.Checked += _on_project_north_visibility_checked
+        set_project_north_visibility_checkbox.Unchecked += _on_project_north_visibility_unchecked
 
     try:
         lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
@@ -453,6 +531,24 @@ def _show_true_north_dialog(
         if selected_param not in (param_labels or []):
             _set_validation("Select a valid parameter from the dropdown.")
             return
+
+        if (
+            enable_project_north_checkbox is not None and
+            enable_project_north_checkbox.IsChecked and
+            project_north_parameter_combo is not None
+        ):
+            _pn_sel = project_north_parameter_combo.SelectedItem
+            if _pn_sel is not None and hasattr(_pn_sel, 'Tag') and _pn_sel.Tag is not None:
+                pn_param = str(_pn_sel.Tag)
+            else:
+                pn_param = str(project_north_parameter_combo.Text or "").strip()
+            if not pn_param or pn_param not in (param_labels or []):
+                _set_validation("Select a valid Project North parameter from the dropdown.")
+                return
+            if pn_param == selected_param:
+                _set_validation("Project North must use a different parameter than True North.")
+                return
+
         window.DialogResult = True
         window.Close()
 
@@ -478,13 +574,102 @@ def _show_true_north_dialog(
         selected_param = str(_sel.Tag)
     else:
         selected_param = str(parameter_combo.Text or "").strip()
+
+    enable_project_north = bool(enable_project_north_checkbox is not None and enable_project_north_checkbox.IsChecked)
+    project_north_param = ""
+    if enable_project_north and project_north_parameter_combo is not None:
+        _pn_sel = project_north_parameter_combo.SelectedItem
+        if _pn_sel is not None and hasattr(_pn_sel, 'Tag') and _pn_sel.Tag is not None:
+            project_north_param = str(_pn_sel.Tag)
+        else:
+            project_north_param = str(project_north_parameter_combo.Text or "").strip()
+    set_project_north_visibility = bool(
+        enable_project_north and
+        set_project_north_visibility_checkbox is not None and
+        set_project_north_visibility_checkbox.IsChecked
+    )
+
     return {
         "selected_indices": sorted(selected_indices),
         "selected_parameter": selected_param,
         "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
         "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
         "hide_on_elev_section": bool(hide_elev_section_checkbox is not None and hide_elev_section_checkbox.IsChecked),
+        "enable_project_north": enable_project_north,
+        "project_north_param": project_north_param,
+        "set_project_north_visibility": set_project_north_visibility,
+        "project_north_visibility_param": str(project_north_visibility_param_combo.Text or "").strip() if (set_project_north_visibility and project_north_visibility_param_combo is not None) else "",
     }
+
+def _update_arrow_for_sheet(
+    titleblock_instance,
+    sheet,
+    sheet_label,
+    primary_view,
+    target_param_name,
+    target_param_scope,
+    set_visibility,
+    visibility_param_name,
+    hide_on_elev_section,
+    angle_value,
+    arrow_tag,
+):
+    """
+    Sets target_param_name to angle_value on the resolved parameter, optionally
+    toggling visibility_param_name. Returns (status, message) where status is
+    "updated" | "hidden" | "failed" and message is None when status == "updated".
+    """
+    _HIDE_VIEW_TYPES = (DB.ViewType.Elevation, DB.ViewType.Section)
+
+    if primary_view is None:
+        if hide_on_elev_section and set_visibility and visibility_param_name:
+            try:
+                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                    vis_p.Set(0)
+                return "hidden", sheet_label + " - No plan view found (north arrow hidden){}".format(arrow_tag)
+            except Exception:
+                pass
+        return "failed", sheet_label + " - No suitable viewport found{}".format(arrow_tag)
+
+    if hide_on_elev_section and set_visibility and visibility_param_name and primary_view.ViewType in _HIDE_VIEW_TYPES:
+        if set_visibility and visibility_param_name:
+            try:
+                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                    vis_p.Set(0)
+            except Exception:
+                pass
+        return "hidden", sheet_label + " - Primary view is {}, north arrow hidden{}".format(
+            "elevation" if primary_view.ViewType == DB.ViewType.Elevation else "section", arrow_tag
+        )
+
+    param, resolved_owner = _resolve_target_parameter(sheet, titleblock_instance, target_param_name, target_param_scope)
+    if not param:
+        return "failed", sheet_label + " - Target parameter missing: {}{}".format(target_param_name, arrow_tag)
+
+    try:
+        if param.IsReadOnly:
+            return "failed", sheet_label + " - Parameter is read-only ({}){}".format(resolved_owner or "", arrow_tag)
+        elif param.StorageType == DB.StorageType.Double:
+            value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
+            param.Set(value_to_set)
+            if set_visibility and visibility_param_name:
+                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                    vis_p.Set(1)
+        elif param.StorageType == DB.StorageType.Integer:
+            param.Set(int(round(angle_value)))
+            if set_visibility and visibility_param_name:
+                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
+                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
+                    vis_p.Set(1)
+        else:
+            return "failed", sheet_label + " - Unsupported storage type: {}{}".format(param.StorageType, arrow_tag)
+    except Exception as e:
+        return "failed", sheet_label + " - Failed to set parameter: {}{}".format(str(e), arrow_tag)
+
+    return "updated", None
 
 def main():
     sheets = list(DB.FilteredElementCollector(doc).OfClass(DB.ViewSheet).ToElements())
@@ -521,6 +706,10 @@ def main():
     last_sheet_ids = getattr(config, "sheet_ids", []) or []
     last_param_name = getattr(config, "true_north_param_name", "") or ""
     last_param_scope = getattr(config, "true_north_param_scope", "") or ""
+    last_project_north_enabled = bool(getattr(config, "project_north_enabled", False))
+    last_project_north_param_name = getattr(config, "project_north_param_name", "") or ""
+    last_project_north_param_scope = getattr(config, "project_north_param_scope", "") or ""
+    last_project_north_visibility_param = getattr(config, "project_north_visibility_param_name", "") or ""
     prechecked_indices = []
     if last_sheet_ids:
         for i, s in enumerate(sheet_by_index):
@@ -550,6 +739,13 @@ def main():
     if last_param_name and last_param_scope:
         default_label = "{} [{}]".format(last_param_name, "Instance" if last_param_scope == "instance" else "Type")
 
+    default_project_north_label = None
+    if last_project_north_param_name and last_project_north_param_scope:
+        default_project_north_label = "{} [{}]".format(
+            last_project_north_param_name,
+            "Instance" if last_project_north_param_scope == "instance" else "Type",
+        )
+
     try:
         dialog_result = _show_true_north_dialog(
             sheet_items,
@@ -560,6 +756,9 @@ def main():
             default_label=default_label,
             yesno_param_labels=yesno_param_labels,
             default_visibility_label=last_visibility_param if last_visibility_param in yesno_param_labels else None,
+            project_north_enabled_default=last_project_north_enabled,
+            default_project_north_label=default_project_north_label,
+            default_project_north_visibility_label=last_project_north_visibility_param if last_project_north_visibility_param in yesno_param_labels else None,
         )
     except Exception as ex:
         UI.TaskDialog.Show("True North Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -587,11 +786,23 @@ def main():
     visibility_param_name = dialog_result.get("visibility_param", "")
     hide_on_elev_section = bool(dialog_result.get("hide_on_elev_section", False))
 
+    enable_project_north = bool(dialog_result.get("enable_project_north", False))
+    project_north_target_label = dialog_result.get("project_north_param", "") if enable_project_north else ""
+    project_north_entry = param_entries.get(project_north_target_label) if project_north_target_label else None
+    project_north_param_name = project_north_entry["name"] if project_north_entry else project_north_target_label
+    project_north_param_scope = project_north_entry["scope"] if project_north_entry else "instance"
+    set_project_north_visibility = bool(dialog_result.get("set_project_north_visibility", False))
+    project_north_visibility_param_name = dialog_result.get("project_north_visibility_param", "")
+
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.true_north_param_name = target_param_name
     config.true_north_param_scope = target_param_scope
     config.visibility_param_name = visibility_param_name if set_visibility else ""
     config.hide_on_elev_section = hide_on_elev_section
+    config.project_north_enabled = enable_project_north
+    config.project_north_param_name = project_north_param_name if enable_project_north else ""
+    config.project_north_param_scope = project_north_param_scope if enable_project_north else ""
+    config.project_north_visibility_param_name = project_north_visibility_param_name if (enable_project_north and set_project_north_visibility) else ""
     save_config()
 
     titleblocks_by_sheet = {}
@@ -640,67 +851,38 @@ def main():
                 primary_view = view
                 break
 
-            if primary_view is None:
-                if hide_on_elev_section and set_visibility and visibility_param_name:
-                    try:
-                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                            vis_p.Set(0)
-                        hidden_sheets.append(sheet_label + " - No plan view found (north arrow hidden)")
-                        continue
-                    except Exception:
-                        pass
-                failed_sheets.append(sheet_label + " - No suitable viewport found")
-                continue
-
-            _HIDE_VIEW_TYPES = (DB.ViewType.Elevation, DB.ViewType.Section)
-            if hide_on_elev_section and primary_view.ViewType in _HIDE_VIEW_TYPES:
-                if set_visibility and visibility_param_name:
-                    try:
-                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                            vis_p.Set(0)
-                    except Exception:
-                        pass
-                hidden_sheets.append(sheet_label + " - Primary view is {}, north arrow hidden".format(
-                    "elevation" if primary_view.ViewType == DB.ViewType.Elevation else "section"
-                ))
-                continue
-
-            angle_value = _get_true_north_angle_for_view(doc, primary_view)
-
-            param, resolved_owner = _resolve_target_parameter(
-                sheet, titleblock_instance, target_param_name, target_param_scope
+            true_north_angle = _get_true_north_angle_for_view(doc, primary_view) if primary_view else 0.0
+            status, message = _update_arrow_for_sheet(
+                titleblock_instance, sheet, sheet_label, primary_view,
+                target_param_name, target_param_scope,
+                set_visibility, visibility_param_name,
+                hide_on_elev_section, true_north_angle,
+                arrow_tag="",
             )
+            if status == "updated":
+                updated_sheets.append(sheet_name)
+                updated_count += 1
+            elif status == "hidden":
+                hidden_sheets.append(message)
+            else:
+                failed_sheets.append(message)
 
-            if not param:
-                failed_sheets.append(sheet_label + " - Target parameter missing: {}".format(target_param_name))
-                continue
-
-            try:
-                if param.IsReadOnly:
-                    failed_sheets.append(sheet_label + " - Parameter is read-only ({})".format(resolved_owner or ""))
-                elif param.StorageType == DB.StorageType.Double:
-                    value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
-                    param.Set(value_to_set)
-                    if set_visibility and visibility_param_name:
-                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                            vis_p.Set(1)
-                    updated_sheets.append(sheet_name)
+            if enable_project_north:
+                project_north_angle = _get_project_north_angle_for_view(primary_view) if primary_view else 0.0
+                pn_status, pn_message = _update_arrow_for_sheet(
+                    titleblock_instance, sheet, sheet_label, primary_view,
+                    project_north_param_name, project_north_param_scope,
+                    set_project_north_visibility, project_north_visibility_param_name,
+                    hide_on_elev_section, project_north_angle,
+                    arrow_tag=" (Project North)",
+                )
+                if pn_status == "updated":
+                    updated_sheets.append(sheet_name + " (Project North)")
                     updated_count += 1
-                elif param.StorageType == DB.StorageType.Integer:
-                    param.Set(int(round(angle_value)))
-                    if set_visibility and visibility_param_name:
-                        vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                        if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                            vis_p.Set(1)
-                    updated_sheets.append(sheet_name)
-                    updated_count += 1
+                elif pn_status == "hidden":
+                    hidden_sheets.append(pn_message)
                 else:
-                    failed_sheets.append(sheet_label + " - Unsupported storage type: {}".format(param.StorageType))
-            except Exception as e:
-                failed_sheets.append(sheet_label + " - Failed to set parameter: {}".format(str(e)))
+                    failed_sheets.append(pn_message)
 
         t.Commit()
     except Exception as e:
@@ -721,7 +903,9 @@ def main():
     _print_text("Updated: {} sheets".format(updated_count))
     _print_text("Hidden: {} sheets".format(len(hidden_sheets)))
     _print_text("Failed/Skipped: {} sheets".format(len(failed_sheets)))
-    _print_text("Target Parameter: {} ({})".format(target_param_name, target_param_scope or "instance"))
+    _print_text("Target Parameter (True North): {} ({})".format(target_param_name, target_param_scope or "instance"))
+    if enable_project_north:
+        _print_text("Target Parameter (Project North): {} ({})".format(project_north_param_name, project_north_param_scope or "instance"))
     if updated_sheets:
         _print_text("")
         _print_text("Changed Sheets:")

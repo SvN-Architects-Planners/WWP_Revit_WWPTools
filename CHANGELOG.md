@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Telemetry: unhandled command errors are now also filed (or updated) as a deduplicated GitHub issue, detected the next time Revit starts (via the existing pyRevit telemetry replay in app-init.py, not in real time) -- via a new, independent reporting endpoint separate from the existing Neon-backed usage log, so a bug reporting outage never affects usage telemetry or vice versa.
+- True North Updater: can now also compute and write a Project North angle onto titleblocks in the same run, with its own optional visibility parameter -- opt-in via a new "Also update a Project North angle parameter" checkbox so existing True-North-only titleblocks and saved settings are unaffected. The existing "hide on elevation/section" option now applies to whichever of True North/Project North visibility toggles are active.
 
 ### Changed
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error reporting service: the "match found" branch in report-error.js no longer throws if a GitHub issue's body is null/absent -- introduced a single `body` local (`existing.body || ''`) used consistently for both the marker match and the marker replace.
 - app-init.py: the telemetry replay loop now respects the user's telemetry opt-out (`WWP_telemetry.is_telemetry_enabled()`) before sending the usage-log worker post or the deduplicated error report; the local debug log write remains unconditional since it never leaves the machine.
+- True North Updater: the shared "hide on elevation/section" checkbox no longer skips writing an arrow's angle on elevation/section sheets when that specific arrow (True North or Project North) has no visibility parameter configured -- each arrow's hide/skip decision now gates on its own visibility toggle and parameter, not just the shared checkbox. Also added a dialog validation error if True North and Project North are set to the same target parameter, preventing one angle from silently overwriting the other.
 
 ## [2.2.0] - 2026-07-03
 
