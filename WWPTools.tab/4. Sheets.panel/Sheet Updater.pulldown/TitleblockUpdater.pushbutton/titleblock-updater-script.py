@@ -69,20 +69,31 @@ def _is_yes_no_parameter(param):
     return False
 
 def _is_angle_parameter(param):
-    """True if the parameter's data type is Angle (modern spec, falling back
-    to the legacy ParameterType when the modern check doesn't match)."""
+    """True if the parameter's data type is Angle or Rotation Angle (modern
+    spec, falling back to the legacy ParameterType when neither modern check
+    matches). Rotation Angle is a distinct data type from plain Angle in
+    Revit's family editor -- north arrow / key plan rotation parameters are
+    conventionally authored as Rotation Angle, not Angle."""
     if not param or not getattr(param, "Definition", None):
         return False
     definition = param.Definition
     try:
         if hasattr(definition, "GetDataType") and hasattr(DB, "SpecTypeId"):
-            if definition.GetDataType() == DB.SpecTypeId.Angle:
+            data_type = definition.GetDataType()
+            if data_type == DB.SpecTypeId.Angle:
+                return True
+            rotation_angle_type = getattr(getattr(DB.SpecTypeId, "Rotation", None), "Angle", None)
+            if rotation_angle_type is not None and data_type == rotation_angle_type:
                 return True
     except Exception:
         pass
     try:
-        if hasattr(definition, "ParameterType") and definition.ParameterType == DB.ParameterType.Angle:
-            return True
+        if hasattr(definition, "ParameterType"):
+            if definition.ParameterType == DB.ParameterType.Angle:
+                return True
+            rotation_angle_param_type = getattr(DB.ParameterType, "RotationAngle", None)
+            if rotation_angle_param_type is not None and definition.ParameterType == rotation_angle_param_type:
+                return True
     except Exception:
         pass
     return False
