@@ -133,6 +133,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
@@ -188,6 +190,20 @@
                           Width="260"
                           MinHeight="32"
                           Margin="14,0,0,0" />
+
+                <TextBlock Grid.Row="4"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Text="Schedule Name"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TitleBrush}"
+                           Margin="0,12,0,6" />
+                <TextBox x:Name="ScheduleNameBox"
+                         Grid.Row="5"
+                         Grid.Column="0"
+                         Grid.ColumnSpan="2"
+                         MinHeight="32"
+                         ToolTip="Name of the key schedule to create or update in Revit." />
             </Grid>
         </Border>
 

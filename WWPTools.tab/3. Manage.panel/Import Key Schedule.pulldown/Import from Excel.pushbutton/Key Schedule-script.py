@@ -139,6 +139,7 @@ def _show_area_keyplan_import_dialog(
     selected_sheet="",
     loaded_sheet="",
     loaded_file_path="",
+    schedule_name="",
     column_names=None,
     target_types=None,
     selected_target_type="",
@@ -177,6 +178,7 @@ def _show_area_keyplan_import_dialog(
     load_button = window.FindName("LoadButton")
     sheet_combo = window.FindName("SheetCombo")
     target_combo = window.FindName("TargetTypeCombo")
+    schedule_name_box = window.FindName("ScheduleNameBox")
     mapping_grid = window.FindName("MappingGrid")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
@@ -189,6 +191,9 @@ def _show_area_keyplan_import_dialog(
 
     if file_path_box is not None:
         file_path_box.Text = file_path or ""
+
+    if schedule_name_box is not None:
+        schedule_name_box.Text = schedule_name or ""
 
     sheets = [str(name) for name in (sheet_names or [])]
     if sheet_combo is not None:
@@ -251,6 +256,9 @@ def _show_area_keyplan_import_dialog(
     def _current_file_path():
         value = str(file_path_box.Text or "") if file_path_box is not None else ""
         return os.path.expandvars(value)
+
+    def _current_schedule_name():
+        return str(schedule_name_box.Text or "").strip() if schedule_name_box is not None else ""
 
     def _update_ok_state():
         if ok_button is None:
@@ -408,6 +416,9 @@ def _show_area_keyplan_import_dialog(
                 "version": 1,
                 "name": name,
                 "setting": saved_sets[name],
+                "sheet_name": _current_sheet(),
+                "file_path": _current_file_path(),
+                "schedule_name": _current_schedule_name(),
             }
             try:
                 with open(dlg.FileName, "w") as f:
@@ -437,7 +448,23 @@ def _show_area_keyplan_import_dialog(
         saved_sets[name] = setting
         _save_saved_sets()
         _refresh_saved_set_combo(name)
+
+        imported_file_path = str(data.get("file_path") or "").strip()
+        file_changed = False
+        if imported_file_path and file_path_box is not None:
+            file_changed = _normalize_path(imported_file_path) != _normalize_path(_current_file_path())
+            file_path_box.Text = imported_file_path
+        if schedule_name_box is not None:
+            imported_schedule_name = str(data.get("schedule_name") or "").strip()
+            if imported_schedule_name:
+                schedule_name_box.Text = imported_schedule_name
+        imported_sheet_name = str(data.get("sheet_name") or "").strip()
+        if imported_sheet_name and sheet_combo is not None and imported_sheet_name in sheets:
+            sheet_combo.SelectedItem = imported_sheet_name
+
         _apply_setting_set(setting)
+        if file_changed:
+            _show_message("Setting '{}' imported. Click Load to read the referenced Excel file.".format(name))
 
     def _sync_mapping_grid_combos():
         if mapping_grid is None or mapping_grid.ItemsSource is None:
@@ -599,6 +626,7 @@ def _show_area_keyplan_import_dialog(
         "selected_target_type": result_target_type,
         "selected_sheet": _current_sheet(),
         "file_path": result_file_path,
+        "schedule_name": _current_schedule_name(),
         "column_names": column_names_out,
         "selected_options": selected_options,
     }
@@ -2030,6 +2058,7 @@ def main():
             selected_sheet=state["selected_sheet"],
             loaded_sheet=state["loaded_sheet"],
             loaded_file_path=state["loaded_file_path"],
+            schedule_name=state.get("schedule_name", ""),
             column_names=state["column_labels"],
             target_types=TARGET_OPTIONS,
             selected_target_type=state.get("selected_target_type", TARGET_OPTIONS[0]),
@@ -2044,6 +2073,7 @@ def main():
         if result is None:
             return
 
+        result_schedule_name = str(result.get("schedule_name") or "").strip()
         selected_target_type = result.get("selected_target_type") or state.get("selected_target_type", TARGET_OPTIONS[0])
         next_target = resolve_schedule_target(selected_target_type)
         next_category_bic = next_target["bic"]
@@ -2064,6 +2094,8 @@ def main():
                 "area_key_import_schedule_name_{}".format(category_key),
                 "",
             ) or _default_schedule_name(state.get("file_path", ""), category_label)
+        elif result_schedule_name:
+            state["schedule_name"] = result_schedule_name
 
         file_path = result.get("file_path") or ""
         selected_sheet = result.get("selected_sheet") or ""
@@ -2148,12 +2180,13 @@ def main():
                     "auto_defaults": auto_defaults,
                 }
             )
-            saved_name = _safe_config_get(
-                config,
-                "area_key_import_schedule_name_{}".format(category_key),
-                "",
-            ) or ""
-            state["schedule_name"] = saved_name or _default_schedule_name(state["file_path"], category_label)
+            if not state.get("schedule_name"):
+                saved_name = _safe_config_get(
+                    config,
+                    "area_key_import_schedule_name_{}".format(category_key),
+                    "",
+                ) or ""
+                state["schedule_name"] = saved_name or _default_schedule_name(state["file_path"], category_label)
             _safe_config_set(config, "area_key_import_headers_signature", signature)
             _safe_config_set(config, "area_key_import_selected_options", defaults)
             _safe_config_set(config, _mapping_signature_key(category_key), signature)

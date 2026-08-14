@@ -1,0 +1,4 @@
+title: "Titleblock\nUpdater"
+tooltip: |
+  Update titleblock True North angle and/or Sheet Scale parameters from sheet views. Combines the former True North Updater and Sheet Scale Updater into one tool.
+author: "Jason Tian"
