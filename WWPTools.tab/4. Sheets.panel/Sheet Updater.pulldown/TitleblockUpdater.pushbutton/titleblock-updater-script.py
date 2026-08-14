@@ -82,7 +82,7 @@ def _is_angle_parameter(param):
             data_type = definition.GetDataType()
             if data_type == DB.SpecTypeId.Angle:
                 return True
-            rotation_angle_type = getattr(getattr(DB.SpecTypeId, "Rotation", None), "Angle", None)
+            rotation_angle_type = getattr(DB.SpecTypeId, "RotationAngle", None)
             if rotation_angle_type is not None and data_type == rotation_angle_type:
                 return True
     except Exception:

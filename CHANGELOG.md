@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-08-14
+
+### Fixed
+
+- Titleblock Updater: `_is_angle_parameter()` still missed "Rotation Angle" family parameters (a data type distinct from plain "Angle" that north arrow/key plan rotation parameters are conventionally authored as) after the earlier same-day fix -- the code checked a nested `SpecTypeId.Rotation.Angle` path that doesn't exist in the Revit API; `SpecTypeId.RotationAngle` is its own flat top-level property. Verified against `RevitAPI.dll` for Revit 2024/2025/2026 via reflection before fixing.
+
 ## [2.6.0] - 2026-08-14
 
 ### Added
