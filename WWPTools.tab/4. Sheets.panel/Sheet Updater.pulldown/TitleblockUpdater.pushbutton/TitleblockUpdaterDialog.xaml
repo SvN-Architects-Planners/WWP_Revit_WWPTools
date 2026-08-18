@@ -35,18 +35,6 @@
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
-        <Style x:Key="SubsectionLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-
-        <Style x:Key="SubsectionDivider" TargetType="Border">
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="Margin" Value="0,0,0,14" />
-        </Style>
-
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource CardBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
@@ -307,14 +295,13 @@
                                 <StackPanel>
                                     <TextBlock Text="ANGLE PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,12" />
 
-                                    <TextBlock Text="True North" Style="{StaticResource SubsectionLabelStyle}" Margin="0,0,0,8" />
                                     <ComboBox x:Name="TN_ParameterCombo"
                                               IsEditable="True"
                                               IsTextSearchEnabled="True"
                                               StaysOpenOnEdit="True"
                                               Style="{StaticResource FlatComboBox}"
                                               Margin="0,0,0,10" />
-                                    <Grid Margin="0,0,0,14">
+                                    <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="16" />
@@ -332,50 +319,6 @@
                                                   IsEnabled="False"
                                                   Style="{StaticResource FlatComboBox}" />
                                     </Grid>
-
-                                    <Border Style="{StaticResource SubsectionDivider}" />
-
-                                    <TextBlock Text="Project North (optional)" Style="{StaticResource SubsectionLabelStyle}" Margin="0,0,0,8" />
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="16" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="TN_EnableProjectNorthCheckBox"
-                                                  Content="Also update"
-                                                  VerticalAlignment="Center"
-                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
-                                        <ComboBox x:Name="TN_ProjectNorthParameterCombo"
-                                                  Grid.Column="2"
-                                                  IsEditable="True"
-                                                  IsTextSearchEnabled="True"
-                                                  StaysOpenOnEdit="True"
-                                                  IsEnabled="False"
-                                                  Style="{StaticResource FlatComboBox}" />
-                                    </Grid>
-                                    <Grid Margin="0,0,0,14">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="16" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="TN_SetProjectNorthVisibilityCheckBox"
-                                                  Content="Also set a visibility parameter"
-                                                  VerticalAlignment="Center"
-                                                  IsEnabled="False"
-                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
-                                        <ComboBox x:Name="TN_ProjectNorthVisibilityParamCombo"
-                                                  Grid.Column="2"
-                                                  IsEditable="True"
-                                                  IsTextSearchEnabled="True"
-                                                  StaysOpenOnEdit="True"
-                                                  IsEnabled="False"
-                                                  Style="{StaticResource FlatComboBox}" />
-                                    </Grid>
-
-                                    <Border Style="{StaticResource SubsectionDivider}" />
-
                                     <CheckBox x:Name="TN_HideCheckBox"
                                               Content="Also hide (set to No) when the primary view is an elevation or section"
                                               IsEnabled="False"
@@ -423,6 +366,111 @@
                                                    FontStyle="Italic"
                                                    TextWrapping="Wrap" />
                                         <TextBlock x:Name="TN_ValidationText"
+                                                   Foreground="{StaticResource DangerBrush}"
+                                                   Visibility="Collapsed"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"
+                                                   FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="Project North(Construction North)" Style="{StaticResource FlatTabItem}">
+                        <Grid Margin="0,16,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <CheckBox x:Name="PN_EnableCheckBox"
+                                      Grid.Row="0"
+                                      Content="Update Project North(Construction North) angle for selected sheets"
+                                      IsChecked="False"
+                                      Margin="0,0,0,14"
+                                      Style="{StaticResource ToggleSwitchCheckBox}" />
+
+                            <Border Grid.Row="1" Style="{StaticResource SectionCard}" Margin="0,0,0,14">
+                                <StackPanel>
+                                    <TextBlock Text="ANGLE PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,12" />
+
+                                    <ComboBox x:Name="PN_ParameterCombo"
+                                              IsEditable="True"
+                                              IsTextSearchEnabled="True"
+                                              StaysOpenOnEdit="True"
+                                              IsEnabled="False"
+                                              Style="{StaticResource FlatComboBox}"
+                                              Margin="0,0,0,10" />
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="16" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="PN_SetVisibilityCheckBox"
+                                                  Content="Also set a visibility parameter"
+                                                  VerticalAlignment="Center"
+                                                  IsEnabled="False"
+                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
+                                        <ComboBox x:Name="PN_VisibilityParamCombo"
+                                                  Grid.Column="2"
+                                                  IsEditable="True"
+                                                  IsTextSearchEnabled="True"
+                                                  StaysOpenOnEdit="True"
+                                                  IsEnabled="False"
+                                                  Style="{StaticResource FlatComboBox}" />
+                                    </Grid>
+                                    <CheckBox x:Name="PN_HideCheckBox"
+                                              Content="Also hide (set to No) when the primary view is an elevation or section"
+                                              IsEnabled="False"
+                                              Style="{StaticResource ToggleSwitchCheckBox}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="2" Style="{StaticResource SectionCard}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="SHEETS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,10" />
+
+                                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="16" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="PN_SearchBox" IsEnabled="False" Style="{StaticResource FlatTextBox}" />
+                                        <CheckBox x:Name="PN_AllSheetsCheckBox"
+                                                  Grid.Column="2"
+                                                  Content="All Sheets"
+                                                  VerticalAlignment="Center"
+                                                  IsEnabled="False"
+                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
+                                    </Grid>
+
+                                    <ListBox x:Name="PN_SheetsList"
+                                             Grid.Row="2"
+                                             SelectionMode="Extended"
+                                             MinHeight="160"
+                                             IsEnabled="False"
+                                             Style="{StaticResource FlatListBox}"
+                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
+
+                                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                                        <TextBlock x:Name="PN_AllSheetsWarningText"
+                                                   Text="To update individual sheets, uncheck 'All Sheets'."
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="12"
+                                                   FontStyle="Italic"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock x:Name="PN_ValidationText"
                                                    Foreground="{StaticResource DangerBrush}"
                                                    Visibility="Collapsed"
                                                    Margin="0,4,0,0"
