@@ -173,11 +173,18 @@ def _get_param_entries_scale(titleblock_instances):
     )
 
 def _get_yesno_param_entries(titleblock_instances):
-    """Return sorted list of writable Yes/No instance parameter names."""
+    """Return family-grouped and flat writable Yes/No instance parameters."""
+    family_params = {}
     names = set()
     for tb in titleblock_instances:
         if not tb:
             continue
+        try:
+            family_name = tb.Symbol.Family.Name
+        except Exception:
+            family_name = "Unknown"
+        if family_name not in family_params:
+            family_params[family_name] = set()
         try:
             for p in tb.Parameters:
                 if not p or not p.Definition:
@@ -189,9 +196,15 @@ def _get_yesno_param_entries(titleblock_instances):
                 name = p.Definition.Name
                 if name:
                     names.add(name)
+                    family_params[family_name].add(name)
         except Exception:
             continue
-    return sorted(names)
+    groups = [
+        (family_name, sorted(param_names))
+        for family_name, param_names in sorted(family_params.items())
+        if param_names
+    ]
+    return groups, sorted(names)
 
 def _lookup_parameter(element, param_name):
     if not element or not param_name:
@@ -263,166 +276,208 @@ def _get_project_north_angle_for_view(view):
     except Exception:
         return 0.0
 
-def _populate_parameter_combo(combo, param_groups, default_label):
-    from System.Windows import FontWeights, Thickness
-    from System.Windows.Controls import ComboBoxItem, Separator
+def _populate_parameter_list(list_box, param_groups, default_labels):
+    from System.Windows import Thickness
+    from System.Windows.Controls import ListBoxItem, TextBlock
+    from System.Windows.Documents import Run
+    from System.Windows.Media import Brushes
 
-    for i, (family_name, keys) in enumerate(param_groups or []):
+    defaults = set(default_labels or [])
+    applied_defaults = set()
+    first_selectable = None
+    for family_name, keys in (param_groups or []):
         if not keys:
             continue
-        if i > 0:
-            combo.Items.Add(Separator())
-        header = ComboBoxItem()
-        header.Content = family_name
-        header.IsEnabled = False
-        header.FontWeight = FontWeights.Bold
-        combo.Items.Add(header)
         for key in keys:
-            ci = ComboBoxItem()
-            ci.Content = key
-            ci.Tag = key
-            ci.Padding = Thickness(24, 3, 8, 3)
-            combo.Items.Add(ci)
+            item = ListBoxItem()
+            label = TextBlock()
+            family_run = Run("{}: ".format(family_name))
+            family_run.Foreground = Brushes.Gray
+            parameter_run = Run(key)
+            parameter_run.Foreground = Brushes.Black
+            label.Inlines.Add(family_run)
+            label.Inlines.Add(parameter_run)
+            item.Content = label
+            item.Tag = key
+            item.Padding = Thickness(8, 6, 8, 6)
+            item.ToolTip = "{}: {}".format(family_name, key)
+            list_box.Items.Add(item)
+            if first_selectable is None:
+                first_selectable = item
+            if key in defaults and key not in applied_defaults:
+                list_box.SelectedItems.Add(item)
+                applied_defaults.add(key)
+    if list_box.SelectedItems.Count == 0 and first_selectable is not None:
+        list_box.SelectedItems.Add(first_selectable)
 
-    default_set = False
-    if default_label:
-        for item in combo.Items:
-            if hasattr(item, 'Tag') and str(item.Tag or '') == default_label:
-                combo.SelectedItem = item
-                default_set = True
-                break
-    if not default_set:
-        for item in combo.Items:
-            if hasattr(item, 'Tag') and item.Tag is not None:
-                combo.SelectedItem = item
-                break
+def _selected_list_values(list_box):
+    values = []
+    seen = set()
+    if list_box is None:
+        return values
+    for item in list_box.SelectedItems:
+        if hasattr(item, "Tag") and item.Tag is not None:
+            value = str(item.Tag)
+        elif hasattr(item, "Content"):
+            value = str(item.Content)
+        else:
+            value = str(item)
+        if value not in seen:
+            values.append(value)
+            seen.add(value)
+    return values
 
-def _selected_combo_value(combo):
-    _sel = combo.SelectedItem
-    if _sel is not None and hasattr(_sel, 'Tag') and _sel.Tag is not None:
-        return str(_sel.Tag)
-    return str(combo.Text or "").strip()
+def _set_visibility_parameters(titleblock_instance, parameter_names, value):
+    for parameter_name in (parameter_names or []):
+        try:
+            vis_param = titleblock_instance.LookupParameter(parameter_name)
+            if vis_param and not vis_param.IsReadOnly and vis_param.StorageType == DB.StorageType.Integer:
+                vis_param.Set(int(value))
+        except Exception:
+            pass
+
+def _update_scale_targets_for_sheet(sheet, titleblock_instance, targets, scale_value):
+    """Update all selected scale targets. Returns an error string or None."""
+    for target in (targets or []):
+        target_name = target.get("name") or ""
+        target_scope = target.get("scope") or "instance"
+        scale_param, resolved_owner = _resolve_target_parameter(
+            sheet, titleblock_instance, target_name, target_scope
+        )
+        if not scale_param:
+            return "Target parameter missing: {}".format(target_name)
+        try:
+            if scale_param.IsReadOnly:
+                return "Parameter is read-only: {} ({})".format(
+                    target_name, resolved_owner or "resolved target"
+                )
+            if scale_param.StorageType == DB.StorageType.Double:
+                scale_param.Set(float(scale_value))
+            elif scale_param.StorageType == DB.StorageType.Integer:
+                scale_param.Set(int(scale_value))
+            elif scale_param.StorageType == DB.StorageType.String:
+                scale_param.Set(str(scale_value))
+            else:
+                scale_param.Set(scale_value)
+        except Exception as ex:
+            return "Failed to set {}: {}".format(target_name, str(ex))
+    return None
 
 def _update_arrow_for_sheet(
     titleblock_instance,
     sheet,
     sheet_label,
     primary_view,
-    target_param_name,
-    target_param_scope,
+    target_parameters,
     set_visibility,
-    visibility_param_name,
-    hide_on_elev_section,
+    visibility_param_names,
+    hide_on_unsupported_view,
     angle_value,
     arrow_tag,
 ):
     """
-    Sets target_param_name to angle_value on the resolved parameter, optionally
-    toggling visibility_param_name. Returns (status, message) where status is
+    Sets every selected target to angle_value and optionally toggles every
+    selected visibility parameter. Returns (status, message) where status is
     "updated" | "hidden" | "failed" and message is None when status == "updated".
     """
-    _HIDE_VIEW_TYPES = (DB.ViewType.Elevation, DB.ViewType.Section)
+    hide_view_types = (DB.ViewType.Elevation, DB.ViewType.Section, DB.ViewType.ThreeD)
 
     if primary_view is None:
-        if hide_on_elev_section and set_visibility and visibility_param_name:
-            try:
-                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                    vis_p.Set(0)
-                return "hidden", sheet_label + " - No plan view found (north arrow hidden){}".format(arrow_tag)
-            except Exception:
-                pass
+        if hide_on_unsupported_view and set_visibility and visibility_param_names:
+            _set_visibility_parameters(titleblock_instance, visibility_param_names, 0)
+            return "hidden", sheet_label + " - No plan view found (north arrow hidden){}".format(arrow_tag)
         return "failed", sheet_label + " - No suitable viewport found{}".format(arrow_tag)
 
-    if hide_on_elev_section and set_visibility and visibility_param_name and primary_view.ViewType in _HIDE_VIEW_TYPES:
-        try:
-            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                vis_p.Set(0)
-        except Exception:
-            pass
+    if hide_on_unsupported_view and set_visibility and visibility_param_names and primary_view.ViewType in hide_view_types:
+        _set_visibility_parameters(titleblock_instance, visibility_param_names, 0)
+        view_type_label = {
+            DB.ViewType.Elevation: "elevation",
+            DB.ViewType.Section: "section",
+            DB.ViewType.ThreeD: "3D",
+        }.get(primary_view.ViewType, str(primary_view.ViewType))
         return "hidden", sheet_label + " - Primary view is {}, north arrow hidden{}".format(
-            "elevation" if primary_view.ViewType == DB.ViewType.Elevation else "section", arrow_tag
+            view_type_label, arrow_tag
         )
 
-    param, resolved_owner = _resolve_target_parameter(sheet, titleblock_instance, target_param_name, target_param_scope)
-    if not param:
-        return "failed", sheet_label + " - Target parameter missing: {}{}".format(target_param_name, arrow_tag)
+    for target in (target_parameters or []):
+        target_name = target.get("name") or ""
+        target_scope = target.get("scope") or "instance"
+        param, resolved_owner = _resolve_target_parameter(
+            sheet, titleblock_instance, target_name, target_scope
+        )
+        if not param:
+            return "failed", sheet_label + " - Target parameter missing: {}{}".format(target_name, arrow_tag)
+        try:
+            if param.IsReadOnly:
+                return "failed", sheet_label + " - Parameter is read-only: {} ({}){}".format(
+                    target_name, resolved_owner or "resolved target", arrow_tag
+                )
+            if param.StorageType == DB.StorageType.Double:
+                value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
+                param.Set(value_to_set)
+            elif param.StorageType == DB.StorageType.Integer:
+                param.Set(int(round(angle_value)))
+            else:
+                return "failed", sheet_label + " - Unsupported storage type for {}: {}{}".format(
+                    target_name, param.StorageType, arrow_tag
+                )
+        except Exception as e:
+            return "failed", sheet_label + " - Failed to set {}: {}{}".format(target_name, str(e), arrow_tag)
 
-    try:
-        if param.IsReadOnly:
-            return "failed", sheet_label + " - Parameter is read-only ({}){}".format(resolved_owner or "", arrow_tag)
-        elif param.StorageType == DB.StorageType.Double:
-            value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
-            param.Set(value_to_set)
-            if set_visibility and visibility_param_name:
-                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                    vis_p.Set(1)
-        elif param.StorageType == DB.StorageType.Integer:
-            param.Set(int(round(angle_value)))
-            if set_visibility and visibility_param_name:
-                vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                    vis_p.Set(1)
-        else:
-            return "failed", sheet_label + " - Unsupported storage type: {}{}".format(param.StorageType, arrow_tag)
-    except Exception as e:
-        return "failed", sheet_label + " - Failed to set parameter: {}{}".format(str(e), arrow_tag)
+    if set_visibility and visibility_param_names:
+        _set_visibility_parameters(titleblock_instance, visibility_param_names, 1)
 
     return "updated", None
 
-def _build_scale_tab_state(window, sheet_items, param_groups, yesno_labels,
-                            prechecked_indices, default_label, default_visibility_label):
+def _build_scale_tab_state(window, sheet_items, param_groups, yesno_param_groups, yesno_labels,
+                            prechecked_indices, default_labels, default_visibility_labels,
+                            visibility_enabled_default, hide_default,
+                            ignore_drafting_default, all_sheets_default):
     prefix = "SC_"
     from System.Windows import Visibility
     from System.Windows.Controls import ListBoxItem
 
-    enable_checkbox = window.FindName(prefix + "EnableCheckBox")
-    parameter_combo = window.FindName(prefix + "ParameterCombo")
+    parameter_list = window.FindName(prefix + "ParameterList")
     search_box = window.FindName(prefix + "SearchBox")
     sheets_list = window.FindName(prefix + "SheetsList")
     all_sheets_checkbox = window.FindName(prefix + "AllSheetsCheckBox")
     all_sheets_warning = window.FindName(prefix + "AllSheetsWarningText")
     validation_text = window.FindName(prefix + "ValidationText")
     set_visibility_checkbox = window.FindName(prefix + "SetVisibilityCheckBox")
-    visibility_param_combo = window.FindName(prefix + "VisibilityParamCombo")
+    visibility_param_list = window.FindName(prefix + "VisibilityParamList")
     hide_checkbox = window.FindName(prefix + "HideCheckBox")
     extra_checkbox = window.FindName(prefix + "IgnoreDraftingViewsCheckBox")
 
     selected_indices = set(prechecked_indices or [])
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
 
-    _populate_parameter_combo(parameter_combo, param_groups, default_label)
+    _populate_parameter_list(parameter_list, param_groups, default_labels)
+    _populate_parameter_list(visibility_param_list, yesno_param_groups, default_visibility_labels)
 
     if all_sheets_checkbox is not None:
-        all_sheets_checkbox.IsChecked = True
-        search_box.IsEnabled = False
-        sheets_list.IsEnabled = False
-
-    for label in (yesno_labels or []):
-        visibility_param_combo.Items.Add(label)
-    if default_visibility_label and default_visibility_label in (yesno_labels or []):
-        visibility_param_combo.SelectedItem = default_visibility_label
-    elif visibility_param_combo.Items.Count > 0:
-        visibility_param_combo.SelectedIndex = 0
+        all_sheets_checkbox.IsChecked = bool(all_sheets_default)
+        search_box.IsEnabled = not bool(all_sheets_default)
+        sheets_list.IsEnabled = not bool(all_sheets_default)
+        if all_sheets_warning is not None:
+            all_sheets_warning.Visibility = Visibility.Visible if all_sheets_default else Visibility.Collapsed
     if set_visibility_checkbox is not None:
-        set_visibility_checkbox.IsChecked = False
+        set_visibility_checkbox.IsChecked = bool(visibility_enabled_default)
     if hide_checkbox is not None:
-        hide_checkbox.IsChecked = False
-        hide_checkbox.IsEnabled = False
+        hide_checkbox.IsChecked = bool(hide_default)
+        hide_checkbox.IsEnabled = bool(visibility_enabled_default)
+    if extra_checkbox is not None:
+        extra_checkbox.IsChecked = bool(ignore_drafting_default)
 
     def _on_visibility_checked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = True
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = True
         if hide_checkbox is not None:
             hide_checkbox.IsEnabled = True
 
     def _on_visibility_unchecked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = False
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = False
         if hide_checkbox is not None:
-            hide_checkbox.IsChecked = False
             hide_checkbox.IsEnabled = False
 
     if set_visibility_checkbox is not None:
@@ -503,40 +558,26 @@ def _build_scale_tab_state(window, sheet_items, param_groups, yesno_labels,
     search_box.TextChanged += _on_search_changed
     sheets_list.SelectionChanged += _on_selection_changed
 
-    def _apply_enabled_state(is_enabled):
-        for ctrl in (parameter_combo, search_box, sheets_list, all_sheets_checkbox, set_visibility_checkbox, extra_checkbox):
+    def _apply_control_state():
+        for ctrl in (parameter_list, all_sheets_checkbox, set_visibility_checkbox, extra_checkbox):
             if ctrl is not None:
-                ctrl.IsEnabled = is_enabled
-        if is_enabled:
-            visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = visibility_on
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = visibility_on
-        else:
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = False
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = False
+                ctrl.IsEnabled = True
+        use_all = bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked)
+        for ctrl in (search_box, sheets_list):
+            if ctrl is not None:
+                ctrl.IsEnabled = not use_all
+        visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = visibility_on
+        if hide_checkbox is not None:
+            hide_checkbox.IsEnabled = visibility_on
         _set_validation("")
 
-    def _on_enable_changed(sender, args):
-        _apply_enabled_state(bool(enable_checkbox is None or enable_checkbox.IsChecked))
-
-    if enable_checkbox is not None:
-        enable_checkbox.Checked += _on_enable_changed
-        enable_checkbox.Unchecked += _on_enable_changed
-
     _render_sheets()
-
-    def is_enabled():
-        return bool(enable_checkbox is None or enable_checkbox.IsChecked)
+    _apply_control_state()
 
     def validate():
-        if not is_enabled():
-            _set_validation("")
-            return True
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
         use_all = all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked
         if use_all:
             selected_indices.clear()
@@ -546,79 +587,80 @@ def _build_scale_tab_state(window, sheet_items, param_groups, yesno_labels,
         if not selected_indices:
             _set_validation("Select at least one sheet.")
             return False
-        if not selected_param:
-            _set_validation("Select a parameter.")
+        if not selected_params:
+            _set_validation("Select at least one target parameter.")
             return False
-        if selected_param not in (param_labels or []):
-            _set_validation("Select a valid parameter from the dropdown.")
+        if any(value not in (param_labels or []) for value in selected_params):
+            _set_validation("Select valid target parameters from the list.")
+            return False
+        if set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked and not _selected_list_values(visibility_param_list):
+            _set_validation("Select at least one visibility parameter.")
             return False
         _set_validation("")
         return True
 
     def get_result():
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
+        visibility_enabled = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
         return {
-            "enabled": is_enabled(),
+            "enabled": True,
             "selected_indices": sorted(selected_indices),
-            "selected_parameter": selected_param,
-            "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
-            "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
+            "selected_parameters": selected_params,
+            "set_visibility": visibility_enabled,
+            "visibility_params": _selected_list_values(visibility_param_list) if visibility_enabled else [],
             "hide_on": bool(hide_checkbox is not None and hide_checkbox.IsChecked),
             "ignore_drafting_views": bool(extra_checkbox is not None and extra_checkbox.IsChecked),
+            "all_sheets": bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked),
         }
 
-    return {"validate": validate, "get_result": get_result, "is_enabled": is_enabled}
+    return {"validate": validate, "get_result": get_result}
 
-def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_labels,
-                                 prechecked_indices, default_label, default_visibility_label):
+def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_groups, yesno_labels,
+                                 prechecked_indices, default_labels, default_visibility_labels,
+                                 visibility_enabled_default, hide_default,
+                                 all_sheets_default):
     prefix = "TN_"
     from System.Windows import Visibility
     from System.Windows.Controls import ListBoxItem
 
-    enable_checkbox = window.FindName(prefix + "EnableCheckBox")
-    parameter_combo = window.FindName(prefix + "ParameterCombo")
+    parameter_list = window.FindName(prefix + "ParameterList")
     search_box = window.FindName(prefix + "SearchBox")
     sheets_list = window.FindName(prefix + "SheetsList")
     all_sheets_checkbox = window.FindName(prefix + "AllSheetsCheckBox")
     all_sheets_warning = window.FindName(prefix + "AllSheetsWarningText")
     validation_text = window.FindName(prefix + "ValidationText")
     set_visibility_checkbox = window.FindName(prefix + "SetVisibilityCheckBox")
-    visibility_param_combo = window.FindName(prefix + "VisibilityParamCombo")
+    visibility_param_list = window.FindName(prefix + "VisibilityParamList")
     hide_checkbox = window.FindName(prefix + "HideCheckBox")
 
     selected_indices = set(prechecked_indices or [])
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
 
-    _populate_parameter_combo(parameter_combo, param_groups, default_label)
+    _populate_parameter_list(parameter_list, param_groups, default_labels)
+    _populate_parameter_list(visibility_param_list, yesno_param_groups, default_visibility_labels)
 
     if all_sheets_checkbox is not None:
-        all_sheets_checkbox.IsChecked = True
-        search_box.IsEnabled = False
-        sheets_list.IsEnabled = False
-
-    for label in (yesno_labels or []):
-        visibility_param_combo.Items.Add(label)
-    if default_visibility_label and default_visibility_label in (yesno_labels or []):
-        visibility_param_combo.SelectedItem = default_visibility_label
-    elif visibility_param_combo.Items.Count > 0:
-        visibility_param_combo.SelectedIndex = 0
+        all_sheets_checkbox.IsChecked = bool(all_sheets_default)
+        search_box.IsEnabled = not bool(all_sheets_default)
+        sheets_list.IsEnabled = not bool(all_sheets_default)
+        if all_sheets_warning is not None:
+            all_sheets_warning.Visibility = Visibility.Visible if all_sheets_default else Visibility.Collapsed
     if set_visibility_checkbox is not None:
-        set_visibility_checkbox.IsChecked = False
+        set_visibility_checkbox.IsChecked = bool(visibility_enabled_default)
     if hide_checkbox is not None:
-        hide_checkbox.IsChecked = False
-        hide_checkbox.IsEnabled = False
+        hide_checkbox.IsChecked = bool(hide_default)
+        hide_checkbox.IsEnabled = bool(visibility_enabled_default)
 
     def _on_visibility_checked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = True
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = True
         if hide_checkbox is not None:
             hide_checkbox.IsEnabled = True
 
     def _on_visibility_unchecked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = False
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = False
         if hide_checkbox is not None:
-            hide_checkbox.IsChecked = False
             hide_checkbox.IsEnabled = False
 
     if set_visibility_checkbox is not None:
@@ -699,40 +741,26 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_labels,
     search_box.TextChanged += _on_search_changed
     sheets_list.SelectionChanged += _on_selection_changed
 
-    def _apply_enabled_state(is_enabled):
-        for ctrl in (parameter_combo, search_box, sheets_list, all_sheets_checkbox, set_visibility_checkbox):
+    def _apply_control_state():
+        for ctrl in (parameter_list, all_sheets_checkbox, set_visibility_checkbox):
             if ctrl is not None:
-                ctrl.IsEnabled = is_enabled
-        if is_enabled:
-            visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = visibility_on
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = visibility_on
-        else:
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = False
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = False
+                ctrl.IsEnabled = True
+        use_all = bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked)
+        for ctrl in (search_box, sheets_list):
+            if ctrl is not None:
+                ctrl.IsEnabled = not use_all
+        visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = visibility_on
+        if hide_checkbox is not None:
+            hide_checkbox.IsEnabled = visibility_on
         _set_validation("")
 
-    def _on_enable_changed(sender, args):
-        _apply_enabled_state(bool(enable_checkbox is None or enable_checkbox.IsChecked))
-
-    if enable_checkbox is not None:
-        enable_checkbox.Checked += _on_enable_changed
-        enable_checkbox.Unchecked += _on_enable_changed
-
     _render_sheets()
-
-    def is_enabled():
-        return bool(enable_checkbox is None or enable_checkbox.IsChecked)
+    _apply_control_state()
 
     def validate():
-        if not is_enabled():
-            _set_validation("")
-            return True
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
         use_all = all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked
         if use_all:
             selected_indices.clear()
@@ -742,78 +770,79 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_labels,
         if not selected_indices:
             _set_validation("Select at least one sheet.")
             return False
-        if not selected_param:
-            _set_validation("Select a True North parameter.")
+        if not selected_params:
+            _set_validation("Select at least one True North parameter.")
             return False
-        if selected_param not in (param_labels or []):
-            _set_validation("Select a valid True North parameter from the dropdown.")
+        if any(value not in (param_labels or []) for value in selected_params):
+            _set_validation("Select valid True North parameters from the list.")
+            return False
+        if set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked and not _selected_list_values(visibility_param_list):
+            _set_validation("Select at least one True North visibility parameter.")
             return False
         _set_validation("")
         return True
 
     def get_result():
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
+        visibility_enabled = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
         return {
-            "enabled": is_enabled(),
+            "enabled": True,
             "selected_indices": sorted(selected_indices),
-            "selected_parameter": selected_param,
-            "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
-            "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
+            "selected_parameters": selected_params,
+            "set_visibility": visibility_enabled,
+            "visibility_params": _selected_list_values(visibility_param_list) if visibility_enabled else [],
             "hide_on": bool(hide_checkbox is not None and hide_checkbox.IsChecked),
+            "all_sheets": bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked),
         }
 
-    return {"validate": validate, "get_result": get_result, "is_enabled": is_enabled}
+    return {"validate": validate, "get_result": get_result}
 
-def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_labels,
-                                    prechecked_indices, default_label, default_visibility_label):
+def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_param_groups, yesno_labels,
+                                    prechecked_indices, default_labels, default_visibility_labels,
+                                    visibility_enabled_default, hide_default,
+                                    all_sheets_default):
     prefix = "PN_"
     from System.Windows import Visibility
     from System.Windows.Controls import ListBoxItem
 
-    enable_checkbox = window.FindName(prefix + "EnableCheckBox")
-    parameter_combo = window.FindName(prefix + "ParameterCombo")
+    parameter_list = window.FindName(prefix + "ParameterList")
     search_box = window.FindName(prefix + "SearchBox")
     sheets_list = window.FindName(prefix + "SheetsList")
     all_sheets_checkbox = window.FindName(prefix + "AllSheetsCheckBox")
     all_sheets_warning = window.FindName(prefix + "AllSheetsWarningText")
     validation_text = window.FindName(prefix + "ValidationText")
     set_visibility_checkbox = window.FindName(prefix + "SetVisibilityCheckBox")
-    visibility_param_combo = window.FindName(prefix + "VisibilityParamCombo")
+    visibility_param_list = window.FindName(prefix + "VisibilityParamList")
     hide_checkbox = window.FindName(prefix + "HideCheckBox")
 
     selected_indices = set(prechecked_indices or [])
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
 
-    _populate_parameter_combo(parameter_combo, param_groups, default_label)
+    _populate_parameter_list(parameter_list, param_groups, default_labels)
+    _populate_parameter_list(visibility_param_list, yesno_param_groups, default_visibility_labels)
 
     if all_sheets_checkbox is not None:
-        all_sheets_checkbox.IsChecked = True
-        search_box.IsEnabled = False
-        sheets_list.IsEnabled = False
-
-    for label in (yesno_labels or []):
-        visibility_param_combo.Items.Add(label)
-    if default_visibility_label and default_visibility_label in (yesno_labels or []):
-        visibility_param_combo.SelectedItem = default_visibility_label
-    elif visibility_param_combo.Items.Count > 0:
-        visibility_param_combo.SelectedIndex = 0
+        all_sheets_checkbox.IsChecked = bool(all_sheets_default)
+        search_box.IsEnabled = not bool(all_sheets_default)
+        sheets_list.IsEnabled = not bool(all_sheets_default)
+        if all_sheets_warning is not None:
+            all_sheets_warning.Visibility = Visibility.Visible if all_sheets_default else Visibility.Collapsed
     if set_visibility_checkbox is not None:
-        set_visibility_checkbox.IsChecked = False
+        set_visibility_checkbox.IsChecked = bool(visibility_enabled_default)
     if hide_checkbox is not None:
-        hide_checkbox.IsChecked = False
-        hide_checkbox.IsEnabled = False
+        hide_checkbox.IsChecked = bool(hide_default)
+        hide_checkbox.IsEnabled = bool(visibility_enabled_default)
 
     def _on_visibility_checked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = True
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = True
         if hide_checkbox is not None:
             hide_checkbox.IsEnabled = True
 
     def _on_visibility_unchecked(sender, args):
-        if visibility_param_combo is not None:
-            visibility_param_combo.IsEnabled = False
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = False
         if hide_checkbox is not None:
-            hide_checkbox.IsChecked = False
             hide_checkbox.IsEnabled = False
 
     if set_visibility_checkbox is not None:
@@ -894,44 +923,26 @@ def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_labe
     search_box.TextChanged += _on_search_changed
     sheets_list.SelectionChanged += _on_selection_changed
 
-    def _apply_enabled_state(is_enabled):
-        for ctrl in (parameter_combo, all_sheets_checkbox, set_visibility_checkbox):
+    def _apply_control_state():
+        for ctrl in (parameter_list, all_sheets_checkbox, set_visibility_checkbox):
             if ctrl is not None:
-                ctrl.IsEnabled = is_enabled
+                ctrl.IsEnabled = True
         use_all = bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked)
         for ctrl in (search_box, sheets_list):
             if ctrl is not None:
-                ctrl.IsEnabled = is_enabled and not use_all
-        if is_enabled:
-            visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = visibility_on
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = visibility_on
-        else:
-            if visibility_param_combo is not None:
-                visibility_param_combo.IsEnabled = False
-            if hide_checkbox is not None:
-                hide_checkbox.IsEnabled = False
+                ctrl.IsEnabled = not use_all
+        visibility_on = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
+        if visibility_param_list is not None:
+            visibility_param_list.IsEnabled = visibility_on
+        if hide_checkbox is not None:
+            hide_checkbox.IsEnabled = visibility_on
         _set_validation("")
 
-    def _on_enable_changed(sender, args):
-        _apply_enabled_state(bool(enable_checkbox is not None and enable_checkbox.IsChecked))
-
-    if enable_checkbox is not None:
-        enable_checkbox.Checked += _on_enable_changed
-        enable_checkbox.Unchecked += _on_enable_changed
-
     _render_sheets()
-
-    def is_enabled():
-        return bool(enable_checkbox is not None and enable_checkbox.IsChecked)
+    _apply_control_state()
 
     def validate():
-        if not is_enabled():
-            _set_validation("")
-            return True
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
         use_all = all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked
         if use_all:
             selected_indices.clear()
@@ -941,43 +952,50 @@ def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_labe
         if not selected_indices:
             _set_validation("Select at least one sheet.")
             return False
-        if not selected_param:
-            _set_validation("Select a Project North(Construction North) parameter.")
+        if not selected_params:
+            _set_validation("Select at least one Project North(Construction North) parameter.")
             return False
-        if selected_param not in (param_labels or []):
-            _set_validation("Select a valid Project North(Construction North) parameter from the dropdown.")
+        if any(value not in (param_labels or []) for value in selected_params):
+            _set_validation("Select valid Project North(Construction North) parameters from the list.")
+            return False
+        if set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked and not _selected_list_values(visibility_param_list):
+            _set_validation("Select at least one Project North visibility parameter.")
             return False
         _set_validation("")
         return True
 
     def get_result():
-        selected_param = _selected_combo_value(parameter_combo)
+        selected_params = _selected_list_values(parameter_list)
+        visibility_enabled = bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked)
         return {
-            "enabled": is_enabled(),
+            "enabled": True,
             "selected_indices": sorted(selected_indices),
-            "selected_parameter": selected_param,
-            "set_visibility": bool(set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked),
-            "visibility_param": str(visibility_param_combo.Text or "").strip() if (set_visibility_checkbox is not None and set_visibility_checkbox.IsChecked) else "",
+            "selected_parameters": selected_params,
+            "set_visibility": visibility_enabled,
+            "visibility_params": _selected_list_values(visibility_param_list) if visibility_enabled else [],
             "hide_on": bool(hide_checkbox is not None and hide_checkbox.IsChecked),
+            "all_sheets": bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked),
         }
 
-    return {"validate": validate, "get_result": get_result, "is_enabled": is_enabled}
+    return {"validate": validate, "get_result": get_result}
 
 def _show_titleblock_dialog(
     sheet_items,
     tn_param_groups,
     pn_param_groups,
     sc_param_groups,
+    yesno_param_groups,
     yesno_labels,
     tn_prechecked_indices,
     pn_prechecked_indices,
     sc_prechecked_indices,
-    tn_default_label,
-    pn_default_label,
-    sc_default_label,
-    tn_default_visibility_label,
-    pn_default_visibility_label,
-    sc_default_visibility_label,
+    tn_default_labels,
+    pn_default_labels,
+    sc_default_labels,
+    tn_default_visibility_labels,
+    pn_default_visibility_labels,
+    sc_default_visibility_labels,
+    dialog_defaults,
 ):
     if not sheet_items:
         return None
@@ -1016,21 +1034,54 @@ def _show_titleblock_dialog(
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
+    remember_choices_checkbox = window.FindName("RememberChoicesCheckBox")
 
-    prompt_text.Text = "Select what to update and choose the target parameter(s):"
+    prompt_text.Text = "Choose a tab, select the target parameter(s), then run that update:"
+    defaults = dialog_defaults or {}
+    if remember_choices_checkbox is not None:
+        remember_choices_checkbox.IsChecked = bool(defaults.get("remember_choices", True))
 
     tn_state = _build_true_north_tab_state(
-        window, sheet_items, tn_param_groups, yesno_labels,
-        tn_prechecked_indices, tn_default_label, tn_default_visibility_label,
+        window, sheet_items, tn_param_groups, yesno_param_groups, yesno_labels,
+        tn_prechecked_indices, tn_default_labels, tn_default_visibility_labels,
+        bool(defaults.get("tn_set_visibility", True)),
+        bool(defaults.get("tn_hide_on", True)),
+        bool(defaults.get("tn_all_sheets", True)),
     )
     pn_state = _build_project_north_tab_state(
-        window, sheet_items, pn_param_groups, yesno_labels,
-        pn_prechecked_indices, pn_default_label, pn_default_visibility_label,
+        window, sheet_items, pn_param_groups, yesno_param_groups, yesno_labels,
+        pn_prechecked_indices, pn_default_labels, pn_default_visibility_labels,
+        bool(defaults.get("pn_set_visibility", True)),
+        bool(defaults.get("pn_hide_on", True)),
+        bool(defaults.get("pn_all_sheets", True)),
     )
     sc_state = _build_scale_tab_state(
-        window, sheet_items, sc_param_groups, yesno_labels,
-        sc_prechecked_indices, sc_default_label, sc_default_visibility_label,
+        window, sheet_items, sc_param_groups, yesno_param_groups, yesno_labels,
+        sc_prechecked_indices, sc_default_labels, sc_default_visibility_labels,
+        bool(defaults.get("sc_set_visibility", False)),
+        bool(defaults.get("sc_hide_on", False)),
+        bool(defaults.get("sc_ignore_drafting_views", False)),
+        bool(defaults.get("sc_all_sheets", True)),
     )
+
+    tab_states = (tn_state, pn_state, sc_state)
+    action_labels = ("Update True North", "Update Project North", "Update Scale")
+    try:
+        selected_tab_index = int(defaults.get("selected_tab_index", 0))
+    except Exception:
+        selected_tab_index = 0
+    if selected_tab_index < 0 or selected_tab_index >= len(tab_states):
+        selected_tab_index = 0
+    tab_control.SelectedIndex = selected_tab_index
+
+    def _sync_action_label(sender=None, args=None):
+        index = int(tab_control.SelectedIndex)
+        if index < 0 or index >= len(action_labels):
+            index = 0
+        ok_button.Content = action_labels[index]
+
+    tab_control.SelectionChanged += _sync_action_label
+    _sync_action_label()
 
     try:
         lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
@@ -1055,25 +1106,10 @@ def _show_titleblock_dialog(
 
     def _on_ok(sender, args):
         _set_global_validation("")
-        if not tn_state["is_enabled"]() and not pn_state["is_enabled"]() and not sc_state["is_enabled"]():
-            _set_global_validation("Enable at least one update (True North, Project North(Construction North), or Scale).")
-            return
-        tn_ok = tn_state["validate"]()
-        if not tn_ok:
-            tab_control.SelectedIndex = 0
-            return
-        pn_ok = pn_state["validate"]()
-        if not pn_ok:
-            tab_control.SelectedIndex = 1
-            return
-        if tn_state["is_enabled"]() and pn_state["is_enabled"]():
-            if tn_state["get_result"]()["selected_parameter"] == pn_state["get_result"]()["selected_parameter"]:
-                _set_global_validation("True North and Project North(Construction North) must use different parameters.")
-                tab_control.SelectedIndex = 1
-                return
-        sc_ok = sc_state["validate"]()
-        if not sc_ok:
-            tab_control.SelectedIndex = 2
+        active_index = int(tab_control.SelectedIndex)
+        if active_index < 0 or active_index >= len(tab_states):
+            active_index = 0
+        if not tab_states[active_index]["validate"]():
             return
         window.DialogResult = True
         window.Close()
@@ -1088,10 +1124,19 @@ def _show_titleblock_dialog(
     if window.ShowDialog() != True:
         return None
 
+    selected_tab_index = int(tab_control.SelectedIndex)
+    tn_result = tn_state["get_result"]()
+    pn_result = pn_state["get_result"]()
+    sc_result = sc_state["get_result"]()
+    tn_result["enabled"] = selected_tab_index == 0
+    pn_result["enabled"] = selected_tab_index == 1
+    sc_result["enabled"] = selected_tab_index == 2
     return {
-        "true_north": tn_state["get_result"](),
-        "project_north": pn_state["get_result"](),
-        "scale": sc_state["get_result"](),
+        "true_north": tn_result,
+        "project_north": pn_result,
+        "scale": sc_result,
+        "selected_tab_index": selected_tab_index,
+        "remember_choices": bool(remember_choices_checkbox is not None and remember_choices_checkbox.IsChecked),
     }
 
 def main():
@@ -1140,20 +1185,12 @@ def main():
                     break
         return indices
 
-    tn_last_sheet_ids = getattr(config, "tn_sheet_ids", []) or []
-    tn_last_param_name = getattr(config, "tn_param_name", "") or ""
-    tn_last_param_scope = getattr(config, "tn_param_scope", "") or ""
-    tn_last_visibility_param = getattr(config, "tn_visibility_param_name", "") or ""
+    remember_choices = bool(getattr(config, "remember_choices", True))
+    use_saved_choices = bool(getattr(config, "remember_choices", False))
 
-    pn_last_sheet_ids = getattr(config, "pn_sheet_ids", []) or []
-    pn_last_param_name = getattr(config, "pn_param_name", "") or ""
-    pn_last_param_scope = getattr(config, "pn_param_scope", "") or ""
-    pn_last_visibility_param = getattr(config, "pn_visibility_param_name", "") or ""
-
-    sc_last_sheet_ids = getattr(config, "sc_sheet_ids", []) or []
-    sc_last_param_name = getattr(config, "sc_param_name", "") or ""
-    sc_last_param_scope = getattr(config, "sc_param_scope", "") or ""
-    sc_last_visibility_param = getattr(config, "sc_visibility_param_name", "") or ""
+    tn_last_sheet_ids = (getattr(config, "tn_sheet_ids", []) or []) if use_saved_choices else []
+    pn_last_sheet_ids = (getattr(config, "pn_sheet_ids", []) or []) if use_saved_choices else []
+    sc_last_sheet_ids = (getattr(config, "sc_sheet_ids", []) or []) if use_saved_choices else []
 
     titleblocks = _collect_titleblocks()
     if not titleblocks:
@@ -1169,17 +1206,52 @@ def main():
         )
         return
 
-    yesno_labels = _get_yesno_param_entries(titleblocks)
+    yesno_param_groups, yesno_labels = _get_yesno_param_entries(titleblocks)
 
-    tn_default_label = None
-    if tn_last_param_name and tn_last_param_scope:
-        tn_default_label = "{} [{}]".format(tn_last_param_name, "Instance" if tn_last_param_scope == "instance" else "Type")
-    pn_default_label = None
-    if pn_last_param_name and pn_last_param_scope:
-        pn_default_label = "{} [{}]".format(pn_last_param_name, "Instance" if pn_last_param_scope == "instance" else "Type")
-    sc_default_label = None
-    if sc_last_param_name and sc_last_param_scope:
-        sc_default_label = "{} [{}]".format(sc_last_param_name, "Instance" if sc_last_param_scope == "instance" else "Type")
+    def _saved_target_labels(prefix, valid_entries):
+        if not use_saved_choices:
+            return []
+        labels = list(getattr(config, prefix + "_param_labels", []) or [])
+        if not labels:
+            legacy_name = getattr(config, prefix + "_param_name", "") or ""
+            legacy_scope = getattr(config, prefix + "_param_scope", "") or ""
+            if legacy_name and legacy_scope:
+                labels = ["{} [{}]".format(
+                    legacy_name, "Instance" if legacy_scope == "instance" else "Type"
+                )]
+        return [value for value in labels if value in valid_entries]
+
+    def _saved_visibility_labels(prefix):
+        if not use_saved_choices:
+            return []
+        labels = list(getattr(config, prefix + "_visibility_param_names", []) or [])
+        if not labels:
+            legacy_name = getattr(config, prefix + "_visibility_param_name", "") or ""
+            if legacy_name:
+                labels = [legacy_name]
+        return [value for value in labels if value in yesno_labels]
+
+    tn_default_labels = _saved_target_labels("tn", tn_param_entries)
+    pn_default_labels = _saved_target_labels("pn", tn_param_entries)
+    sc_default_labels = _saved_target_labels("sc", sc_param_entries)
+    tn_default_visibility_labels = _saved_visibility_labels("tn")
+    pn_default_visibility_labels = _saved_visibility_labels("pn")
+    sc_default_visibility_labels = _saved_visibility_labels("sc")
+
+    dialog_defaults = {
+        "remember_choices": remember_choices,
+        "selected_tab_index": int(getattr(config, "selected_tab_index", 0)) if use_saved_choices else 0,
+        "tn_set_visibility": bool(getattr(config, "tn_set_visibility", True)) if use_saved_choices else True,
+        "pn_set_visibility": bool(getattr(config, "pn_set_visibility", True)) if use_saved_choices else True,
+        "sc_set_visibility": bool(getattr(config, "sc_set_visibility", False)) if use_saved_choices else False,
+        "tn_hide_on": bool(getattr(config, "tn_hide_on_elev_section", True)) if use_saved_choices else True,
+        "pn_hide_on": bool(getattr(config, "pn_hide_on", True)) if use_saved_choices else True,
+        "sc_hide_on": bool(getattr(config, "sc_hide_on_no_scale", False)) if use_saved_choices else False,
+        "sc_ignore_drafting_views": bool(getattr(config, "sc_ignore_drafting_views", False)) if use_saved_choices else False,
+        "tn_all_sheets": bool(getattr(config, "tn_all_sheets", True)) if use_saved_choices else True,
+        "pn_all_sheets": bool(getattr(config, "pn_all_sheets", True)) if use_saved_choices else True,
+        "sc_all_sheets": bool(getattr(config, "sc_all_sheets", True)) if use_saved_choices else True,
+    }
 
     try:
         dialog_result = _show_titleblock_dialog(
@@ -1187,16 +1259,18 @@ def main():
             tn_param_groups,
             tn_param_groups,
             sc_param_groups,
+            yesno_param_groups,
             yesno_labels,
             _prechecked_for(tn_last_sheet_ids),
             _prechecked_for(pn_last_sheet_ids),
             _prechecked_for(sc_last_sheet_ids),
-            tn_default_label,
-            pn_default_label,
-            sc_default_label,
-            tn_last_visibility_param if tn_last_visibility_param in yesno_labels else None,
-            pn_last_visibility_param if pn_last_visibility_param in yesno_labels else None,
-            sc_last_visibility_param if sc_last_visibility_param in yesno_labels else None,
+            tn_default_labels,
+            pn_default_labels,
+            sc_default_labels,
+            tn_default_visibility_labels,
+            pn_default_visibility_labels,
+            sc_default_visibility_labels,
+            dialog_defaults,
         )
     except Exception as ex:
         UI.TaskDialog.Show("Titleblock Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -1224,20 +1298,18 @@ def main():
     tn_updated_sheets, tn_failed_sheets, tn_hidden_sheets = [], [], []
     pn_updated_sheets, pn_failed_sheets, pn_hidden_sheets = [], [], []
     sc_updated_sheets, sc_failed_sheets, sc_warning_sheets = [], [], []
-    tn_param_name = tn_param_scope = None
-    pn_param_name = pn_param_scope = None
-    sc_param_name = sc_param_scope = None
+    tn_param_labels, pn_param_labels, sc_param_labels = [], [], []
+    tn_targets, pn_targets, sc_targets = [], [], []
 
     t = DB.Transaction(doc, "Update Titleblock Parameters")
     t.Start()
     try:
         if tn.get("enabled"):
-            entry = tn_param_entries.get(tn.get("selected_parameter"))
-            tn_param_name = entry["name"] if entry else tn.get("selected_parameter")
-            tn_param_scope = entry["scope"] if entry else "instance"
+            tn_param_labels = list(tn.get("selected_parameters") or [])
+            tn_targets = [tn_param_entries[label] for label in tn_param_labels if label in tn_param_entries]
             set_visibility = bool(tn.get("set_visibility"))
-            visibility_param_name = tn.get("visibility_param") or ""
-            hide_on_elev_section = bool(tn.get("hide_on"))
+            visibility_param_names = list(tn.get("visibility_params") or [])
+            hide_on_unsupported_view = bool(tn.get("hide_on"))
 
             view_cache = {}
             for i in tn.get("selected_indices", []):
@@ -1272,9 +1344,9 @@ def main():
                 true_north_angle = _get_true_north_angle_for_view(doc, primary_view) if primary_view else 0.0
                 status, message = _update_arrow_for_sheet(
                     titleblock_instance, sheet, sheet_label, primary_view,
-                    tn_param_name, tn_param_scope,
-                    set_visibility, visibility_param_name,
-                    hide_on_elev_section, true_north_angle,
+                    tn_targets,
+                    set_visibility, visibility_param_names,
+                    hide_on_unsupported_view, true_north_angle,
                     arrow_tag="",
                 )
                 if status == "updated":
@@ -1285,12 +1357,11 @@ def main():
                     tn_failed_sheets.append(message)
 
         if pn.get("enabled"):
-            entry = tn_param_entries.get(pn.get("selected_parameter"))
-            pn_param_name = entry["name"] if entry else pn.get("selected_parameter")
-            pn_param_scope = entry["scope"] if entry else "instance"
+            pn_param_labels = list(pn.get("selected_parameters") or [])
+            pn_targets = [tn_param_entries[label] for label in pn_param_labels if label in tn_param_entries]
             set_pn_visibility = bool(pn.get("set_visibility"))
-            pn_visibility_param_name = pn.get("visibility_param") or ""
-            hide_on_elev_section_pn = bool(pn.get("hide_on"))
+            pn_visibility_param_names = list(pn.get("visibility_params") or [])
+            hide_on_unsupported_view_pn = bool(pn.get("hide_on"))
 
             pn_view_cache = {}
             for i in pn.get("selected_indices", []):
@@ -1325,9 +1396,9 @@ def main():
                 project_north_angle = _get_project_north_angle_for_view(primary_view) if primary_view else 0.0
                 pn_status, pn_message = _update_arrow_for_sheet(
                     titleblock_instance, sheet, sheet_label, primary_view,
-                    pn_param_name, pn_param_scope,
-                    set_pn_visibility, pn_visibility_param_name,
-                    hide_on_elev_section_pn, project_north_angle,
+                    pn_targets,
+                    set_pn_visibility, pn_visibility_param_names,
+                    hide_on_unsupported_view_pn, project_north_angle,
                     arrow_tag="",
                 )
                 if pn_status == "updated":
@@ -1338,12 +1409,11 @@ def main():
                     pn_failed_sheets.append(pn_message)
 
         if sc.get("enabled"):
-            entry = sc_param_entries.get(sc.get("selected_parameter"))
-            sc_param_name = entry["name"] if entry else sc.get("selected_parameter")
-            sc_param_scope = entry["scope"] if entry else "instance"
+            sc_param_labels = list(sc.get("selected_parameters") or [])
+            sc_targets = [sc_param_entries[label] for label in sc_param_labels if label in sc_param_entries]
             ignore_drafting_views = bool(sc.get("ignore_drafting_views"))
             set_visibility = bool(sc.get("set_visibility"))
-            visibility_param_name = sc.get("visibility_param") or ""
+            visibility_param_names = list(sc.get("visibility_params") or [])
             hide_on_no_scale = bool(sc.get("hide_on"))
 
             view_scale_cache = {}
@@ -1405,13 +1475,8 @@ def main():
                     sc_warning_sheets.append(warning_message)
 
                 if not scales:
-                    if hide_on_no_scale and set_visibility and visibility_param_name:
-                        try:
-                            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                                vis_p.Set(0)
-                        except Exception:
-                            pass
+                    if hide_on_no_scale and set_visibility and visibility_param_names:
+                        _set_visibility_parameters(titleblock_instance, visibility_param_names, 0)
                     if only_drafting and ignore_drafting_views:
                         sc_failed_sheets.append(sheet_label + " - Only drafting views found and ignored")
                     else:
@@ -1420,48 +1485,16 @@ def main():
 
                 sheet_scale_value = list(scales)[0] if len(scales) == 1 else 0
 
-                sheet_scale_param, resolved_target_owner = _resolve_target_parameter(
-                    sheet, titleblock_instance, sc_param_name, sc_param_scope
+                target_error = _update_scale_targets_for_sheet(
+                    sheet, titleblock_instance, sc_targets, sheet_scale_value
                 )
 
-                if not sheet_scale_param:
-                    sc_failed_sheets.append(sheet_label + " - Target parameter missing: {}".format(sc_param_name))
-                    continue
-
-                try:
-                    if sheet_scale_param.IsReadOnly:
-                        owner_label = resolved_target_owner or "resolved target"
-                        sc_failed_sheets.append(sheet_label + " - Parameter is read-only ({})".format(owner_label))
-                    elif sheet_scale_param.StorageType == DB.StorageType.Double:
-                        sheet_scale_param.Set(float(sheet_scale_value))
-                        if set_visibility and visibility_param_name:
-                            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                                vis_p.Set(1)
-                        sc_updated_sheets.append(sheet_name)
-                    elif sheet_scale_param.StorageType == DB.StorageType.Integer:
-                        sheet_scale_param.Set(int(sheet_scale_value))
-                        if set_visibility and visibility_param_name:
-                            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                                vis_p.Set(1)
-                        sc_updated_sheets.append(sheet_name)
-                    elif sheet_scale_param.StorageType == DB.StorageType.String:
-                        sheet_scale_param.Set(str(sheet_scale_value))
-                        if set_visibility and visibility_param_name:
-                            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                                vis_p.Set(1)
-                        sc_updated_sheets.append(sheet_name)
-                    else:
-                        sheet_scale_param.Set(sheet_scale_value)
-                        if set_visibility and visibility_param_name:
-                            vis_p = titleblock_instance.LookupParameter(visibility_param_name)
-                            if vis_p and not vis_p.IsReadOnly and vis_p.StorageType == DB.StorageType.Integer:
-                                vis_p.Set(1)
-                        sc_updated_sheets.append(sheet_name)
-                except Exception as e:
-                    sc_failed_sheets.append(sheet_label + " - Failed to set parameter: {}".format(str(e)))
+                if target_error:
+                    sc_failed_sheets.append(sheet_label + " - " + target_error)
+                else:
+                    if set_visibility and visibility_param_names:
+                        _set_visibility_parameters(titleblock_instance, visibility_param_names, 1)
+                    sc_updated_sheets.append(sheet_name)
 
         t.Commit()
     except Exception as e:
@@ -1470,28 +1503,44 @@ def main():
         return
 
     # Persist settings after a successful commit.
-    config.tn_enabled = bool(tn.get("enabled"))
-    if tn.get("enabled"):
+    remember_choices = bool(dialog_result.get("remember_choices"))
+    config.remember_choices = remember_choices
+    if remember_choices:
+        config.selected_tab_index = int(dialog_result.get("selected_tab_index", 0))
+        config.tn_enabled = bool(tn.get("enabled"))
         config.tn_sheet_ids = [v for v in (_elem_id_int(sheet_by_index[i].Id) for i in tn.get("selected_indices", [])) if v is not None]
-        config.tn_param_name = tn_param_name
-        config.tn_param_scope = tn_param_scope
-        config.tn_visibility_param_name = tn.get("visibility_param") if tn.get("set_visibility") else ""
+        config.tn_all_sheets = bool(tn.get("all_sheets"))
+        config.tn_param_labels = list(tn.get("selected_parameters") or [])
+        first_target = tn_param_entries.get(config.tn_param_labels[0]) if config.tn_param_labels else None
+        config.tn_param_name = first_target.get("name") if first_target else ""
+        config.tn_param_scope = first_target.get("scope") if first_target else ""
+        config.tn_set_visibility = bool(tn.get("set_visibility"))
+        config.tn_visibility_param_names = list(tn.get("visibility_params") or [])
+        config.tn_visibility_param_name = config.tn_visibility_param_names[0] if config.tn_visibility_param_names else ""
         config.tn_hide_on_elev_section = bool(tn.get("hide_on"))
 
-    config.pn_enabled = bool(pn.get("enabled"))
-    if pn.get("enabled"):
+        config.pn_enabled = bool(pn.get("enabled"))
         config.pn_sheet_ids = [v for v in (_elem_id_int(sheet_by_index[i].Id) for i in pn.get("selected_indices", [])) if v is not None]
-        config.pn_param_name = pn_param_name
-        config.pn_param_scope = pn_param_scope
-        config.pn_visibility_param_name = pn.get("visibility_param") if pn.get("set_visibility") else ""
+        config.pn_all_sheets = bool(pn.get("all_sheets"))
+        config.pn_param_labels = list(pn.get("selected_parameters") or [])
+        first_target = tn_param_entries.get(config.pn_param_labels[0]) if config.pn_param_labels else None
+        config.pn_param_name = first_target.get("name") if first_target else ""
+        config.pn_param_scope = first_target.get("scope") if first_target else ""
+        config.pn_set_visibility = bool(pn.get("set_visibility"))
+        config.pn_visibility_param_names = list(pn.get("visibility_params") or [])
+        config.pn_visibility_param_name = config.pn_visibility_param_names[0] if config.pn_visibility_param_names else ""
         config.pn_hide_on = bool(pn.get("hide_on"))
 
-    config.sc_enabled = bool(sc.get("enabled"))
-    if sc.get("enabled"):
+        config.sc_enabled = bool(sc.get("enabled"))
         config.sc_sheet_ids = [v for v in (_elem_id_int(sheet_by_index[i].Id) for i in sc.get("selected_indices", [])) if v is not None]
-        config.sc_param_name = sc_param_name
-        config.sc_param_scope = sc_param_scope
-        config.sc_visibility_param_name = sc.get("visibility_param") if sc.get("set_visibility") else ""
+        config.sc_all_sheets = bool(sc.get("all_sheets"))
+        config.sc_param_labels = list(sc.get("selected_parameters") or [])
+        first_target = sc_param_entries.get(config.sc_param_labels[0]) if config.sc_param_labels else None
+        config.sc_param_name = first_target.get("name") if first_target else ""
+        config.sc_param_scope = first_target.get("scope") if first_target else ""
+        config.sc_set_visibility = bool(sc.get("set_visibility"))
+        config.sc_visibility_param_names = list(sc.get("visibility_params") or [])
+        config.sc_visibility_param_name = config.sc_visibility_param_names[0] if config.sc_visibility_param_names else ""
         config.sc_hide_on_no_scale = bool(sc.get("hide_on"))
         config.sc_ignore_drafting_views = bool(sc.get("ignore_drafting_views"))
     save_config()
@@ -1526,7 +1575,8 @@ def main():
     if tn.get("enabled"):
         _print_text("")
         _print_text("-- True North --")
-        _print_text("Target Parameter: {} ({})".format(tn_param_name, tn_param_scope or "instance"))
+        _print_text("Target Parameters: {}".format(", ".join(tn_param_labels)))
+        _print_text("Visibility Parameters: {}".format(", ".join(tn.get("visibility_params") or []) or "None"))
         _print_text("Updated: {} sheets".format(len(tn_updated_sheets)))
         _print_text("Hidden: {} sheets".format(len(tn_hidden_sheets)))
         _print_text("Failed/Skipped: {} sheets".format(len(tn_failed_sheets)))
@@ -1539,7 +1589,8 @@ def main():
     if pn.get("enabled"):
         _print_text("")
         _print_text("-- Project North(Construction North) --")
-        _print_text("Target Parameter: {} ({})".format(pn_param_name, pn_param_scope or "instance"))
+        _print_text("Target Parameters: {}".format(", ".join(pn_param_labels)))
+        _print_text("Visibility Parameters: {}".format(", ".join(pn.get("visibility_params") or []) or "None"))
         _print_text("Updated: {} sheets".format(len(pn_updated_sheets)))
         _print_text("Hidden: {} sheets".format(len(pn_hidden_sheets)))
         _print_text("Failed/Skipped: {} sheets".format(len(pn_failed_sheets)))
@@ -1552,7 +1603,8 @@ def main():
     if sc.get("enabled"):
         _print_text("")
         _print_text("-- Scale --")
-        _print_text("Target Parameter: {} ({})".format(sc_param_name, sc_param_scope or "instance"))
+        _print_text("Target Parameters: {}".format(", ".join(sc_param_labels)))
+        _print_text("Visibility Parameters: {}".format(", ".join(sc.get("visibility_params") or []) or "None"))
         _print_text("Ignore Drafting Views: {}".format("Yes" if sc.get("ignore_drafting_views") else "No"))
         _print_text("Updated: {} sheets".format(len(sc_updated_sheets)))
         _print_text("Warnings: {} sheets".format(len(sc_warning_sheets)))
