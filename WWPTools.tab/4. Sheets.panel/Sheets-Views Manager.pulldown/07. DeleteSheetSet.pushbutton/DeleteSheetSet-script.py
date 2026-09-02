@@ -20,6 +20,7 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 
 from pyrevit import DB, revit
+import WWP_uiUtils as ui
 
 WINDOW_TITLE = "Delete Sheet Set"
 EMPTY_VALUE = "???"
@@ -170,6 +171,7 @@ def collect_sheets(document):
 class DeleteSheetSetDialog(object):
 
     def __init__(self):
+        ui.uiUtils_ensure_theme()
         xaml_path = os.path.join(script_dir, "DeleteSheetSetWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
         self.window = XamlReader.Parse(xaml_text)

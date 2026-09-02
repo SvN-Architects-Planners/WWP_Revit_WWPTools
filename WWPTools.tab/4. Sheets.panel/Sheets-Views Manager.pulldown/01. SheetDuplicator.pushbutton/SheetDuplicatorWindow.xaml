@@ -7,7 +7,7 @@
         MinHeight="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Background="#FFF7F7F9">
+        Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,8 +19,8 @@
 
         <Border Grid.Row="0"
                 Padding="16"
-                Background="White"
-                BorderBrush="#22000000"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
             <StackPanel>
@@ -30,7 +30,7 @@
                            Text="Sheet Duplicator"/>
                 <TextBlock x:Name="HeaderSubtitle"
                            Margin="0,6,0,0"
-                           Foreground="#66000000"
+                           Foreground="{StaticResource MutedBrush}"
                            TextWrapping="Wrap"
                            Text="Duplicate one source sheet with the same viewport locations. Each viewport can get a newly duplicated view name before the new sheet is created."/>
             </StackPanel>
@@ -45,8 +45,8 @@
 
             <Border Grid.Column="0"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -77,7 +77,7 @@
                                    FontWeight="SemiBold"
                                    Text="Source titleblock"/>
                         <TextBlock x:Name="TxtTitleblock"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text=""/>
 
@@ -124,7 +124,7 @@
                                          Grid.Column="2"/>
                             </Grid>
                             <TextBlock Margin="0,6,0,0"
-                                       Foreground="#66000000"
+                                       Foreground="{StaticResource MutedBrush}"
                                        Text="Prefix and suffix for newly duplicated view names."
                                        TextWrapping="Wrap"/>
                         </StackPanel>
@@ -135,16 +135,16 @@
                                    FontWeight="SemiBold"
                                    Text="Viewport Assignments"/>
                         <TextBlock Margin="0,6,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text="Each row duplicates the source view and places it back on the new sheet at the same viewport location. Views that cannot duplicate will reuse the source view."/>
                     </StackPanel>
 
                     <Border Grid.Row="6"
-                            BorderBrush="#22000000"
+                            BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Background="#FFF9FAFB">
+                            Background="{StaticResource WindowBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel x:Name="AssignmentsHost"
                                         Margin="8"/>
@@ -159,12 +159,12 @@
                                 Content="Reset Target Names"/>
                         <TextBlock x:Name="TxtSummary"
                                    Margin="0,10,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text=""/>
                         <TextBlock x:Name="TxtWarning"
                                    Margin="0,8,0,0"
-                                   Foreground="#C62828"
+                                   Foreground="{StaticResource DangerBrush}"
                                    TextWrapping="Wrap"
                                    Text=""/>
                     </StackPanel>
@@ -181,8 +181,8 @@
 
             <Border Grid.Column="2"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -197,15 +197,15 @@
                                    FontWeight="SemiBold"
                                    Text="Sheet Preview"/>
                         <TextBlock Margin="0,6,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text="Grey boxes show the source sheet layout. The new sheet keeps these viewport locations while using the assigned duplicate view names."/>
                     </StackPanel>
 
                     <Border Grid.Row="2"
                             x:Name="PreviewHost"
-                            Background="#FFF1F3F4"
-                            BorderBrush="#22000000"
+                            Background="{StaticResource WindowBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             MinHeight="420">
@@ -221,7 +221,7 @@
                    LastChildFill="False">
             <TextBlock x:Name="FooterStatus"
                        VerticalAlignment="Center"
-                       Foreground="#66000000"
+                       Foreground="{StaticResource MutedBrush}"
                        Text=""/>
             <StackPanel Orientation="Horizontal"
                         DockPanel.Dock="Right">

@@ -7,7 +7,7 @@
         MinHeight="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Background="#FFF7F7F9">
+        Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,8 +19,8 @@
 
         <Border Grid.Row="0"
                 Padding="16"
-                Background="White"
-                BorderBrush="#22000000"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
             <DockPanel LastChildFill="True">
@@ -31,7 +31,7 @@
                                Text="Lay Views on Sheet"/>
                     <TextBlock x:Name="HeaderSubtitle"
                                Margin="0,6,0,0"
-                               Foreground="#66000000"
+                               Foreground="{StaticResource MutedBrush}"
                                TextWrapping="Wrap"
                                Text="Create one new sheet from selected views. Drag the grey boxes to adjust viewport locations before placing them."/>
                 </StackPanel>
@@ -47,8 +47,8 @@
 
             <Border Grid.Column="0"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -95,7 +95,7 @@
                                  MinWidth="120"/>
 
                         <TextBlock Margin="0,12,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text="Reset auto layout after changing the gap or titleblock. You can then drag individual boxes in the preview."/>
 
@@ -139,23 +139,23 @@
                         </StackPanel>
 
                         <Border Grid.Row="4"
-                                BorderBrush="#22000000"
+                                BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
-                                Background="#FFF9FAFB">
+                                Background="{StaticResource WindowBrush}">
                             <ListBox x:Name="ViewsList"/>
                         </Border>
                     </Grid>
 
                     <TextBlock x:Name="TxtViewSummary"
                                Grid.Row="8"
-                               Foreground="#66000000"
+                               Foreground="{StaticResource MutedBrush}"
                                TextWrapping="Wrap"
                                Text=""/>
                     <TextBlock x:Name="TxtWarning"
                                Grid.Row="9"
                                Margin="0,8,0,0"
-                               Foreground="#C62828"
+                               Foreground="{StaticResource DangerBrush}"
                                TextWrapping="Wrap"
                                Text=""/>
                 </Grid>
@@ -171,8 +171,8 @@
 
             <Border Grid.Column="2"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -187,15 +187,15 @@
                                    FontWeight="SemiBold"
                                    Text="Sheet Preview"/>
                         <TextBlock Margin="0,6,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text="Grey boxes represent viewport bounds. Drag them to set the final placement before creating the sheet."/>
                     </StackPanel>
 
                     <Border Grid.Row="2"
                             x:Name="PreviewHost"
-                            Background="#FFF1F3F4"
-                            BorderBrush="#22000000"
+                            Background="{StaticResource WindowBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             MinHeight="420">
@@ -211,7 +211,7 @@
                    LastChildFill="False">
             <TextBlock x:Name="FooterStatus"
                        VerticalAlignment="Center"
-                       Foreground="#66000000"
+                       Foreground="{StaticResource MutedBrush}"
                        Text=""/>
             <StackPanel Orientation="Horizontal"
                         DockPanel.Dock="Right">

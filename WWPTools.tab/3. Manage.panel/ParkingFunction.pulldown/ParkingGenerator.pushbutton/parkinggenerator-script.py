@@ -23,6 +23,7 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 from WWP_versioning import apply_window_title  # noqa: E402
 from WWP_settings import ProjectToolSettings   # noqa: E402
+import WWP_uiUtils as ui                       # noqa: E402
 
 _SETTINGS_KEY = "ParkingLayoutSolver"
 
@@ -750,8 +751,6 @@ def _show_dialog(doc, room, families):
         VerticalAlignment, HorizontalAlignment, TextAlignment,
     )
     from System.Windows.Media import SolidColorBrush, Color
-    from System import Uri
-    from System.Windows.Media.Imaging import BitmapImage
 
     xaml_path = os.path.join(script_dir, "ParkingLayoutDialog.xaml")
     if not os.path.isfile(xaml_path):
@@ -789,17 +788,7 @@ def _show_dialog(doc, room, families):
     room_area_text.Text = "{:,.0f} m2".format(area_sqm)
 
     # Logo
-    try:
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if os.path.isfile(logo_path):
-            bmp = BitmapImage()
-            bmp.BeginInit()
-            bmp.UriSource = Uri(logo_path)
-            bmp.CacheOption = BitmapImage.CacheOption.OnLoad
-            bmp.EndInit()
-            logo_image.Source = bmp
-    except Exception:
-        pass
+    ui.uiUtils_load_logo(logo_image, os.path.join(lib_path, "WWPtools-logo.png"))
 
     # Slider <-> TextBox sync
     def _sync_s(slider, textbox, fmt):

@@ -1272,9 +1272,7 @@ def _show_export_form(
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
     from System.IO import StringReader
-    from System import Uri
     from System.Windows.Markup import XamlReader
-    from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
     from System.Windows.Controls import SelectionMode
 
@@ -1361,18 +1359,8 @@ def _show_export_form(
     if use_category_sheet_name_ctrl is not None:
         use_category_sheet_name_ctrl.IsChecked = bool(last_use_category_sheet_name)
 
-    try:
-        lib_path = os.path.abspath(os.path.join(dialog_script_dir, "..", "..", "..", "lib"))
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if logo_image is not None and os.path.isfile(logo_path):
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path)
-            bitmap.CacheOption = BitmapCacheOption.OnLoad
-            bitmap.EndInit()
-            logo_image.Source = bitmap
-    except Exception:
-        pass
+    lib_path = os.path.abspath(os.path.join(dialog_script_dir, "..", "..", "..", "lib"))
+    ui.uiUtils_load_logo(logo_image, os.path.join(lib_path, "WWPtools-logo.png"))
 
     selected_names = set()
     if prechecked_indices:

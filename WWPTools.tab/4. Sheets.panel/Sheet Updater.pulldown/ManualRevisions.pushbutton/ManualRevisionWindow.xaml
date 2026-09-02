@@ -135,8 +135,8 @@
 
                 <Border Grid.Row="2"
                         Padding="16,14"
-                        Background="#EAF4FB"
-                        BorderBrush="#C7DDEE"
+                        Background="{StaticResource InfoSoftBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="6">
                     <Grid>
@@ -195,7 +195,7 @@
                           Width="8"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
-                          Background="#D7DEE8"
+                          Background="{StaticResource BorderBrush}"
                           ShowsPreview="True"
                           ResizeDirection="Columns"
                           ResizeBehavior="PreviousAndNext" />

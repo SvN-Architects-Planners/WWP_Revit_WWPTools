@@ -3,9 +3,7 @@ import sys
 
 from pyrevit import forms, script
 from pyrevit.coreutils import git as pygit
-from System import Uri
 from System.Windows import Visibility
-from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
 
 
 script_dir = os.path.dirname(__file__)
@@ -15,6 +13,7 @@ if lib_path not in sys.path:
 
 from WWP_versioning import get_installed_version
 import WWP_telemetry
+import WWP_uiUtils as ui
 
 
 WEBSITE_URL = "https://wwparchitects.com"
@@ -55,8 +54,7 @@ class AboutWindow(forms.WPFWindow):
         )
         self.FooterText.Text = "Click anywhere outside the content panel or press any key to close."
 
-        if os.path.exists(self.logo_path):
-            self.LogoImage.Source = self.make_bitmap_image(self.logo_path)
+        ui.uiUtils_load_logo(self.LogoImage, self.logo_path)
 
         repo_info = _discover_repo()
         if repo_info:
@@ -71,14 +69,6 @@ class AboutWindow(forms.WPFWindow):
         self.ReleaseButton.Click += self._open_release
 
         self.TelemetryCheckBox.IsChecked = WWP_telemetry.is_telemetry_enabled()
-
-    def make_bitmap_image(self, image_path):
-        bitmap = BitmapImage()
-        bitmap.BeginInit()
-        bitmap.CacheOption = BitmapCacheOption.OnLoad
-        bitmap.UriSource = Uri(image_path)
-        bitmap.EndInit()
-        return bitmap
 
     def _open_website(self, sender, args):
         script.open_url(WEBSITE_URL)

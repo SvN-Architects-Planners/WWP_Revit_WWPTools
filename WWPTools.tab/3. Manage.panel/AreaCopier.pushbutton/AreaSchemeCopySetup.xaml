@@ -9,7 +9,7 @@
         ResizeMode="CanResize"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="FlatToggleStyle" TargetType="ToggleButton">
             <Setter Property="Width" Value="38"/>
@@ -20,8 +20,8 @@
                     <ControlTemplate TargetType="ToggleButton">
                         <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
                             <Border x:Name="SwitchTrack"
-                                    Background="#B8C1CC"
-                                    BorderBrush="#AEB8C4"
+                                    Background="{StaticResource SelectedBrush}"
+                                    BorderBrush="{StaticResource BorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="9.5"/>
                             <Ellipse x:Name="SwitchThumb"
@@ -108,8 +108,8 @@
     </Window.Resources>
 
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -125,7 +125,7 @@
                 <TextBlock Grid.Row="0"
                            Text="Source area scheme"
                            Margin="0,0,0,6"
-                           Foreground="#6B7280"
+                           Foreground="{StaticResource MutedBrush}"
                            FontWeight="SemiBold"/>
                 <ComboBox x:Name="SourceSchemeCombo"
                           Grid.Row="1"
@@ -142,7 +142,7 @@
                     <TextBlock Grid.Row="0"
                                Text="Target area scheme"
                                Margin="0,0,0,6"
-                               Foreground="#6B7280"
+                               Foreground="{StaticResource MutedBrush}"
                                FontWeight="SemiBold"/>
                     <ComboBox x:Name="TargetSchemeCombo"
                               Grid.Row="1"
@@ -151,7 +151,7 @@
                     <TextBlock Grid.Row="2"
                                Text="Levels to copy"
                                Margin="0,0,0,6"
-                               Foreground="#6B7280"
+                               Foreground="{StaticResource MutedBrush}"
                                FontWeight="SemiBold"/>
                     <ListBox x:Name="LevelsList"
                              Grid.Row="3"
@@ -182,20 +182,17 @@
 
                 <TextBlock x:Name="ValidationText"
                            Grid.Row="4"
-                           Foreground="#C43D3D"
+                           Foreground="{StaticResource DangerBrush}"
                            Visibility="Collapsed"
                            TextWrapping="Wrap"
                            Margin="0,0,0,8"
                            FontWeight="SemiBold"/>
 
                 <DockPanel Grid.Row="5">
-                    <Image x:Name="LogoImage"
+                    <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
                            DockPanel.Dock="Left"
-                           Width="56"
-                           Height="56"
                            VerticalAlignment="Bottom"
-                           HorizontalAlignment="Left"
-                           IsHitTestVisible="False" />
+                           HorizontalAlignment="Left" />
                     <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">

@@ -6,7 +6,7 @@
     MinWidth="400" MinHeight="260"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -20,9 +20,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,18">
             <TextBlock Text="Publish Fire Rating to Doors"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap"/>
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             <TextBlock Text="Copies FRR and STC parameter values from host walls to doors."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
@@ -34,10 +34,10 @@
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="FRR Parameter Name:"
                        VerticalAlignment="Center"
-                       Foreground="#17324D" FontSize="13"/>
+                       Foreground="{StaticResource TextBrush}" FontSize="13"/>
             <TextBox Grid.Column="1" x:Name="TxtFrrParam"
                      Height="32" Padding="8,4"
-                     BorderBrush="#D9E2EC" BorderThickness="1"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                      FontSize="13" VerticalContentAlignment="Center"/>
         </Grid>
 
@@ -49,16 +49,16 @@
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="STC Parameter Name:"
                        VerticalAlignment="Center"
-                       Foreground="#17324D" FontSize="13"/>
+                       Foreground="{StaticResource TextBrush}" FontSize="13"/>
             <TextBox Grid.Column="1" x:Name="TxtStcParam"
                      Height="32" Padding="8,4"
-                     BorderBrush="#D9E2EC" BorderThickness="1"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                      FontSize="13" VerticalContentAlignment="Center"/>
         </Grid>
 
         <!-- Status -->
         <TextBlock Grid.Row="3" x:Name="LblStatus"
-                   Foreground="#B42318" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" FontSize="12"
                    Margin="0,4,0,8" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
@@ -72,12 +72,12 @@
             <Button Grid.Column="1" x:Name="BtnCancel"
                     Content="Cancel" Width="90" Height="34"
                     FontSize="13"
-                    Background="White" BorderBrush="#D9E2EC"
-                    Foreground="#17324D" Cursor="Hand"/>
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
             <Button Grid.Column="3" x:Name="BtnRun"
                     Content="Publish" Width="90" Height="34"
                     FontSize="13" FontWeight="SemiBold"
-                    Background="#17324D" Foreground="White"
+                    Background="{StaticResource AccentBrush}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"/>
         </Grid>
     </Grid>

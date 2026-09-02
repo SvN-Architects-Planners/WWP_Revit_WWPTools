@@ -9,7 +9,7 @@
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#3F9AD9"/>
@@ -64,8 +64,8 @@
         </Style>
     </Window.Resources>
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -79,7 +79,7 @@
                 <TextBlock Grid.Row="0"
                            Text="Select which Excel columns drive the color scheme value and color."
                            TextWrapping="Wrap"
-                           Foreground="#374151"
+                           Foreground="{StaticResource TextBrush}"
                            Margin="0,0,0,12"/>
                 <Grid Grid.Row="1" Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
@@ -88,13 +88,13 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Worksheet" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
+                        <TextBlock Text="Worksheet" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
                         <ComboBox x:Name="WorksheetCombo" Margin="0,0,0,10"/>
-                        <TextBlock Text="Value Column" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
+                        <TextBlock Text="Value Column" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
                         <ComboBox x:Name="ValueColumnCombo" Margin="0,0,0,10"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="Color Column" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
+                        <TextBlock Text="Color Column" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
                         <ComboBox x:Name="ColorColumnCombo" Margin="0,0,0,10"/>
                         <CheckBox x:Name="UseCellFillCheck"
                                   IsChecked="True"
@@ -108,7 +108,7 @@
                 </Grid>
                 <TextBlock x:Name="ValidationText"
                            Grid.Row="2"
-                           Foreground="#C43D3D"
+                           Foreground="{StaticResource DangerBrush}"
                            Visibility="Collapsed"
                            TextWrapping="Wrap"
                            Margin="0,0,0,8"

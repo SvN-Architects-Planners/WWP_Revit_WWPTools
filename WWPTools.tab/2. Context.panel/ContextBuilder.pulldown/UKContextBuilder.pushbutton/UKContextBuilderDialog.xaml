@@ -7,7 +7,7 @@
         MinWidth="820"
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterOwner"
-        Background="#FFF6F7FB"
+        Background="{StaticResource WindowBrush}"
         FontFamily="Segoe UI">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -18,8 +18,8 @@
 
         <Border Grid.Row="0"
                 Padding="18"
-                Background="White"
-                BorderBrush="#FFD7DCE6"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="12">
             <Grid>
@@ -27,19 +27,16 @@
                     <ColumnDefinition Width="64"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Image x:Name="LogoImage"
+                <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
                        Grid.Column="0"
-                       Width="48"
-                       Height="48"
-                       Margin="0,0,12,0"
-                       Stretch="Uniform"/>
+                       Margin="0,0,12,0"/>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="UK Context Builder"
                                FontSize="20"
                                FontWeight="SemiBold"
-                               Foreground="#FF1D2738"/>
+                               Foreground="{StaticResource TextBrush}"/>
                     <TextBlock Margin="0,6,0,0"
-                               Foreground="#FF5E6B80"
+                               Foreground="{StaticResource MutedBrush}"
                                TextWrapping="Wrap">
                         Imports UK context from OSM with EA terrain support for terrain and missing building heights.
                     </TextBlock>
@@ -56,8 +53,8 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
-                    Background="White"
-                    BorderBrush="#FFD7DCE6"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="12">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -85,7 +82,7 @@
                                    Margin="0,0,12,12"
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF1D2738"
+                                   Foreground="{StaticResource TextBrush}"
                                    Text="Address"/>
                         <TextBox x:Name="AddressTextBox"
                                  Grid.Row="0"
@@ -99,8 +96,8 @@
                                 Margin="12,0,0,12"
                                 MinWidth="84"
                                 Height="30"
-                                Background="White"
-                                BorderBrush="#FFD7DCE6"
+                                Background="{StaticResource PanelBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
                                 Content="Locate"/>
 
                         <TextBlock Grid.Row="1"
@@ -108,7 +105,7 @@
                                    Margin="0,0,12,12"
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF1D2738"
+                                   Foreground="{StaticResource TextBrush}"
                                    Text="Radius (m)"/>
                         <TextBox x:Name="RadiusTextBox"
                                  Grid.Row="1"
@@ -123,7 +120,7 @@
                                    Margin="0,0,12,12"
                                    VerticalAlignment="Center"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF1D2738"
+                                   Foreground="{StaticResource TextBrush}"
                                    Text="Dense Area (m)"/>
                         <TextBox x:Name="DenseAreaTextBox"
                                  Grid.Row="2"
@@ -142,7 +139,7 @@
                         <TextBlock Grid.Row="3"
                                    Grid.ColumnSpan="3"
                                    Margin="0,0,0,12"
-                                   Foreground="#FF5E6B80"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap">
                             Leave Address blank to use the project site location when available. Click the map to set a location and reverse-geocode it back into the address field.
                         </TextBlock>
@@ -158,8 +155,8 @@
                                 Grid.ColumnSpan="3"
                                 Margin="0,0,0,12"
                                 Padding="12"
-                                Background="#FFF2F5FA"
-                                BorderBrush="#FFD7DCE6"
+                                Background="{StaticResource WindowBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="8">
                             <Grid>
@@ -168,7 +165,7 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <TextBlock FontWeight="SemiBold"
-                                           Foreground="#FF1D2738"
+                                           Foreground="{StaticResource TextBrush}"
                                            Text="Layers"/>
                                 <WrapPanel Grid.Row="1"
                                            Margin="0,8,0,0">
@@ -208,16 +205,16 @@
                                 Grid.ColumnSpan="3"
                                 Margin="0,0,0,12"
                                 Padding="12"
-                                Background="#FFF2F5FA"
-                                BorderBrush="#FFD7DCE6"
+                                Background="{StaticResource WindowBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="8">
                             <StackPanel>
                                 <TextBlock FontWeight="SemiBold"
-                                           Foreground="#FF1D2738"
+                                           Foreground="{StaticResource TextBrush}"
                                            Text="Automatic Outputs"/>
                                 <TextBlock Margin="0,6,0,0"
-                                           Foreground="#FF5E6B80"
+                                           Foreground="{StaticResource MutedBrush}"
                                            TextWrapping="Wrap"
                                            Text="Buildings -> DirectShape&#x0a;Missing building heights -> DSM minus DTM fallback&#x0a;Roads, Tracks, Parcels, Parks, Water -> Floors or terrain subdivisions&#x0a;Terrain -> Toposolid from UK EA DTM"/>
                             </StackPanel>
@@ -226,7 +223,7 @@
                         <TextBlock x:Name="ValidationText"
                                    Grid.Row="7"
                                    Grid.ColumnSpan="3"
-                                   Foreground="#FFB42318"
+                                   Foreground="{StaticResource DangerBrush}"
                                    FontWeight="SemiBold"
                                    Visibility="Collapsed"
                                    TextWrapping="Wrap"/>
@@ -240,13 +237,13 @@
                           VerticalAlignment="Stretch"
                           ResizeBehavior="PreviousAndNext"
                           ResizeDirection="Columns"
-                          Background="#FFD7DCE6"
+                          Background="{StaticResource BorderBrush}"
                           ShowsPreview="True"/>
 
             <Border Grid.Column="2"
                     Margin="16,0,0,0"
-                    Background="White"
-                    BorderBrush="#FFD7DCE6"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="12">
                 <Grid Margin="18">
@@ -258,16 +255,16 @@
                                Margin="0,0,0,10">
                         <TextBlock DockPanel.Dock="Left"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF1D2738"
+                                   Foreground="{StaticResource TextBrush}"
                                    Text="Map Preview"/>
                         <TextBlock x:Name="MapHintText"
                                    Margin="12,0,0,0"
-                                   Foreground="#FF5E6B80"
+                                   Foreground="{StaticResource MutedBrush}"
                                    Text="Click map to choose the import center."/>
                     </DockPanel>
                     <Border Grid.Row="1"
-                            Background="#FFF2F5FA"
-                            BorderBrush="#FFD7DCE6"
+                            Background="{StaticResource WindowBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             ClipToBounds="True">
@@ -285,22 +282,22 @@
                     Width="110"
                     Height="34"
                     Margin="0,0,10,0"
-                    Background="White"
-                    BorderBrush="#FFD7DCE6"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     Content="Dry Run"/>
             <Button x:Name="RunButton"
                     Width="110"
                     Height="34"
                     Margin="0,0,10,0"
-                    Background="#FF2D6CDF"
+                    Background="{StaticResource InfoBrush}"
                     Foreground="White"
-                    BorderBrush="#FF2D6CDF"
+                    BorderBrush="{StaticResource InfoBrush}"
                     Content="Run"/>
             <Button x:Name="CancelButton"
                     Width="110"
                     Height="34"
-                    Background="White"
-                    BorderBrush="#FFD7DCE6"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     Content="Cancel"/>
         </StackPanel>
     </Grid>

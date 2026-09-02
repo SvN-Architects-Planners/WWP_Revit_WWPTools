@@ -9,7 +9,7 @@
         ResizeMode="CanResize"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#3F9AD9"/>
@@ -64,8 +64,8 @@
     </Window.Resources>
 
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -82,20 +82,20 @@
                 <TextBlock Grid.Row="0"
                            Text="Source color scheme"
                            Margin="0,0,0,6"
-                           Foreground="#6B7280"
+                           Foreground="{StaticResource MutedBrush}"
                            FontWeight="SemiBold"/>
                 <ComboBox x:Name="SourceSchemeCombo" Grid.Row="1" Margin="0,0,0,12"/>
 
                 <TextBlock Grid.Row="2"
                            Text="Target color scheme"
                            Margin="0,0,0,6"
-                           Foreground="#6B7280"
+                           Foreground="{StaticResource MutedBrush}"
                            FontWeight="SemiBold"/>
                 <ComboBox x:Name="TargetSchemeCombo" Grid.Row="3" Margin="0,0,0,12"/>
 
                 <TextBlock x:Name="ValidationText"
                            Grid.Row="4"
-                           Foreground="#C43D3D"
+                           Foreground="{StaticResource DangerBrush}"
                            Visibility="Collapsed"
                            TextWrapping="Wrap"
                            Margin="0,0,0,8"
@@ -106,7 +106,7 @@
                               Margin="0,0,0,10"
                               Content="Create new scheme in target scope (leave selected target unchanged)" />
 
-                    <TextBlock Foreground="#6B7280"
+                    <TextBlock Foreground="{StaticResource MutedBrush}"
                                FontSize="13"
                                TextWrapping="Wrap"
                                Text="Unchecked: overwrites the selected target scheme. Checked: creates a new scheme in the selected target scope and copies into it."/>

@@ -9,7 +9,7 @@
         ResizeMode="NoResize"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#3F9AD9"/>
@@ -60,8 +60,8 @@
     </Window.Resources>
 
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -101,7 +101,7 @@
                                Margin="0,0,12,12"
                                VerticalAlignment="Center"
                                Text="Mass Typical Floor Area"
-                               Foreground="#374151"/>
+                               Foreground="{StaticResource TextBrush}"/>
                     <ComboBox x:Name="AreaParamCombo"
                               Grid.Row="0"
                               Grid.Column="1"
@@ -112,7 +112,7 @@
                                Margin="0,0,12,12"
                                VerticalAlignment="Center"
                                Text="Mass Included Levels"
-                               Foreground="#374151"/>
+                               Foreground="{StaticResource TextBrush}"/>
                     <ComboBox x:Name="CountParamCombo"
                               Grid.Row="1"
                               Grid.Column="1"
@@ -123,7 +123,7 @@
                                Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                Text="Mass Highest Level"
-                               Foreground="#374151"/>
+                               Foreground="{StaticResource TextBrush}"/>
                     <ComboBox x:Name="HighestLevelParamCombo"
                               Grid.Row="2"
                               Grid.Column="1"/>

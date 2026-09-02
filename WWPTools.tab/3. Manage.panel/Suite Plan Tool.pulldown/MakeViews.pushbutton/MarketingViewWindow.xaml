@@ -6,7 +6,7 @@
     MinWidth="560" MinHeight="500"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,9 +19,9 @@
         <StackPanel Grid.Row="0">
             <TextBlock Text="Make Marketing View"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap" />
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
             <TextBlock Text="Create a cropped marketing view and sheet for each selected area."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
 
@@ -30,7 +30,7 @@
             <StackPanel>
 
                 <!-- Area and Door info -->
-                <Border Background="White" BorderBrush="#D9E2EC" BorderThickness="1"
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                         Padding="14,10" Margin="0,0,0,12">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -40,19 +40,19 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Selected Area"
-                                       FontSize="11" Foreground="#4F6478" />
+                                       FontSize="11" Foreground="{StaticResource MutedBrush}" />
                             <TextBlock x:Name="AreaLabel"
                                        Text="(not selected)"
                                        FontSize="13" FontWeight="SemiBold"
-                                       Foreground="#17324D" TextWrapping="Wrap" />
+                                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="Entry Door"
-                                       FontSize="11" Foreground="#4F6478" />
+                                       FontSize="11" Foreground="{StaticResource MutedBrush}" />
                             <TextBlock x:Name="DoorLabel"
                                        Text="(not found)"
                                        FontSize="13" FontWeight="SemiBold"
-                                       Foreground="#17324D" TextWrapping="Wrap" />
+                                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -60,10 +60,10 @@
                 <!-- Sheet Settings section header -->
                 <TextBlock Text="Sheet Settings"
                            FontSize="13" FontWeight="SemiBold"
-                           Foreground="#17324D" Margin="0,0,0,6" />
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,6" />
 
                 <!-- Sheet Settings fields -->
-                <Border Background="White" BorderBrush="#D9E2EC" BorderThickness="1"
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                         Padding="14,12" Margin="0,0,0,12">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -78,31 +78,31 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0"
                                    Text="Sheet Number Parameter:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="SheetNumberParamCombo"
                                   Grid.Row="0" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Sheet Name Parameter:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="SheetNameParamCombo"
                                   Grid.Row="2" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
                     </Grid>
                 </Border>
 
                 <!-- View Settings section header -->
                 <TextBlock Text="View Settings"
                            FontSize="13" FontWeight="SemiBold"
-                           Foreground="#17324D" Margin="0,0,0,6" />
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,6" />
 
                 <!-- View Settings fields -->
-                <Border Background="White" BorderBrush="#D9E2EC" BorderThickness="1"
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                         Padding="14,12" Margin="0,0,0,12">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -117,44 +117,44 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0"
                                    Text="View Template:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="TemplateCombo"
                                   Grid.Row="0" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Titleblock:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="TitleblockCombo"
                                   Grid.Row="2" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
                     </Grid>
                 </Border>
 
                 <!-- Options section header -->
                 <TextBlock Text="Options"
                            FontSize="13" FontWeight="SemiBold"
-                           Foreground="#17324D" Margin="0,0,0,6" />
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,6" />
 
                 <!-- Options fields -->
-                <Border Background="White" BorderBrush="#D9E2EC" BorderThickness="1"
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                         Padding="14,12" Margin="0,0,0,12">
                     <CheckBox x:Name="OverwriteCheckBox"
                               Content="Overwrite existing sheets with the same sheet number"
-                              FontSize="12" Foreground="#17324D" />
+                              FontSize="12" Foreground="{StaticResource TextBrush}" />
                 </Border>
 
                 <!-- Keyplan section header -->
                 <TextBlock Text="Keyplan"
                            FontSize="13" FontWeight="SemiBold"
-                           Foreground="#17324D" Margin="0,0,0,6" />
+                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,6" />
 
                 <!-- Keyplan fields -->
-                <Border Background="White" BorderBrush="#D9E2EC" BorderThickness="1"
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                         Padding="14,12" Margin="0,0,0,4">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -172,31 +172,31 @@
                         <CheckBox x:Name="KeyplanCheckBox"
                                   Grid.Row="0" Grid.ColumnSpan="2"
                                   Content="Create keyplan view alongside marketing view"
-                                  FontSize="12" Foreground="#17324D" />
+                                  FontSize="12" Foreground="{StaticResource TextBrush}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0"
                                    Text="Keyplan Template:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="KeyplanTemplateCombo"
                                   Grid.Row="2" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
 
                         <TextBlock Grid.Row="4" Grid.Column="0"
                                    Text="Fill Type:"
-                                   FontSize="12" Foreground="#17324D"
+                                   FontSize="12" Foreground="{StaticResource TextBrush}"
                                    VerticalAlignment="Center" />
                         <ComboBox x:Name="FillTypeCombo"
                                   Grid.Row="4" Grid.Column="1"
                                   Height="30" FontSize="12"
-                                  Background="White" BorderBrush="#D9E2EC" />
+                                  Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
                     </Grid>
                 </Border>
 
                 <!-- Validation text -->
                 <TextBlock x:Name="ValidationText"
-                           Foreground="#B42318" FontSize="12"
+                           Foreground="{StaticResource DangerBrush}" FontSize="12"
                            TextWrapping="Wrap"
                            Visibility="Collapsed"
                            Margin="0,8,0,0" />
@@ -213,13 +213,13 @@
                 <Button x:Name="CancelButton"
                         Content="Cancel" Width="90" Height="34"
                         FontSize="13"
-                        Background="White" Foreground="#17324D"
-                        BorderBrush="#D9E2EC" Cursor="Hand"
+                        Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" Cursor="Hand"
                         Margin="0,0,8,0" />
                 <Button x:Name="OkButton"
                         Content="Create" Width="100" Height="34"
                         FontSize="13" FontWeight="SemiBold"
-                        Background="#1976D2" Foreground="White"
+                        Background="{StaticResource InfoBrush}" Foreground="White"
                         BorderThickness="0" Cursor="Hand" />
             </StackPanel>
         </Grid>

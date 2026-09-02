@@ -22,6 +22,7 @@ to remain.
 """
 #pylint: disable=import-error,invalid-name,broad-except,superfluous-parens
 import re
+import sys
 import os.path as op
 import codecs
 import csv
@@ -43,6 +44,14 @@ from pyrevit import forms
 from pyrevit import revit, DB
 from pyrevit import script
 from pyrevit.compat import get_elementid_value_func
+
+script_dir = op.dirname(__file__)
+lib_path = op.abspath(op.join(script_dir, "..", "..", "..", "..", "lib"))
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
+
+import WWP_uiUtils as ui
+ui.uiUtils_ensure_theme()
 
 try:
     from Microsoft.Win32 import OpenFileDialog, SaveFileDialog

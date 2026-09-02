@@ -181,6 +181,37 @@ def _ensure_theme():
 	_THEME_LOADED = True
 
 
+def uiUtils_ensure_theme():
+	"""Load the shared WWPTools theme for command-local XAML dialogs."""
+	_ensure_theme()
+	return bool(_THEME_LOADED)
+
+
+def uiUtils_load_logo(image_control, logo_path=None):
+	"""Load the shared transparent logo without keeping the PNG file locked."""
+	if image_control is None:
+		return False
+	path = logo_path or os.path.join(_get_lib_dir(), "WWPtools-logo.png")
+	if not os.path.isfile(path):
+		return False
+	try:
+		from System import Uri
+		from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
+		bitmap = BitmapImage()
+		bitmap.BeginInit()
+		bitmap.CacheOption = BitmapCacheOption.OnLoad
+		bitmap.UriSource = Uri(path)
+		bitmap.EndInit()
+		try:
+			bitmap.Freeze()
+		except Exception:
+			pass
+		image_control.Source = bitmap
+		return True
+	except Exception:
+		return False
+
+
 def _load_window_xaml(xaml_filename):
 	from System.Windows.Markup import XamlReader
 	xaml_path = os.path.join(_get_lib_dir(), xaml_filename)
@@ -1017,3 +1048,12 @@ def uiUtils_match_property_select_params(
 	if result is None:
 		return None
 	return list(result.SelectedParams) if result.SelectedParams else []
+
+
+# Most command modules import WWP_uiUtils before parsing their local XAML.
+# Load the shared resource dictionary once so those dialogs can consume the
+# same semantic brushes and image styles as the compiled WPF views.
+try:
+	_ensure_theme()
+except Exception:
+	pass

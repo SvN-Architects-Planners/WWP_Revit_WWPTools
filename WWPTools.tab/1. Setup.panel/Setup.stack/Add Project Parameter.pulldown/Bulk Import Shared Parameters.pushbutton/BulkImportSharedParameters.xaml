@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterOwner"
         FontFamily="Segoe UI"
         FontSize="12"
-        Background="#FFF7F8FA">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF"/>
         <SolidColorBrush x:Key="PanelBorderBrush" Color="#FFD9DEE7"/>

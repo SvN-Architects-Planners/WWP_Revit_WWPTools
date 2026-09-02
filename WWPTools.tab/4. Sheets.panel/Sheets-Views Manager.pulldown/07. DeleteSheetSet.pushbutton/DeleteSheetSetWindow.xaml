@@ -6,7 +6,7 @@
     MinWidth="720" MinHeight="500"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,9 +18,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="Delete Sheet Set"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap" />
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
             <TextBlock Text="Filter by parameter, search, and delete the selected set while continuing to work in Revit."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
 
@@ -55,20 +55,20 @@
                 <!-- Filter Parameter label -->
                 <TextBlock Grid.Row="0"
                            FontSize="12" FontWeight="SemiBold"
-                           Foreground="#17324D" Text="Filter Parameter" />
+                           Foreground="{StaticResource TextBrush}" Text="Filter Parameter" />
 
                 <!-- Filter parameter combo -->
                 <ComboBox x:Name="FilterParamCombo"
                           Grid.Row="2"
                           Height="30"
                           FontSize="12"
-                          Background="White"
-                          BorderBrush="#D9E2EC" />
+                          Background="{StaticResource PanelBrush}"
+                          BorderBrush="{StaticResource BorderBrush}" />
 
                 <!-- Value label -->
                 <TextBlock Grid.Row="4"
                            FontSize="12" FontWeight="SemiBold"
-                           Foreground="#17324D" Text="Value" />
+                           Foreground="{StaticResource TextBrush}" Text="Value" />
 
                 <!-- Apply + Clear buttons on same row as Value label -->
                 <StackPanel Grid.Row="4"
@@ -77,20 +77,20 @@
                     <Button x:Name="ApplyFilterButton"
                             Content="Apply" Width="64" Height="24"
                             FontSize="11"
-                            Background="#1976D2" Foreground="White"
+                            Background="{StaticResource InfoBrush}" Foreground="White"
                             BorderThickness="0" Cursor="Hand" />
                     <Button x:Name="ClearFilterButton"
                             Content="Clear" Width="52" Height="24"
                             FontSize="11"
-                            Background="White" Foreground="#17324D"
-                            BorderBrush="#D9E2EC" Margin="4,0,0,0"
+                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                            BorderBrush="{StaticResource BorderBrush}" Margin="4,0,0,0"
                             Cursor="Hand" />
                 </StackPanel>
 
                 <!-- Value list -->
                 <Border Grid.Row="6"
-                        BorderBrush="#D9E2EC" BorderThickness="1"
-                        Background="White">
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        Background="{StaticResource PanelBrush}">
                     <ListBox x:Name="FilterValueList"
                              SelectionMode="Extended"
                              BorderThickness="0"
@@ -101,7 +101,7 @@
                 <!-- Search label -->
                 <TextBlock Grid.Row="8"
                            FontSize="12" FontWeight="SemiBold"
-                           Foreground="#17324D" Text="Search" />
+                           Foreground="{StaticResource TextBrush}" Text="Search" />
 
                 <!-- Search box -->
                 <TextBox x:Name="SearchBox"
@@ -110,28 +110,28 @@
                          FontSize="12"
                          VerticalContentAlignment="Center"
                          Padding="6,0"
-                         BorderBrush="#D9E2EC"
-                         Background="White" />
+                         BorderBrush="{StaticResource BorderBrush}"
+                         Background="{StaticResource PanelBrush}" />
 
                 <!-- Select All / None / Invert -->
                 <WrapPanel Grid.Row="12" Orientation="Horizontal">
                     <Button x:Name="SelectAllButton"
                             Content="Select All" Width="88" Height="28"
                             FontSize="11"
-                            Background="White" Foreground="#17324D"
-                            BorderBrush="#D9E2EC"
+                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             Margin="0,0,4,4" Cursor="Hand" />
                     <Button x:Name="SelectNoneButton"
                             Content="None" Width="64" Height="28"
                             FontSize="11"
-                            Background="White" Foreground="#17324D"
-                            BorderBrush="#D9E2EC"
+                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             Margin="0,0,4,4" Cursor="Hand" />
                     <Button x:Name="InvertButton"
                             Content="Invert" Width="64" Height="28"
                             FontSize="11"
-                            Background="White" Foreground="#17324D"
-                            BorderBrush="#D9E2EC"
+                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             Margin="0,0,0,4" Cursor="Hand" />
                 </WrapPanel>
 
@@ -139,7 +139,7 @@
                 <TextBlock x:Name="CountLabel"
                            Grid.Row="14"
                            FontSize="11"
-                           Foreground="#4F6478"
+                           Foreground="{StaticResource MutedBrush}"
                            TextWrapping="Wrap"
                            VerticalAlignment="Bottom" />
             </Grid>
@@ -170,10 +170,10 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
                                FontSize="12" FontWeight="SemiBold"
-                               Foreground="#17324D" Text="Available Sheets" />
+                               Foreground="{StaticResource TextBrush}" Text="Available Sheets" />
                     <Border Grid.Row="2"
-                            BorderBrush="#D9E2EC" BorderThickness="1"
-                            Background="White">
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Background="{StaticResource PanelBrush}">
                         <ListBox x:Name="AvailableList"
                                  BorderThickness="0"
                                  FontSize="12"
@@ -191,14 +191,14 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
                                FontSize="12" FontWeight="SemiBold"
-                               Foreground="#17324D" Text="Sheets To Delete" />
+                               Foreground="{StaticResource TextBrush}" Text="Sheets To Delete" />
                     <Border Grid.Row="2"
-                            BorderBrush="#D9E2EC" BorderThickness="1"
-                            Background="#FAFBFC">
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Background="{StaticResource WindowBrush}">
                         <ListBox x:Name="PreviewList"
                                  BorderThickness="0"
                                  FontSize="12"
-                                 Foreground="#4F6478"
+                                 Foreground="{StaticResource MutedBrush}"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />
                     </Border>
                 </Grid>
@@ -215,7 +215,7 @@
             <TextBlock x:Name="ValidationText"
                        Grid.Column="0"
                        VerticalAlignment="Center"
-                       Foreground="#B42318"
+                       Foreground="{StaticResource DangerBrush}"
                        FontSize="12"
                        TextWrapping="Wrap"
                        Visibility="Collapsed" />
@@ -224,20 +224,20 @@
                 <Button x:Name="RefreshButton"
                         Content="Refresh" Width="90" Height="34"
                         FontSize="13"
-                        Background="White" Foreground="#17324D"
-                        BorderBrush="#D9E2EC"
+                        Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
                         Margin="0,0,8,0" Cursor="Hand" />
                 <Button x:Name="DeleteButton"
                         Content="Delete Selected" Width="140" Height="34"
                         FontSize="13" FontWeight="SemiBold"
-                        Background="#B42318" Foreground="White"
+                        Background="{StaticResource DangerBrush}" Foreground="White"
                         BorderThickness="0"
                         Margin="0,0,8,0" Cursor="Hand" />
                 <Button x:Name="CloseButton"
                         Content="Close" Width="90" Height="34"
                         FontSize="13"
-                        Background="White" Foreground="#17324D"
-                        BorderBrush="#D9E2EC"
+                        Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
                         Cursor="Hand" />
             </StackPanel>
         </Grid>

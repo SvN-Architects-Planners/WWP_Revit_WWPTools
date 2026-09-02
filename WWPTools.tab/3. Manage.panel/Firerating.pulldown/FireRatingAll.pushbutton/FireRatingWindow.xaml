@@ -6,7 +6,7 @@
     MinWidth="420" MinHeight="260"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -21,15 +21,15 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="Create Fire Rating Lines"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap"/>
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             <TextBlock Text="Draws detail lines along wall centerlines based on the FRR parameter value. If a line style is not found automatically, a mapping dialog will appear."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Wall count -->
         <TextBlock Grid.Row="1" x:Name="LblWallCount"
-                   FontSize="12" Foreground="#4F6478" Margin="0,0,0,12"/>
+                   FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
 
         <!-- FRR Param -->
         <Grid Grid.Row="2" Margin="0,0,0,8">
@@ -39,17 +39,17 @@
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="FRR Instance Parameter:"
                        VerticalAlignment="Center"
-                       Foreground="#17324D" FontSize="13"/>
+                       Foreground="{StaticResource TextBrush}" FontSize="13"/>
             <TextBox Grid.Column="1" x:Name="TxtFrrParam"
                      Height="32" Padding="8,4"
-                     BorderBrush="#D9E2EC" BorderThickness="1"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                      FontSize="13" VerticalContentAlignment="Center"
                      ToolTip="The instance parameter name on walls that stores the FRR rating (e.g. FRR, FRR Walls)"/>
         </Grid>
 
         <!-- Status -->
         <TextBlock Grid.Row="4" x:Name="LblStatus"
-                   Foreground="#B42318" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" FontSize="12"
                    Margin="0,4,0,8" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
@@ -62,12 +62,12 @@
             </Grid.ColumnDefinitions>
             <Button Grid.Column="1" x:Name="BtnCancel"
                     Content="Cancel" Width="90" Height="34" FontSize="13"
-                    Background="White" BorderBrush="#D9E2EC"
-                    Foreground="#17324D" Cursor="Hand"/>
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
             <Button Grid.Column="3" x:Name="BtnRun"
                     Content="Create Lines" Width="110" Height="34"
                     FontSize="13" FontWeight="SemiBold"
-                    Background="#17324D" Foreground="White"
+                    Background="{StaticResource AccentBrush}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"/>
         </Grid>
     </Grid>

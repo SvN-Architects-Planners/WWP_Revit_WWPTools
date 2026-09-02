@@ -38,41 +38,58 @@ if confirm_response == 1:
         if config.has_option("CloudModelCache", "CacheLocation"):
             revit_cloud_local_path = config.get("CloudModelCache", "CacheLocation")
 
-    print(collab_cache_path)
-    print(journal_path)
-    print(temp_path)
-    print(revit_cloud_local_path)
-    
     subprocess.Popen(['explorer', collab_cache_path])
     subprocess.Popen(['explorer', journal_path])
     subprocess.Popen(['explorer', temp_path])
     subprocess.Popen(['explorer', revit_cloud_local_path])
 
+    stats = {
+        "deleted_files": 0,
+        "deleted_folders": 0,
+        "skipped_targets": 0,
+        "failed_files": 0,
+        "failed_folders": 0,
+    }
+
     def delete_files_and_folders(directory):
         if not directory or not os.path.isdir(directory):
-            print("Skip missing directory: " + str(directory))
+            stats["skipped_targets"] += 1
             return
         for root, dirs, files in os.walk(directory, topdown=False):
             for name in files:
                 file_path = os.path.join(root, name)
                 try:
                     os.remove(file_path)
-                    print("Deleted file: " + file_path)
-                except Exception as e:
-                    print("Error deleting file: " + file_path)
-                    print("Error message: " + str(e))
+                    stats["deleted_files"] += 1
+                except Exception:
+                    stats["failed_files"] += 1
             for name in dirs:
                 dir_path = os.path.join(root, name)
                 try:
                     os.rmdir(dir_path)
-                except Exception as e:
-                    print("Error deleting folder: " + dir_path)
-                    print("Error message: " + str(e))
+                    stats["deleted_folders"] += 1
+                except Exception:
+                    stats["failed_folders"] += 1
 
     delete_files_and_folders(collab_cache_path)
     delete_files_and_folders(journal_path)
     delete_files_and_folders(temp_path)
     delete_files_and_folders(revit_cloud_local_path)
+
+    print(
+        "Cleaning complete.\n"
+        "Deleted: {0} ({1} files, {2} folders).\n"
+        "Skipped: {3} missing target directories.\n"
+        "Failed: {4} ({5} files, {6} folders).".format(
+            stats["deleted_files"] + stats["deleted_folders"],
+            stats["deleted_files"],
+            stats["deleted_folders"],
+            stats["skipped_targets"],
+            stats["failed_files"] + stats["failed_folders"],
+            stats["failed_files"],
+            stats["failed_folders"],
+        )
+    )
 
 else:
     print("Cleaning process cancelled.")

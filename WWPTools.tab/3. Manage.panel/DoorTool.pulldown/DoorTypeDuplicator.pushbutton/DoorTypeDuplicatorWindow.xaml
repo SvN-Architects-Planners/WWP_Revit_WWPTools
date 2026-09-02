@@ -6,7 +6,7 @@
     MinWidth="460" MinHeight="460"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -22,18 +22,18 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Door Type Duplicator"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap"/>
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             <TextBlock Text="Select a door type to duplicate, then enter a name for the new type."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Door type list -->
-        <Border Grid.Row="1" BorderBrush="#D9E2EC" BorderThickness="1"
+        <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                 CornerRadius="4" Margin="0,0,0,10">
             <ListBox x:Name="LstDoorTypes"
-                     Background="White" BorderThickness="0"
-                     FontSize="13" Foreground="#17324D"
+                     Background="{StaticResource PanelBrush}" BorderThickness="0"
+                     FontSize="13" Foreground="{StaticResource TextBrush}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"/>
         </Border>
 
@@ -45,17 +45,17 @@
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="New Type Name:"
                        VerticalAlignment="Center"
-                       Foreground="#17324D" FontSize="13"/>
+                       Foreground="{StaticResource TextBrush}" FontSize="13"/>
             <TextBox Grid.Column="1" x:Name="TxtNewName"
                      Height="32" Padding="8,4"
-                     BorderBrush="#D9E2EC" BorderThickness="1"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                      FontSize="13" VerticalContentAlignment="Center"/>
         </Grid>
 
         <!-- Custom size toggle -->
         <CheckBox Grid.Row="3" x:Name="ChkCustomSize"
                   Content="Set custom dimensions (mm)"
-                  Foreground="#17324D" FontSize="13"
+                  Foreground="{StaticResource TextBrush}" FontSize="13"
                   Margin="0,0,0,6" Cursor="Hand"/>
 
         <!-- Custom size panel -->
@@ -70,25 +70,25 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Width (mm):"
                            VerticalAlignment="Center"
-                           Foreground="#17324D" FontSize="13"/>
+                           Foreground="{StaticResource TextBrush}" FontSize="13"/>
                 <TextBox Grid.Column="1" x:Name="TxtWidth"
                          Height="30" Padding="6,4"
-                         BorderBrush="#D9E2EC" BorderThickness="1"
+                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                          FontSize="13" VerticalContentAlignment="Center"/>
                 <TextBlock Grid.Column="2"/>
                 <TextBlock Grid.Column="3" Text="Height (mm):"
                            VerticalAlignment="Center"
-                           Foreground="#17324D" FontSize="13"/>
+                           Foreground="{StaticResource TextBrush}" FontSize="13"/>
                 <TextBox Grid.Column="4" x:Name="TxtHeight"
                          Height="30" Padding="6,4"
-                         BorderBrush="#D9E2EC" BorderThickness="1"
+                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                          FontSize="13" VerticalContentAlignment="Center"/>
             </Grid>
         </StackPanel>
 
         <!-- Status -->
         <TextBlock Grid.Row="5" x:Name="LblStatus"
-                   Foreground="#B42318" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" FontSize="12"
                    Margin="0,4,0,8" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
@@ -102,12 +102,12 @@
             <Button Grid.Column="1" x:Name="BtnCancel"
                     Content="Cancel" Width="90" Height="34"
                     FontSize="13"
-                    Background="White" BorderBrush="#D9E2EC"
-                    Foreground="#17324D" Cursor="Hand"/>
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
             <Button Grid.Column="3" x:Name="BtnDuplicate"
                     Content="Duplicate" Width="100" Height="34"
                     FontSize="13" FontWeight="SemiBold"
-                    Background="#17324D" Foreground="White"
+                    Background="{StaticResource AccentBrush}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"/>
         </Grid>
     </Grid>

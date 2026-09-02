@@ -677,19 +677,10 @@ def _show_inputs_form(
     if type_options:
         type_combo.SelectedIndex = 0
 
-    try:
-        from System import Uri
-        from System.Windows.Media.Imaging import BitmapImage
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if os.path.isfile(logo_path):
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path)
-            bitmap.CacheOption = BitmapImage.CacheOption.OnLoad
-            bitmap.EndInit()
-            logo_image.Source = bitmap
-    except Exception:
-        pass
+    _load_uiutils().uiUtils_load_logo(
+        logo_image,
+        os.path.join(lib_path, "WWPtools-logo.png"),
+    )
 
     def _update_breakdown_visibility(_sender, _args):
         checked = breakdown_check.IsChecked == True

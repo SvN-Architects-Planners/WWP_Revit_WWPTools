@@ -6,7 +6,7 @@
     MinWidth="420" MinHeight="300"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,9 +19,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Map FRR Values to Line Styles"
                        FontSize="18" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap"/>
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             <TextBlock Text="No matching line style was found for the values below. Select a line style for each, or choose &#x2014; Skip &#x2014; to ignore those walls."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
@@ -32,7 +32,7 @@
 
         <!-- Status -->
         <TextBlock Grid.Row="2" x:Name="LblStatus"
-                   Foreground="#B42318" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" FontSize="12"
                    Margin="0,4,0,8" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
@@ -45,12 +45,12 @@
             </Grid.ColumnDefinitions>
             <Button Grid.Column="1" x:Name="BtnCancel"
                     Content="Cancel" Width="90" Height="34" FontSize="13"
-                    Background="White" BorderBrush="#D9E2EC"
-                    Foreground="#17324D" Cursor="Hand"/>
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
             <Button Grid.Column="3" x:Name="BtnOK"
                     Content="Apply" Width="90" Height="34"
                     FontSize="13" FontWeight="SemiBold"
-                    Background="#17324D" Foreground="White"
+                    Background="{StaticResource AccentBrush}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"/>
         </Grid>
     </Grid>

@@ -1231,8 +1231,6 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
-    from System import Uri
-    from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
 
     window = _load_export_window()
     apply_window_title(window, "Export2Ex Beta")
@@ -1562,17 +1560,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         window.DialogResult = False
         window.Close()
 
-    try:
-        logo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib", "WWPtools-logo.png"))
-        if logo_image is not None and os.path.isfile(logo_path):
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path)
-            bitmap.CacheOption = BitmapCacheOption.OnLoad
-            bitmap.EndInit()
-            logo_image.Source = bitmap
-    except Exception:
-        pass
+    logo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib", "WWPtools-logo.png"))
+    ui.uiUtils_load_logo(logo_image, logo_path)
 
     from_schedule_toggle.Checked += lambda _sender, _args: _refresh_source_list()
     from_schedule_toggle.Unchecked += lambda _sender, _args: _refresh_source_list()

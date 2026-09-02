@@ -6,7 +6,7 @@
     MinWidth="400" MinHeight="260"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
-    Background="#F6F8FB">
+    Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,9 +19,9 @@
         <StackPanel Grid.Row="0">
             <TextBlock Text="Make Keyplans"
                        FontSize="20" FontWeight="SemiBold"
-                       Foreground="#17324D" TextWrapping="Wrap" />
+                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
             <TextBlock Text="Create keyplan views with a filled region highlighting the selected suite area(s)."
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
 
@@ -46,37 +46,37 @@
             <TextBlock Grid.Row="0" Grid.Column="0"
                        Text="Selected Area:"
                        FontSize="12" FontWeight="SemiBold"
-                       Foreground="#17324D" VerticalAlignment="Center" />
+                       Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
             <TextBlock x:Name="AreaLabel"
                        Grid.Row="0" Grid.Column="1"
                        Text="(not selected)"
-                       FontSize="12" Foreground="#4F6478"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}"
                        VerticalAlignment="Center" TextWrapping="Wrap" />
 
             <!-- Keyplan Template -->
             <TextBlock Grid.Row="2" Grid.Column="0"
                        Text="Keyplan Template:"
                        FontSize="12" FontWeight="SemiBold"
-                       Foreground="#17324D" VerticalAlignment="Center" />
+                       Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
             <ComboBox x:Name="TemplateCombo"
                       Grid.Row="2" Grid.Column="1"
                       Height="30" FontSize="12"
-                      Background="White" BorderBrush="#D9E2EC" />
+                      Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
 
             <!-- Fill Type -->
             <TextBlock Grid.Row="4" Grid.Column="0"
                        Text="Fill Type:"
                        FontSize="12" FontWeight="SemiBold"
-                       Foreground="#17324D" VerticalAlignment="Center" />
+                       Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
             <ComboBox x:Name="FillTypeCombo"
                       Grid.Row="4" Grid.Column="1"
                       Height="30" FontSize="12"
-                      Background="White" BorderBrush="#D9E2EC" />
+                      Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" />
 
             <!-- Validation -->
             <TextBlock x:Name="ValidationText"
                        Grid.Row="6" Grid.ColumnSpan="2"
-                       Foreground="#B42318" FontSize="12"
+                       Foreground="{StaticResource DangerBrush}" FontSize="12"
                        TextWrapping="Wrap" Visibility="Collapsed" />
         </Grid>
 
@@ -86,14 +86,14 @@
             <Button x:Name="OkButton"
                     Content="Create" Width="100" Height="34"
                     FontSize="13" FontWeight="SemiBold"
-                    Background="#1976D2" Foreground="White"
+                    Background="{StaticResource InfoBrush}" Foreground="White"
                     BorderThickness="0" Cursor="Hand"
                     Margin="0,0,8,0" />
             <Button x:Name="CancelButton"
                     Content="Cancel" Width="90" Height="34"
                     FontSize="13"
-                    Background="White" Foreground="#17324D"
-                    BorderBrush="#D9E2EC" Cursor="Hand" />
+                    Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" Cursor="Hand" />
         </StackPanel>
     </Grid>
 </Window>

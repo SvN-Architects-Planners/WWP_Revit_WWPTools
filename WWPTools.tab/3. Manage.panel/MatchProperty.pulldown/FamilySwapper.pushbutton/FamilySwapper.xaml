@@ -116,10 +116,10 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Family Swapper"
-                       FontSize="17" FontWeight="Medium" Foreground="#222222"/>
+                       FontSize="17" FontWeight="Medium" Foreground="{StaticResource TextBrush}"/>
             <TextBlock Text="Replace a titleblock family across sheets and remap instance parameters."
-                       FontSize="11" Foreground="#777777" Margin="0,3,0,10"/>
-            <Separator Background="#DDDDDD"/>
+                       FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,10"/>
+            <Separator Background="{StaticResource BorderBrush}"/>
         </StackPanel>
 
         <!-- Scrollable config -->
@@ -162,7 +162,7 @@
                 <GroupBox Header="Type mapping">
                     <StackPanel>
                         <TextBlock Text="Each source type maps to a target type."
-                                   FontSize="11" Foreground="#777777" Margin="0,0,0,6"/>
+                                   FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6"/>
                         <DataGrid x:Name="TypeGrid" MinHeight="56" MaxHeight="180" Margin="0,0,0,6">
                             <DataGrid.Columns>
                                 <DataGridComboBoxColumn Header="Source type"
@@ -183,7 +183,7 @@
                 <!-- Parameter Mapping -->
                 <GroupBox Header="Parameter mapping">
                     <StackPanel>
-                        <TextBlock FontSize="11" Foreground="#777777" Margin="0,0,0,6"
+                        <TextBlock FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6"
                                    TextWrapping="Wrap"
                                    Text="Map old parameter names to new names. Leave target blank to keep the same name. Click Discover to populate dropdowns from the project."/>
                         <DataGrid x:Name="ParamGrid" MinHeight="56" MaxHeight="200" Margin="0,0,0,6">
@@ -252,7 +252,7 @@
                 Margin="0,10,0,6"/>
 
         <!-- Log -->
-        <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="1" Background="#F7F7F7">
+        <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource SurfaceBrush}">
             <TextBox x:Name="LogBox"
                      IsReadOnly="True"
                      TextWrapping="Wrap"
@@ -261,7 +261,7 @@
                      Background="Transparent"
                      BorderThickness="0"
                      Padding="6,5"
-                     Foreground="#333333"/>
+                     Foreground="{StaticResource TextBrush}"/>
         </Border>
 
     </Grid>

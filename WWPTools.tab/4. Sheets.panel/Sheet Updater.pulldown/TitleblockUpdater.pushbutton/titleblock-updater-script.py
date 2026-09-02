@@ -7,7 +7,7 @@ from Autodesk.Revit import DB, UI
 
 from pyrevit import script
 from WWP_settings import get_tool_settings
-from WWP_uiUtils import uiUtils_alert
+from WWP_uiUtils import uiUtils_alert, uiUtils_load_logo
 from WWP_versioning import apply_window_title
 
 doc = __revit__.ActiveUIDocument.Document
@@ -1006,11 +1006,9 @@ def _show_titleblock_dialog(
     clr.AddReference("System.Xml")
 
     from System.IO import File, StringReader
-    from System import Uri
     from System.Windows import Visibility
     from System.Windows.Interop import WindowInteropHelper
     from System.Windows.Markup import XamlReader
-    from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
 
     xaml_path = os.path.join(os.path.dirname(__file__), "TitleblockUpdaterDialog.xaml")
@@ -1083,18 +1081,8 @@ def _show_titleblock_dialog(
     tab_control.SelectionChanged += _sync_action_label
     _sync_action_label()
 
-    try:
-        lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if logo_image is not None and os.path.isfile(logo_path):
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path)
-            bitmap.CacheOption = BitmapCacheOption.OnLoad
-            bitmap.EndInit()
-            logo_image.Source = bitmap
-    except Exception:
-        pass
+    lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
+    uiUtils_load_logo(logo_image, os.path.join(lib_path, "WWPtools-logo.png"))
 
     def _set_global_validation(message):
         if message:

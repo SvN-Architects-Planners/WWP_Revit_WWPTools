@@ -7,7 +7,7 @@
         MinWidth="820"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
-        Background="#FFF7F8FA">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="PanelBorderBrush" Color="#FFD9DEE7" />
@@ -298,13 +298,10 @@
         </DataGrid>
 
         <DockPanel Grid.Row="5">
-            <Image x:Name="LogoImage"
+            <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
                    DockPanel.Dock="Left"
-                   Width="56"
-                   Height="56"
                    VerticalAlignment="Bottom"
-                   HorizontalAlignment="Left"
-                   IsHitTestVisible="False" />
+                   HorizontalAlignment="Left" />
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">

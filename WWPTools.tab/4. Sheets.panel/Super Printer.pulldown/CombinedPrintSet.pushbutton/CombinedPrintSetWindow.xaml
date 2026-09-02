@@ -7,7 +7,7 @@
         MinHeight="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Background="#FFF7F7F9">
+        Background="{StaticResource WindowBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,8 +19,8 @@
 
         <Border Grid.Row="0"
                 Padding="16"
-                Background="White"
-                BorderBrush="#22000000"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
             <StackPanel>
@@ -30,7 +30,7 @@
                            Text="Combined Print Set"/>
                 <TextBlock x:Name="HeaderSubtitle"
                            Margin="0,6,0,0"
-                           Foreground="#66000000"
+                           Foreground="{StaticResource MutedBrush}"
                            TextWrapping="Wrap"
                            Text="Load sheets from open or closed Revit models, arrange the final order, and print one merged PDF drawing set."/>
             </StackPanel>
@@ -48,8 +48,8 @@
 
             <Border Grid.Column="0"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -119,8 +119,8 @@
 
             <Border Grid.Column="4"
                     Padding="16"
-                    Background="White"
-                    BorderBrush="#22000000"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Grid>
@@ -137,7 +137,7 @@
                                    FontWeight="SemiBold"
                                    Text="Ordered Print Set"/>
                         <TextBlock Margin="0,6,0,0"
-                                   Foreground="#66000000"
+                                   Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap"
                                    Text="The right-hand list defines the final PDF page order. Use the move buttons to sort sheets across models."/>
                     </StackPanel>
@@ -157,7 +157,7 @@
                                     Orientation="Horizontal">
                             <TextBlock x:Name="TxtSummary"
                                        VerticalAlignment="Center"
-                                       Foreground="#66000000"
+                                       Foreground="{StaticResource MutedBrush}"
                                        TextWrapping="Wrap"
                                        Text=""/>
                         </StackPanel>
@@ -189,7 +189,7 @@
 
                             <TextBlock x:Name="TxtWarning"
                                        Margin="0,10,0,0"
-                                       Foreground="#C62828"
+                                       Foreground="{StaticResource DangerBrush}"
                                        TextWrapping="Wrap"
                                        Text=""/>
                         </StackPanel>
@@ -229,7 +229,7 @@
                    LastChildFill="False">
             <TextBlock x:Name="FooterStatus"
                        VerticalAlignment="Center"
-                       Foreground="#66000000"
+                       Foreground="{StaticResource MutedBrush}"
                        Text=""/>
             <StackPanel Orientation="Horizontal"
                         DockPanel.Dock="Right">

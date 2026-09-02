@@ -408,6 +408,8 @@ def show_publish_mapping_dialog(param_names, xaml_dir, preselect=None):
         return None
 
     try:
+        import WWP_uiUtils as ui
+        ui.uiUtils_ensure_theme()
         clr.AddReference("PresentationFramework")
         clr.AddReference("PresentationCore")
         clr.AddReference("WindowsBase")

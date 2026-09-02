@@ -18,12 +18,11 @@ for assembly_name in (
         pass
 
 from System.IO import File, StringReader
-from System import Uri, Int64
+from System import Int64
 from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
-from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
 from System.Xml import XmlReader
 
 script_dir = os.path.dirname(__file__)
@@ -170,17 +169,10 @@ def _show_setup_dialog(scheme_names, level_names, defaults=None):
     except Exception:
         pass
 
-    try:
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if logo_image is not None and os.path.isfile(logo_path):
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path)
-            bitmap.CacheOption = BitmapCacheOption.OnLoad
-            bitmap.EndInit()
-            logo_image.Source = bitmap
-    except Exception:
-        pass
+    _load_uiutils().uiUtils_load_logo(
+        logo_image,
+        os.path.join(lib_path, "WWPtools-logo.png"),
+    )
 
     result = {"ok": False}
 

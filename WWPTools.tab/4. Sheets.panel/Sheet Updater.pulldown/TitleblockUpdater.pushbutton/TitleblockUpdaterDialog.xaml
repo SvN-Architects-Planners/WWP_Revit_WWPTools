@@ -9,7 +9,7 @@
         ResizeMode="CanResize"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <SolidColorBrush x:Key="WindowBrush" Color="#F3F5F7" />
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
@@ -157,8 +157,8 @@
                                   Height="19"
                                   VerticalAlignment="Center">
                                 <Border x:Name="SwitchTrack"
-                                        Background="#B8C1CC"
-                                        BorderBrush="#AEB8C4"
+                                        Background="{StaticResource SelectedBrush}"
+                                        BorderBrush="{StaticResource BorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="9.5" />
                                 <Ellipse x:Name="SwitchThumb"
@@ -253,7 +253,7 @@
 
     <Grid Background="{StaticResource WindowBrush}" Margin="16">
         <Border Background="{StaticResource PanelBrush}"
-                BorderBrush="#D7DEE6"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -630,12 +630,9 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Image x:Name="LogoImage"
-                           Width="52"
-                           Height="52"
+                    <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
                            VerticalAlignment="Bottom"
-                           HorizontalAlignment="Left"
-                           IsHitTestVisible="False" />
+                           HorizontalAlignment="Left" />
                     <CheckBox x:Name="RememberChoicesCheckBox"
                               Grid.Column="1"
                               Content="Remember my choices for this project"

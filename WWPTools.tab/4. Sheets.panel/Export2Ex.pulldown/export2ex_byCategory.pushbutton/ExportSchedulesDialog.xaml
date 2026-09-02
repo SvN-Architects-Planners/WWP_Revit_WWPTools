@@ -9,7 +9,7 @@
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#3F9AD9"/>
@@ -40,8 +40,8 @@
         </Style>
     </Window.Resources>
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -62,7 +62,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0"
                                Text="Set name:"
-                               Foreground="#374151"
+                               Foreground="{StaticResource TextBrush}"
                                VerticalAlignment="Center"
                                FontSize="12"
                                Margin="0,0,8,0"/>
@@ -77,7 +77,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0"
                                Text="Sheet name:"
-                               Foreground="#374151"
+                               Foreground="{StaticResource TextBrush}"
                                VerticalAlignment="Center"
                                FontSize="12"
                                Margin="0,0,8,0"/>
@@ -86,7 +86,7 @@
 
                 <!-- Row 2: Mode toggle + Units selector -->
                 <Border Grid.Row="2"
-                        BorderBrush="#E2E8F0"
+                        BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,1,0,0"
                         Margin="0,12,0,0"
                         Padding="0,10,0,0">
@@ -95,7 +95,7 @@
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
                             <TextBlock Text="Units:"
-                                       Foreground="#6B7280"
+                                       Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
                                        VerticalAlignment="Center"
                                        Margin="0,0,6,0"/>
@@ -112,7 +112,7 @@
                                   Content="Category From Schedule"
                                   FontSize="13"
                                   FontWeight="SemiBold"
-                                  Foreground="#374151"
+                                  Foreground="{StaticResource TextBrush}"
                                   VerticalAlignment="Center"/>
                     </DockPanel>
                 </Border>
@@ -121,13 +121,13 @@
                 <StackPanel Grid.Row="3" Margin="0,10,0,0">
                     <TextBlock Name="SourceLabel"
                                Text="Search categories:"
-                               Foreground="#6B7280"
+                               Foreground="{StaticResource MutedBrush}"
                                FontSize="12"
                                Margin="0,0,0,2"/>
                     <TextBox Name="SourceSearchBox" Margin="0,0,0,4"/>
                     <TextBlock Name="SourceListLabel"
                                Text="Categories"
-                               Foreground="#6B7280"
+                               Foreground="{StaticResource MutedBrush}"
                                FontSize="12"
                                Margin="0,0,0,2"/>
                     <ListBox Name="SourceList"
@@ -152,7 +152,7 @@
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0"
                                    Text="Available Parameters:"
-                                   Foreground="#374151"
+                                   Foreground="{StaticResource TextBrush}"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,4"/>
                         <WrapPanel Grid.Row="1" Margin="0,0,0,4">
@@ -160,11 +160,11 @@
                                       Content="Show Read-Only"
                                       IsChecked="True"
                                       FontSize="12"
-                                      Foreground="#374151"
+                                      Foreground="{StaticResource TextBrush}"
                                       VerticalAlignment="Center"
                                       Margin="0,0,12,0"/>
                             <TextBlock Text="Search:"
-                                       Foreground="#6B7280"
+                                       Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
                                        VerticalAlignment="Center"
                                        Margin="0,0,4,0"/>
@@ -205,7 +205,7 @@
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0"
                                    Text="Selected Properties:"
-                                   Foreground="#374151"
+                                   Foreground="{StaticResource TextBrush}"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,4"/>
                         <ListBox Name="SelectedParameterList"

@@ -11,10 +11,25 @@
     <SolidColorBrush x:Key="AccentBrush"      Color="#18181B" />  <!-- zinc-900 (shadcn primary) -->
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#27272A" />  <!-- zinc-800 -->
     <SolidColorBrush x:Key="AccentPressBrush" Color="#3F3F46" />  <!-- zinc-700 -->
-    <SolidColorBrush x:Key="AccentSoftBrush"  Color="#F4F4F5" />  <!-- zinc-100 (hover bg) -->
+    <SolidColorBrush x:Key="AccentSoftBrush"  Color="#F4F4F5" />  <!-- zinc-100 (hover/selected bg) -->
     <SolidColorBrush x:Key="SelectedBrush"    Color="#E4E4E7" />  <!-- zinc-200 (selected bg) -->
     <SolidColorBrush x:Key="DangerBrush"      Color="#EF4444" />  <!-- red-500 -->
     <SolidColorBrush x:Key="DangerSoftBrush"  Color="#FEF2F2" />
+    <SolidColorBrush x:Key="InfoBrush"        Color="#2563EB" />
+    <SolidColorBrush x:Key="InfoSoftBrush"    Color="#EFF6FF" />
+    <SolidColorBrush x:Key="SuccessBrush"     Color="#16A34A" />
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="#F0FDF4" />
+    <SolidColorBrush x:Key="WarningBrush"     Color="#D97706" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#FFFBEB" />
+    <SolidColorBrush x:Key="OverlayBrush"     Color="#6609090B" />
+
+    <!-- WWPTools ribbon/brand palette -->
+    <SolidColorBrush x:Key="BrandSetupBrush"   Color="#3A449A" />
+    <SolidColorBrush x:Key="BrandContextBrush" Color="#2B8AC7" />
+    <SolidColorBrush x:Key="BrandManageBrush"  Color="#6AA747" />
+    <SolidColorBrush x:Key="BrandSheetsBrush"  Color="#ED691F" />
+    <SolidColorBrush x:Key="BrandCleanupBrush" Color="#54565A" />
+    <SolidColorBrush x:Key="BrandCueBrush"     Color="#FFDD47" />
 
     <!-- ═══════════════════════════════════════════════════ WINDOW -->
     <Style TargetType="Window">
@@ -23,6 +38,30 @@
         <Setter Property="FontSize"          Value="13.5" />
         <Setter Property="Foreground"        Value="{StaticResource TextBrush}" />
         <Setter Property="UseLayoutRounding" Value="True" />
+    </Style>
+
+    <!-- Shared surface compositions -->
+    <Style x:Key="WwpWindowFrame" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="20" />
+    </Style>
+
+    <Style x:Key="WwpCardSurface" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
+    <Style x:Key="WwpSectionHeading" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <!-- ════════════════════════════════════════════════ TEXTBLOCK -->
@@ -47,7 +86,7 @@
 
     <!-- ══════════════════════════════════════════════════ TOOLTIP -->
     <Style TargetType="ToolTip">
-        <Setter Property="Background" Value="#09090B" />
+        <Setter Property="Background" Value="#1C2333" />
         <Setter Property="Foreground" Value="#FFFFFF" />
         <Setter Property="Padding"    Value="9,5" />
         <Setter Property="FontSize"   Value="12" />
@@ -145,10 +184,10 @@
                 <Setter TargetName="Arrow" Property="Stroke"      Value="{StaticResource MutedBrush}" />
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
-                <Setter TargetName="Arrow" Property="Data"            Value="M 0 6.5 L 5 1.5 L 10 6.5" />
-                <Setter TargetName="Bd"    Property="BorderBrush"     Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="Arrow" Property="Data"        Value="M 0 6.5 L 5 1.5 L 10 6.5" />
+                <Setter TargetName="Bd"    Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                 <Setter TargetName="Bd"    Property="BorderThickness" Value="1.5" />
-                <Setter TargetName="Arrow" Property="Stroke"          Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="Arrow" Property="Stroke"      Value="{StaticResource AccentBrush}" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -352,7 +391,7 @@
         <Setter Property="BorderThickness"  Value="1" />
         <Setter Property="Height"           Value="32" />
         <Setter Property="Padding"          Value="18,0" />
-        <Setter Property="FontWeight"       Value="Medium" />
+        <Setter Property="FontWeight"       Value="SemiBold" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor"           Value="Hand" />
         <Setter Property="Template">
@@ -682,7 +721,7 @@
         <Setter Property="BorderThickness"  Value="1" />
         <Setter Property="Height"           Value="32" />
         <Setter Property="Padding"          Value="18,0" />
-        <Setter Property="FontWeight"       Value="Medium" />
+        <Setter Property="FontWeight"       Value="SemiBold" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor"           Value="Hand" />
         <Setter Property="Template">
@@ -724,7 +763,7 @@
         <Setter Property="BorderThickness"  Value="1" />
         <Setter Property="Height"           Value="32" />
         <Setter Property="Padding"          Value="18,0" />
-        <Setter Property="FontWeight"       Value="Medium" />
+        <Setter Property="FontWeight"       Value="SemiBold" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor"           Value="Hand" />
         <Setter Property="Template">
@@ -742,10 +781,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                            <Setter TargetName="Bd" Property="Background"  Value="{StaticResource AccentSoftBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBrush}" />
+                            <Setter TargetName="Bd" Property="Background"  Value="{StaticResource SelectedBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
@@ -801,7 +840,7 @@
         <Setter Property="BorderThickness"  Value="1" />
         <Setter Property="Height"           Value="32" />
         <Setter Property="Padding"          Value="18,0" />
-        <Setter Property="FontWeight"       Value="Medium" />
+        <Setter Property="FontWeight"       Value="SemiBold" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Cursor"           Value="Hand" />
         <Setter Property="Template">
@@ -833,6 +872,34 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Brand image roles. The PNG itself supplies transparent outer pixels. -->
+    <Style x:Key="BrandLogoHero" TargetType="Image">
+        <Setter Property="Width" Value="142" />
+        <Setter Property="Height" Value="142" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+    </Style>
+
+    <Style x:Key="BrandLogoFooter" TargetType="Image">
+        <Setter Property="Width" Value="56" />
+        <Setter Property="Height" Value="56" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+    </Style>
+
+    <Style x:Key="BrandLogoCompact" TargetType="Image">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
     </Style>
 
 </ResourceDictionary>

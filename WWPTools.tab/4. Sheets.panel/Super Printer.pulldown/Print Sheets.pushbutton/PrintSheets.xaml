@@ -20,7 +20,7 @@
         </Style>
 
         <ControlTemplate x:Key="Default" TargetType="{x:Type DataGridCell}">
-            <StackPanel Background="White">
+            <StackPanel Background="{StaticResource PanelBrush}">
                 <GridViewRowPresenter Content="{TemplateBinding Content}"
                                       Columns="{TemplateBinding GridView.ColumnCollection}"/>
             </StackPanel>

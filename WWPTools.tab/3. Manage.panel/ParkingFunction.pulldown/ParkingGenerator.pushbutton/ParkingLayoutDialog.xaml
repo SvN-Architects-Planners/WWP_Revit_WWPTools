@@ -9,7 +9,7 @@
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
         FontSize="13"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
 
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
@@ -123,15 +123,15 @@
         <!-- HEADER -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Parking Layout Solver"
-                       FontSize="17" FontWeight="SemiBold" Foreground="#17324D"/>
+                       FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
             <TextBlock Text="Pick a Room or Area boundary, configure spot types and layout, then Generate."
-                       FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                       FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0"/>
         </StackPanel>
 
         <!-- ROOM INFO CARD -->
         <Border Grid.Row="1"
-                Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Margin="0,0,0,10"
                 Padding="12,10">
@@ -146,7 +146,7 @@
                                Margin="0,0,0,3"/>
                     <TextBlock x:Name="RoomNameText"
                                Text="-"
-                               FontSize="14" FontWeight="SemiBold" Foreground="#17324D"/>
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                     <TextBlock Text="GROSS AREA"
@@ -154,7 +154,7 @@
                                HorizontalAlignment="Right" Margin="0,0,0,3"/>
                     <TextBlock x:Name="RoomAreaText"
                                Text="-"
-                               FontSize="14" FontWeight="SemiBold" Foreground="#17324D"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
                                HorizontalAlignment="Right"/>
                 </StackPanel>
             </Grid>
@@ -165,8 +165,8 @@
             <StackPanel>
 
                 <!-- SPOT TYPES CARD -->
-                <Border Background="#FFFFFF"
-                        BorderBrush="#D7DEE6"
+                <Border Background="{StaticResource PanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"
                         Margin="0,0,0,10"
                         Padding="12,10">
@@ -211,13 +211,13 @@
                         <StackPanel x:Name="RowsPanel"/>
 
                         <TextBlock Text="Count 0 = fill all remaining available positions."
-                                   FontSize="10" Foreground="#9CA3AF" Margin="0,5,0,0"/>
+                                   FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <!-- DIMENSIONS CARD -->
-                <Border Background="#FFFFFF"
-                        BorderBrush="#D7DEE6"
+                <Border Background="{StaticResource PanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"
                         Margin="0,0,0,10"
                         Padding="12,10">
@@ -243,7 +243,7 @@
                                      Text="2.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <!-- Stall depth -->
@@ -262,7 +262,7 @@
                                      Text="5.0" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <!-- Road / aisle width -->
@@ -281,7 +281,7 @@
                                      Text="6.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <Separator/>
@@ -305,7 +305,7 @@
                                      Text="0.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <!-- Perimetral mode -->
@@ -322,13 +322,13 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        Text="Adjust if stalls face the wrong direction after generate."
-                                       FontSize="11" Foreground="#9CA3AF"
+                                       FontSize="11" Foreground="{StaticResource MutedBrush}"
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                             <TextBox x:Name="RotationText" Grid.Column="1"
                                      Text="0" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="deg"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <!-- Max run -->
@@ -341,13 +341,13 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        Text="Max stalls before a mid-row gap. 0 = no limit."
-                                       FontSize="11" Foreground="#9CA3AF"
+                                       FontSize="11" Foreground="{StaticResource MutedBrush}"
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                             <TextBox x:Name="MaxRunText" Grid.Column="1"
                                      Text="0" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="#"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                         <!-- Max run gap width -->
@@ -360,13 +360,13 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        Text="Gap between runs (e.g. 0.5 m every N stalls)."
-                                       FontSize="11" Foreground="#9CA3AF"
+                                       FontSize="11" Foreground="{StaticResource MutedBrush}"
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                             <TextBox x:Name="MaxRunGapText" Grid.Column="1"
                                      Text="0.5" TextAlignment="Right" Margin="5,0"/>
                             <TextBlock Grid.Column="2" Text="m"
                                        VerticalAlignment="Center"
-                                       Foreground="#9CA3AF" FontSize="11"/>
+                                       Foreground="{StaticResource MutedBrush}" FontSize="11"/>
                         </Grid>
 
                     </StackPanel>
@@ -391,14 +391,14 @@
                 <TextBlock x:Name="StatusText"
                            Grid.Column="0"
                            Text="Ready. Configure settings and click Generate."
-                           FontSize="11" Foreground="#9CA3AF"
+                           FontSize="11" Foreground="{StaticResource MutedBrush}"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"/>
                 <TextBlock x:Name="StallCountText"
                            Grid.Column="1"
                            Text=""
                            FontSize="12" FontWeight="SemiBold"
-                           Foreground="#16A34A"
+                           Foreground="{StaticResource SuccessBrush}"
                            HorizontalAlignment="Right"
                            VerticalAlignment="Center"
                            Margin="10,0,0,0"/>
@@ -406,11 +406,9 @@
 
             <!-- Button row -->
             <DockPanel Grid.Row="1">
-                <Image x:Name="LogoImage"
+                <Image x:Name="LogoImage" Style="{StaticResource BrandLogoCompact}"
                        DockPanel.Dock="Left"
-                       Width="36" Height="36"
                        VerticalAlignment="Center"
-                       IsHitTestVisible="False"
                        Margin="0,0,10,0"/>
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"

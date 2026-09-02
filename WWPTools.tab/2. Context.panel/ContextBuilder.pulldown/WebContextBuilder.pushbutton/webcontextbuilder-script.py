@@ -13,13 +13,11 @@ import sys
 import traceback
 import xml.etree.ElementTree as ET
 
-from System import Uri
 from System.Collections.Generic import List
 from System.IO import File, StringReader
 from System.Windows import Visibility
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
-from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
 from System.Xml import XmlReader
 
 clr.AddReference("RevitAPI")
@@ -132,18 +130,7 @@ def _set_owner(window):
 
 
 def _load_logo(image_control):
-    try:
-        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
-        if image_control is None or not os.path.isfile(logo_path):
-            return
-        bitmap = BitmapImage()
-        bitmap.BeginInit()
-        bitmap.UriSource = Uri(logo_path)
-        bitmap.CacheOption = BitmapCacheOption.OnLoad
-        bitmap.EndInit()
-        image_control.Source = bitmap
-    except Exception:
-        pass
+    ui.uiUtils_load_logo(image_control, os.path.join(lib_path, "WWPtools-logo.png"))
 
 
 def _ensure_cache_dir(bucket_name):

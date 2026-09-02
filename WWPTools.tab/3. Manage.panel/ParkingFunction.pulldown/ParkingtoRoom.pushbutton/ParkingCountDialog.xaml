@@ -7,7 +7,7 @@
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
         FontSize="14"
-        Background="#F3F5F7">
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#3F9AD9"/>
@@ -76,8 +76,8 @@
         </Style>
     </Window.Resources>
     <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 Padding="20">
             <Grid>
@@ -90,7 +90,7 @@
                 <TextBlock Grid.Row="0"
                            Text="Select rooms/areas with parking"
                            Margin="0,0,0,10"
-                           Foreground="#6B7280"
+                           Foreground="{StaticResource MutedBrush}"
                            FontWeight="SemiBold"/>
 
                 <!-- Three-column main area -->
@@ -106,7 +106,7 @@
                         <TextBlock DockPanel.Dock="Top"
                                    Text="Rooms / areas"
                                    Margin="0,0,0,6"
-                                   Foreground="#6B7280"
+                                   Foreground="{StaticResource MutedBrush}"
                                    FontWeight="SemiBold"/>
                         <ListBox Name="RoomsList" SelectionMode="Extended"/>
                     </DockPanel>
@@ -116,7 +116,7 @@
                         <TextBlock DockPanel.Dock="Top"
                                    Text="Parking families to include"
                                    Margin="0,0,0,6"
-                                   Foreground="#6B7280"
+                                   Foreground="{StaticResource MutedBrush}"
                                    FontWeight="SemiBold"/>
                         <Grid DockPanel.Dock="Bottom" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
@@ -140,13 +140,13 @@
                     <StackPanel Grid.Column="2">
                         <TextBlock Text="Target text parameter to write"
                                    Margin="0,0,0,6"
-                                   Foreground="#6B7280"
+                                   Foreground="{StaticResource MutedBrush}"
                                    FontWeight="SemiBold"/>
                         <ComboBox Name="RoomParamCombo" Margin="0,0,0,12"/>
 
                         <TextBlock Text="Parking count source"
                                    Margin="0,0,0,6"
-                                   Foreground="#6B7280"
+                                   Foreground="{StaticResource MutedBrush}"
                                    FontWeight="SemiBold"/>
                         <ComboBox Name="CountParamCombo" Margin="0,0,0,16"/>
 
@@ -157,7 +157,7 @@
                         <TextBlock Name="TypeSourceLabel"
                                    Text="Type parameter"
                                    Margin="0,0,0,6"
-                                   Foreground="#6B7280"
+                                   Foreground="{StaticResource MutedBrush}"
                                    FontWeight="SemiBold"
                                    Visibility="Collapsed"/>
                         <ComboBox Name="TypeSourceCombo"
