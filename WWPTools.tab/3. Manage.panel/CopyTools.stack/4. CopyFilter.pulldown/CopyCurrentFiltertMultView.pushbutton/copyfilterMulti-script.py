@@ -71,6 +71,7 @@ class CopyCurrentFiltersDialog(object):
         self.result = None
 
         cfc.ensure_wpfui_theme(lib_path)
+        ui.uiUtils_ensure_theme()
         xaml_path = os.path.join(script_dir, "CopyCurrentFiltertMultViewWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
         self.window = XamlReader.Parse(xaml_text)

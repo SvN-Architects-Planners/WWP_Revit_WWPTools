@@ -83,6 +83,7 @@ def find_style_by_name(name, all_styles):
 class FireRatingAllDialog(object):
     def __init__(self, default_param):
         xaml_path = os.path.join(script_dir, "FireRatingWindow.xaml")
+        ui.uiUtils_ensure_theme()
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.window.Title = WINDOW_TITLE
         apply_window_title(self.window, WINDOW_TITLE)
@@ -140,6 +141,7 @@ class FRRMappingDialog(object):
 
     def __init__(self, unmapped_values, all_style_names, saved_map):
         xaml_path = os.path.join(script_dir, "FRRMappingWindow.xaml")
+        ui.uiUtils_ensure_theme()
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.window.Title = WINDOW_TITLE
         apply_window_title(self.window, WINDOW_TITLE)

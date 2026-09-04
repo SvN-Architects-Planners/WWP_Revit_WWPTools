@@ -586,6 +586,7 @@ class MarketingViewOptionsDialog(object):
                  sheet_number_param="", sheet_name_param=""):
         xaml_path = os.path.join(script_dir, "MarketingViewWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
+        uiutils.uiUtils_ensure_theme()
         self.window = XamlReader.Parse(xaml_text)
         self.window.Title = "Make Marketing View"
 

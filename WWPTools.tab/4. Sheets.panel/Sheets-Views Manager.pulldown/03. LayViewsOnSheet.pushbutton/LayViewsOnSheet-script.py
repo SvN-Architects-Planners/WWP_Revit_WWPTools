@@ -428,6 +428,7 @@ class LayoutPreviewWindow(object):
         self._drag_start_center = None
 
         ensure_wpfui_theme()
+        ui.uiUtils_ensure_theme()
         xaml_path = os.path.join(script_dir, "LayViewsOnSheetWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
         self.window = XamlReader.Parse(xaml_text)

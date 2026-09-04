@@ -1287,6 +1287,7 @@ def _show_export_form(
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
     xaml_text = File.ReadAllText(xaml_path)
+    load_uiutils().uiUtils_ensure_theme()
     reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
     apply_window_title(window, "Multiple Schedules Exporter")

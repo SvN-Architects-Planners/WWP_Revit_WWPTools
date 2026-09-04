@@ -53,6 +53,7 @@ def get_line_style_by_name(name):
 
 class FireLineDialog(object):
     def __init__(self, line_styles):
+        ui.uiUtils_ensure_theme()
         xaml_path = os.path.join(script_dir, "FireLineWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
         self.window = XamlReader.Parse(xaml_text)

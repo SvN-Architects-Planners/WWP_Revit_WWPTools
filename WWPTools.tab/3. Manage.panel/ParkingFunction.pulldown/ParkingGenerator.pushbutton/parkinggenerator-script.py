@@ -755,6 +755,7 @@ def _show_dialog(doc, room, families):
     xaml_path = os.path.join(script_dir, "ParkingLayoutDialog.xaml")
     if not os.path.isfile(xaml_path):
         raise Exception("Missing XAML: {}".format(xaml_path))
+    ui.uiUtils_ensure_theme()
     window = XamlReader.Parse(File.ReadAllText(xaml_path))
     apply_window_title(window, "Parking Layout Solver")
 

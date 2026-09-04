@@ -74,6 +74,7 @@ def _show_selection_dialog(display_names):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
     xaml_text = File.ReadAllText(xaml_path)
+    ui.uiUtils_ensure_theme()
     window = XamlReader.Parse(xaml_text)
     apply_window_title(window, "Copy Color Scheme")
     _set_owner(window)

@@ -848,6 +848,7 @@ def _load_export_window():
     from System.Xml import XmlReader
 
     xaml_path = os.path.join(os.path.dirname(__file__), "ExportSchedulesDialog.xaml")
+    load_uiutils().uiUtils_ensure_theme()
     sources = [
         ("file", lambda: File.ReadAllText(xaml_path)),
         ("embedded", lambda: EMBEDDED_EXPORT_DIALOG_XAML),

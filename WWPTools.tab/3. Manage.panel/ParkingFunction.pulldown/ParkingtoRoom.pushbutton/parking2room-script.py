@@ -640,6 +640,7 @@ def _show_inputs_form(
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
     xaml_text = File.ReadAllText(xaml_path)
+    _load_uiutils().uiUtils_ensure_theme()
     reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
     apply_window_title(window, TOOL_TITLE)

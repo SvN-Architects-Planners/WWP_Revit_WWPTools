@@ -373,6 +373,7 @@ class SheetDuplicatorDialog(object):
         self._loading = True
 
         ensure_wpfui_theme()
+        ui.uiUtils_ensure_theme()
         xaml_text = File.ReadAllText(os.path.join(script_dir, "SheetDuplicatorWindow.xaml"))
         self.window = XamlReader.Parse(xaml_text)
         self.window.Title = WINDOW_TITLE

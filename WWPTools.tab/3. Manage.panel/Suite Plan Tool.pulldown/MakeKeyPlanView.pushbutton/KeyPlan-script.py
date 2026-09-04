@@ -186,6 +186,7 @@ class KeyPlanOptionsDialog(object):
                  template_index=0, fill_type_index=0):
         xaml_path = os.path.join(script_dir, "KeyPlanWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
+        uiutils.uiUtils_ensure_theme()
         self.window = XamlReader.Parse(xaml_text)
         self.window.Title = "Make Keyplans"
 

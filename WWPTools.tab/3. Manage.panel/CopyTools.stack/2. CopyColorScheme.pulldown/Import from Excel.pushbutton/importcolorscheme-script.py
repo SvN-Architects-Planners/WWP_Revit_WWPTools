@@ -244,6 +244,7 @@ def _show_mapping_dialog(uidoc, workbook_info):
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
+    ui.uiUtils_ensure_theme()
     window = XamlReader.Parse(File.ReadAllText(xaml_path))
     _set_owner(window, uidoc)
 

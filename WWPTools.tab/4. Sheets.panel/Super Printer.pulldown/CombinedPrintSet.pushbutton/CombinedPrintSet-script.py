@@ -747,6 +747,7 @@ class CombinedPrintSetDialog(object):
         self._selected_source_key = None
 
         ensure_wpfui_theme()
+        ui.uiUtils_ensure_theme()
         xaml_path = os.path.join(script_dir, "CombinedPrintSetWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
         self.window = XamlReader.Parse(xaml_text)

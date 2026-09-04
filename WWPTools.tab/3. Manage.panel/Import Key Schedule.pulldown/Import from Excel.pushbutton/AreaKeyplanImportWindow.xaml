@@ -6,9 +6,9 @@
         MinHeight="560"
         MinWidth="820"
         ResizeMode="CanResize"
-        WindowStartupLocation="CenterOwner"
-        Background="{StaticResource WindowBrush}">
+        WindowStartupLocation="CenterOwner">
     <Window.Resources>
+        <SolidColorBrush x:Key="WindowBrush" Color="#FFF3F5F7" />
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="PanelBorderBrush" Color="#FFD9DEE7" />
         <SolidColorBrush x:Key="TitleBrush" Color="#FF152033" />
@@ -85,9 +85,18 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="BrandLogoFooter" TargetType="Image">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="20">
+    <Grid Margin="20" Background="{StaticResource WindowBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />

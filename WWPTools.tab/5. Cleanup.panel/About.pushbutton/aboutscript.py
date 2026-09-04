@@ -41,6 +41,7 @@ def _discover_repo():
 
 class AboutWindow(forms.WPFWindow):
     def __init__(self, xaml_file):
+        ui.uiUtils_ensure_theme()
         forms.WPFWindow.__init__(self, xaml_file)
 
         version = get_installed_version("dev")

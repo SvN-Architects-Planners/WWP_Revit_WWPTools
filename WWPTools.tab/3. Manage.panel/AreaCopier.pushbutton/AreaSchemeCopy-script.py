@@ -116,6 +116,7 @@ def _show_setup_dialog(scheme_names, level_names, defaults=None):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
     xaml_text = File.ReadAllText(xaml_path)
+    _load_uiutils().uiUtils_ensure_theme()
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)
     apply_window_title(window, "Copy Areas - Setup")

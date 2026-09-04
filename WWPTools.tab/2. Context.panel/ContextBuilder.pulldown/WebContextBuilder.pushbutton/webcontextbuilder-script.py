@@ -682,6 +682,7 @@ def _show_dialog(doc):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
     xaml_text = File.ReadAllText(xaml_path)
+    ui.uiUtils_ensure_theme()
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)
     apply_window_title(window, TITLE)

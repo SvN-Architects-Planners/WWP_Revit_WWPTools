@@ -54,6 +54,7 @@ class DoorTypeDuplicatorDialog(object):
     def __init__(self, door_types):
         xaml_path = os.path.join(script_dir, "DoorTypeDuplicatorWindow.xaml")
         xaml_text = File.ReadAllText(xaml_path)
+        ui.uiUtils_ensure_theme()
         self.window = XamlReader.Parse(xaml_text)
         self.window.Title = WINDOW_TITLE
         apply_window_title(self.window, WINDOW_TITLE)

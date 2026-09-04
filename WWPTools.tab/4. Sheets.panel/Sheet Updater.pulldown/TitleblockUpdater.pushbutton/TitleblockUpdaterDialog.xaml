@@ -8,8 +8,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         FontFamily="Segoe UI"
-        FontSize="14"
-        Background="{StaticResource WindowBrush}">
+        FontSize="14">
     <Window.Resources>
         <SolidColorBrush x:Key="WindowBrush" Color="#F3F5F7" />
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
@@ -22,6 +21,7 @@
         <SolidColorBrush x:Key="DangerBrush" Color="#C43D3D" />
         <SolidColorBrush x:Key="CardBrush" Color="#FAFBFC" />
         <SolidColorBrush x:Key="CardBorderBrush" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="SelectedBrush" Color="#E4E4E7" />
 
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
@@ -220,6 +220,15 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="BrandLogoFooter" TargetType="Image">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
         </Style>
 
         <Style x:Key="FlatTabItem" TargetType="TabItem">
